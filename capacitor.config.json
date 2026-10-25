@@ -1,0 +1,8 @@
+{
+  "appId": "ca.care.enfant",
+  "appName": "Care",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#F6F4FB"
+  }
+}

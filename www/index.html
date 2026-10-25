@@ -1,0 +1,1658 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFEDE5">
+<meta name="description" content="Care — Croissance, Activité, Rendez-vous, Éveil : le carnet de l'enfant de 0 à 18 ans">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}
+</style>
+<title>Care</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Figtree:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+/* Layout : coquille d'app — barre latérale (desktop) / onglets en bas (mobile), cartes douces.
+   L'ambiance (décor de fond, illustration, typo, arrondis) change avec le stade de l'enfant via [data-stage]. */
+:root{
+  --bg:#F6F4FB; --surface:#FFFFFF; --surface2:#F0EDF8; --line:#E4DFF0;
+  --ink:#2A2340; --muted:#736B8A; --soft:#A39BB8;
+  --peach:#FF9E7A; --peach-ink:#B24A22; --peach-bg:#FFEDE5;
+  --mint:#62C9A4; --mint-ink:#1E7A58; --mint-bg:#E2F6EE;
+  --butter:#FFD36E; --butter-ink:#8A6200; --butter-bg:#FFF5D9;
+  --sky:#7DB8F7; --sky-ink:#1F5E9E; --sky-bg:#E3F0FE;
+  --lilac:#A994F2; --lilac-ink:#5A3FB8; --lilac-bg:#EEE9FD;
+  --rose:#F47FA3; --rose-ink:#A3264F; --rose-bg:#FDE6EE;
+  --danger:#E0465E; --danger-bg:#FDE7EA;
+  --kid:var(--peach); --kid-bg:var(--peach-bg); --kid-ink:var(--peach-ink);
+  --shadow:0 1px 2px rgba(42,35,64,.06),0 8px 24px -12px rgba(42,35,64,.18);
+  --glass:rgba(255,255,255,.82);
+  --display:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+  --body:"Figtree","Segoe UI",system-ui,-apple-system,sans-serif;
+  --r-lg:22px; --r-md:16px; --deco-op:.55;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#17141F; --surface:#221E2E; --surface2:#2B2639; --line:#383148;
+  --ink:#F3F0FA; --muted:#B0A8C6; --soft:#7F7896;
+  --peach-ink:#FFB89E; --peach-bg:#3A2A2A; --mint-ink:#8EE3C2; --mint-bg:#1E3530;
+  --butter-ink:#FFD98A; --butter-bg:#38311F; --sky-ink:#A9D0FB; --sky-bg:#1F2D40;
+  --lilac-ink:#C9BBFA; --lilac-bg:#2D2645; --rose-ink:#F9A9C2; --rose-bg:#3B2230;
+  --danger:#FF7186; --danger-bg:#3D2027; --glass:rgba(34,30,46,.85); --deco-op:.28;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -14px rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17141F; --surface:#221E2E; --surface2:#2B2639; --line:#383148;
+  --ink:#F3F0FA; --muted:#B0A8C6; --soft:#7F7896;
+  --peach-ink:#FFB89E; --peach-bg:#3A2A2A; --mint-ink:#8EE3C2; --mint-bg:#1E3530;
+  --butter-ink:#FFD98A; --butter-bg:#38311F; --sky-ink:#A9D0FB; --sky-bg:#1F2D40;
+  --lilac-ink:#C9BBFA; --lilac-bg:#2D2645; --rose-ink:#F9A9C2; --rose-bg:#3B2230;
+  --danger:#FF7186; --danger-bg:#3D2027; --glass:rgba(34,30,46,.85); --deco-op:.28;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -14px rgba(0,0,0,.6); color-scheme:dark}
+/* Ados : typo plus géométrique, arrondis plus sobres */
+:root[data-stage="ado"]{ --display:"Outfit","Segoe UI",system-ui,sans-serif; --r-lg:16px; --r-md:12px }
+:root[data-stage="scol"]{ --r-lg:18px }
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:1.75rem;line-height:1.15} h2{font-size:1.2rem} h3{font-size:1.02rem;font-weight:600}
+p{margin:0}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:.86rem} .tiny{font-size:.76rem}
+.eyebrow{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+a{color:var(--kid-ink)}
+:focus-visible{outline:3px solid var(--lilac);outline-offset:2px;border-radius:8px}
+
+/* décor de fond selon l'âge */
+.deco{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:var(--deco-op)}
+.deco svg{width:100%;height:100%;display:block}
+
+/* shell */
+.app{position:relative;z-index:1;display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100%;max-width:1240px;margin:0 auto}
+.side{position:sticky;top:0;height:100vh;padding:24px 14px;display:flex;flex-direction:column;gap:18px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px}
+.brand b{font-family:var(--display);font-size:1.45rem;font-weight:700;letter-spacing:-.02em}
+.navlist{display:flex;flex-direction:column;gap:4px}
+.nav-btn{display:flex;align-items:center;gap:12px;padding:11px 12px;border:0;background:none;border-radius:14px;cursor:pointer;color:var(--muted);font-weight:600;text-align:left}
+.nav-btn svg{width:22px;height:22px;flex:none}
+.nav-btn:hover{background:var(--surface2);color:var(--ink)}
+.nav-btn[aria-current="page"]{background:var(--kid-bg);color:var(--kid-ink)}
+.main{min-width:0;padding-block:20px 120px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+.bottom{display:none}
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{display:none}
+  .main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 110px}
+  .bottom{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+  .bottom .nav-btn{flex-direction:column;gap:2px;font-size:.7rem;padding:7px 2px;justify-content:center;align-items:center;text-align:center}
+}
+
+/* topbar */
+.top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kids{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;padding:2px;scrollbar-width:none}
+.kid-pill{display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 14px 4px 4px;cursor:pointer;white-space:nowrap;font-weight:600}
+.kid-pill[aria-pressed="true"]{border-color:var(--kid);background:var(--kid-bg);color:var(--kid-ink)}
+.add-kid{border:1.5px dashed var(--soft);background:var(--surface);border-radius:999px;padding:6px 14px;cursor:pointer;color:var(--muted);font-weight:600;white-space:nowrap}
+.icon-btn{width:40px;height:40px;border-radius:14px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer;flex:none;padding:0}
+.icon-btn svg{width:20px;height:20px}
+.icon-btn.flat{border:0;background:none;width:32px;height:32px}
+.avatar{flex:none;border-radius:50%}
+img.avatar{object-fit:cover}
+
+/* cards */
+.grid{display:grid;gap:14px;grid-template-columns:repeat(12,minmax(0,1fr))}
+.c12{grid-column:span 12}.c8{grid-column:span 8}.c7{grid-column:span 7}.c6{grid-column:span 6}.c5{grid-column:span 5}.c4{grid-column:span 4}
+@media (max-width:1000px){.c4{grid-column:span 6}.c8,.c7,.c5{grid-column:span 12}}
+@media (max-width:640px){.c4,.c6{grid-column:span 12}}
+.card{background:var(--surface);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow);min-width:0;display:flex;flex-direction:column;gap:12px}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tint{background:var(--kid-bg);box-shadow:none}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:10px}
+.between{justify-content:space-between}
+
+/* hero */
+.hero{position:relative;overflow:hidden;background:var(--kid-bg);border-radius:calc(var(--r-lg) + 6px);padding:22px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:18px;align-items:center}
+.hero h1{font-size:clamp(1.6rem,4vw,2.2rem)}
+.hero .age{font-family:var(--display);font-size:1.12rem;color:var(--kid-ink);font-weight:500}
+.hero-illu{width:150px;height:120px;flex:none}
+@media (max-width:640px){.hero{grid-template-columns:auto minmax(0,1fr)}.hero-illu{display:none}}
+@media (max-width:420px){.hero{grid-template-columns:1fr}}
+
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:700;background:var(--surface2);color:var(--muted);white-space:nowrap}
+.chip.peach{background:var(--peach-bg);color:var(--peach-ink)}.chip.mint{background:var(--mint-bg);color:var(--mint-ink)}
+.chip.butter{background:var(--butter-bg);color:var(--butter-ink)}.chip.sky{background:var(--sky-bg);color:var(--sky-ink)}
+.chip.lilac{background:var(--lilac-bg);color:var(--lilac-ink)}.chip.rose{background:var(--rose-bg);color:var(--rose-ink)}
+.chip.danger{background:var(--danger-bg);color:var(--danger)}
+button.chip{border:0;cursor:pointer}
+button.chip[aria-pressed="false"]{opacity:.5;text-decoration:line-through}
+
+.stat{display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat .v{font-family:var(--display);font-size:1.5rem;font-weight:600;line-height:1.1}
+.stat .v small{font-size:.85rem;color:var(--muted);font-weight:500;margin-left:2px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:14px;padding:10px 16px;font-weight:700;cursor:pointer;background:var(--ink);color:var(--surface);text-decoration:none}
+.btn.kid{background:var(--kid);color:#2A1A10}
+.btn.ghost{background:var(--surface2);color:var(--ink)}
+.btn.line{background:none;border:1.5px solid var(--line);color:var(--ink)}
+.btn.danger{background:var(--danger-bg);color:var(--danger)}
+.btn.sm{padding:6px 11px;border-radius:11px;font-size:.85rem}
+.btn svg{width:18px;height:18px}
+
+.quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px}
+.qbtn{border:0;border-radius:18px;padding:14px 8px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:.86rem;transition:transform .15s}
+.qbtn:hover{transform:translateY(-2px)} .qbtn:active{transform:scale(.97)}
+.qbtn svg{width:30px;height:30px}
+@media (prefers-reduced-motion:reduce){.qbtn,.qbtn:hover{transition:none;transform:none}}
+
+.list{display:flex;flex-direction:column}
+.li{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line);min-width:0}
+.li:first-child{border-top:0}
+.li .grow{flex:1;min-width:0}
+.ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none}
+.ic svg{width:20px;height:20px}
+.li-title{font-weight:600;overflow-wrap:anywhere}
+button.li{border-left:0;border-right:0;border-bottom:0;background:none;text-align:left;cursor:pointer;width:100%}
+
+.seg{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:14px;overflow-x:auto;scrollbar-width:none;max-width:100%}
+.seg button{border:0;background:none;padding:7px 13px;border-radius:10px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap;font-size:.88rem}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
+.banner{border-radius:var(--r-md);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;font-size:.9rem}
+.banner>svg{width:20px;height:20px;flex:none;margin-top:1px}
+.banner.info{background:var(--sky-bg);color:var(--sky-ink)}
+.banner.warn{background:var(--butter-bg);color:var(--butter-ink)}
+.banner.alert{background:var(--danger-bg);color:var(--danger)}
+.banner.ok{background:var(--mint-bg);color:var(--mint-ink)}
+.banner ul{margin:4px 0 0;padding-left:18px}
+.tipcard{border-radius:var(--r-md);padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+
+/* forms */
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field>label{font-size:.8rem;font-weight:700;color:var(--muted)}
+.inp{width:100%;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;min-width:0}
+.inp:focus{outline:none;border-color:var(--kid)}
+textarea.inp{min-height:70px;resize:vertical}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.radio-row{display:flex;gap:6px;flex-wrap:wrap}
+.radio-row label{display:inline-flex}
+.radio-row input{position:absolute;opacity:0;pointer-events:none}
+.radio-row span{padding:7px 13px;border-radius:11px;border:1.5px solid var(--line);font-weight:600;cursor:pointer;font-size:.88rem}
+.radio-row input:checked+span{border-color:var(--kid);background:var(--kid-bg);color:var(--kid-ink)}
+.radio-row input:focus-visible+span{outline:3px solid var(--lilac)}
+
+.switch{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
+.switch:first-child{border-top:0}
+.switch input{position:absolute;opacity:0;pointer-events:none}
+.switch .tg{width:44px;height:26px;border-radius:99px;background:var(--line);position:relative;flex:none;transition:background .15s}
+.switch .tg::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .15s}
+.switch input:checked+.tg{background:var(--kid)}
+.switch input:checked+.tg::after{left:21px}
+.switch input:focus-visible+.tg{outline:3px solid var(--lilac)}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(23,18,36,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:min(580px,100%);max-height:92vh;overflow:auto;border-radius:26px 26px 0 0;padding:20px max(18px,env(safe-area-inset-right,0px)) calc(22px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px;animation:up .22s ease-out}
+.sheet-grab{width:44px;height:5px;border-radius:9px;background:var(--line);align-self:center;margin-top:-6px}
+@media (min-width:821px){.scrim{align-items:center}.sheet{border-radius:26px}}
+@keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:10px 18px;border-radius:999px;font-weight:700;z-index:60;font-size:.9rem;box-shadow:var(--shadow)}
+
+.timer{display:flex;align-items:center;gap:12px;background:var(--lilac-bg);color:var(--lilac-ink);border-radius:var(--r-md);padding:10px 12px}
+.timer .t{font-family:var(--display);font-size:1.4rem;font-weight:600}
+.pulse{width:10px;height:10px;border-radius:50%;background:var(--lilac);animation:pl 1.4s infinite;flex:none}
+@keyframes pl{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+
+/* chart */
+.chart-wrap{overflow-x:auto;margin:0 -4px}
+.chart-wrap svg{display:block;width:100%;min-width:320px;height:auto}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:3px;vertical-align:middle;margin-right:5px}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:700;padding:6px 8px}
+td{padding:9px 8px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.tbl{overflow-x:auto}
+
+/* rings bien-être */
+.rings{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.ring{display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:var(--r-md);padding:10px 12px;min-width:0}
+.ring svg{width:52px;height:52px;flex:none}
+.ring .v{font-family:var(--display);font-weight:600;font-size:1.1rem;line-height:1.1}
+
+/* vaccins */
+.vgroup{display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;padding:14px 0;border-top:1px dashed var(--line)}
+.vgroup:first-child{border-top:0}
+.vage{font-family:var(--display);font-weight:600;font-size:1.05rem;line-height:1.2}
+.vdose{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:var(--surface2);flex-wrap:wrap}
+.vdose+.vdose{margin-top:6px}
+.vdose .grow{flex:1;min-width:150px}
+@media (max-width:520px){.vgroup{grid-template-columns:1fr;gap:6px}}
+
+/* jalons */
+.ms{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.ms:first-child{border-top:0}
+.check{width:26px;height:26px;border-radius:9px;border:2px solid var(--soft);background:none;flex:none;cursor:pointer;display:grid;place-items:center;padding:0}
+.check[aria-checked="true"]{background:var(--mint);border-color:var(--mint)}
+.check svg{width:16px;height:16px;color:#fff}
+.dom{font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.tl-row{display:grid;grid-template-columns:26px minmax(0,1fr);gap:10px;padding:9px 0;border-top:1px solid var(--line);align-items:start}
+.tl-row:first-of-type{border-top:0}
+.track{position:relative;height:14px;border-radius:7px;background:var(--surface2);margin-top:6px}
+.track .bar{position:absolute;top:2px;bottom:2px;border-radius:5px}
+.track .now{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:2px}
+.track .flag{position:absolute;top:-3px;width:3px;height:20px;background:var(--danger);border-radius:2px}
+.axis{position:relative;height:16px;margin-left:36px;font-size:.7rem;color:var(--muted)}
+.axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.dombar{height:8px;border-radius:5px;background:var(--surface2);overflow:hidden}
+.dombar i{display:block;height:100%;border-radius:5px}
+
+/* calendrier */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .dow{font-size:.72rem;font-weight:700;color:var(--muted);text-align:center;padding:4px 0}
+.day{aspect-ratio:1/1;max-width:100%;border:0;border-radius:12px;background:var(--surface2);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 2px;gap:3px;font-weight:600;font-size:.88rem;min-width:0}
+.day.out{background:none;color:var(--soft)}
+.day.today{outline:2px solid var(--kid);outline-offset:-2px}
+.day.sel{background:var(--kid);color:#2A1A10}
+.dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}
+.dots i{width:6px;height:6px;border-radius:50%}
+
+.tooth{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:8px 10px;border-radius:12px;background:var(--surface2)}
+.tbtn{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:5px 10px;font-weight:700;font-size:.8rem;cursor:pointer}
+.tbtn[aria-pressed="true"]{background:var(--mint);border-color:var(--mint);color:#0E3B2A}
+
+.empty{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:22px 10px;color:var(--muted)}
+.empty svg{width:56px;height:56px}
+.sep{height:1px;background:var(--line)}
+.kbd-num{font-family:var(--display);font-weight:600}
+.pre{white-space:pre-wrap;font-size:.86rem;background:var(--surface2);border-radius:14px;padding:14px;max-height:420px;overflow:auto;font-variant-numeric:tabular-nums}
+.phone{font-family:var(--display);font-size:1.45rem;font-weight:600;user-select:all}
+.weekbars{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;height:90px}
+.weekbars .wb{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;min-width:0}
+.weekbars .wb i{width:100%;max-width:26px;border-radius:7px 7px 3px 3px;min-height:3px}
+.weekbars .wb span{font-size:.68rem;color:var(--muted);font-weight:700}
+</style>
+
+
+</head>
+<body>
+<div class="deco" id="deco" aria-hidden="true"></div>
+<div class="app">
+  <aside class="side" aria-label="Navigation">
+    <div class="brand" id="brand"></div>
+    <nav class="navlist" id="sidenav"></nav>
+    <div style="margin-top:auto" class="stack" id="sidefoot"></div>
+  </aside>
+  <main class="main" id="main"></main>
+  <nav class="bottom" id="bottomnav" aria-label="Navigation"></nav>
+</div>
+<div id="layer"></div>
+
+<script>
+/* =========================================================================
+   CARE v2 — carnet de suivi enfant 0-18 ans (prototype)
+   Croissance : tables LMS OMS (normes 2006 pour 0-5 ans, référence 2007 pour 5-19 ans).
+   ========================================================================= */
+const LMS = {"weight":{"M":[[0,0.3487,3.3464,0.14602],[1,0.2303,4.4525,0.13413],[2,0.1969,5.5714,0.12382],[3,0.174,6.369,0.11732],[4,0.1551,7.0069,0.11313],[5,0.1396,7.5077,0.11081],[6,0.1256,7.9389,0.10957],[7,0.1134,8.2963,0.10902],[8,0.1023,8.6102,0.10882],[9,0.0917,8.9019,0.10881],[10,0.0821,9.1618,0.1089],[11,0.0729,9.4136,0.10906],[12,0.0645,9.646,0.10925],[13,0.0563,9.8772,0.10949],[14,0.0487,10.0944,0.10976],[15,0.0412,10.3139,0.11008],[16,0.0343,10.5228,0.11041],[17,0.0276,10.7289,0.11078],[18,0.021,10.9393,0.1112],[19,0.0149,11.1409,0.11163],[20,0.0087,11.3478,0.11212],[21,0.0029,11.5474,0.11261],[22,-0.0029,11.7528,0.11315],[23,-0.0083,11.951,0.11369],[24,-0.0137,12.1548,0.11427],[25,-0.0189,12.3506,0.11485],[26,-0.0239,12.5442,0.11544],[27,-0.0289,12.7413,0.11604],[28,-0.0337,12.9288,0.11663],[29,-0.0385,13.1188,0.11723],[30,-0.0431,13.2993,0.11781],[31,-0.0477,13.4824,0.1184],[32,-0.052,13.6567,0.11896],[33,-0.0563,13.8285,0.11952],[34,-0.0607,14.0038,0.12008],[35,-0.0648,14.1719,0.12062],[36,-0.0689,14.3443,0.12116],[37,-0.0729,14.5102,0.12168],[38,-0.0769,14.6811,0.12221],[39,-0.0808,14.8462,0.12271],[40,-0.0846,15.0167,0.12323],[41,-0.0883,15.1816,0.12373],[42,-0.092,15.3465,0.12424],[43,-0.0957,15.5168,0.12478],[44,-0.0992,15.6815,0.12531],[45,-0.1028,15.8514,0.12587],[46,-0.1063,16.0156,0.12642],[47,-0.1098,16.1851,0.12701],[48,-0.1131,16.3489,0.12759],[49,-0.1164,16.5126,0.12818],[50,-0.1198,16.6818,0.12881],[51,-0.123,16.8454,0.12942],[52,-0.1263,17.0145,0.13006],[53,-0.1294,17.1782,0.13068],[54,-0.1326,17.3473,0.13133],[55,-0.1356,17.5107,0.13196],[56,-0.1387,17.674,0.1326],[57,-0.1417,17.8425,0.13325],[58,-0.1447,18.0053,0.13389],[59,-0.1477,18.1732,0.13454],[60,-0.1506,18.3352,0.13517],[61,-0.2026,18.5057,0.12988],[62,-0.213,18.6802,0.13028],[63,-0.2234,18.8563,0.13067],[64,-0.2338,19.034,0.13105],[65,-0.2443,19.2132,0.13142],[66,-0.2548,19.394,0.13178],[67,-0.2653,19.5765,0.13213],[68,-0.2758,19.7607,0.13246],[69,-0.2864,19.9468,0.13279],[70,-0.2969,20.1344,0.13311],[71,-0.3075,20.3235,0.13342],[72,-0.318,20.5137,0.13372],[73,-0.3285,20.7052,0.13402],[74,-0.339,20.8979,0.13432],[75,-0.3494,21.0918,0.13462],[76,-0.3598,21.287,0.13493],[77,-0.3701,21.4833,0.13523],[78,-0.3804,21.681,0.13554],[79,-0.3906,21.8799,0.13586],[80,-0.4007,22.08,0.13618],[81,-0.4107,22.2813,0.13652],[82,-0.4207,22.4837,0.13686],[83,-0.4305,22.6872,0.13722],[84,-0.4402,22.8915,0.13759],[85,-0.4499,23.0968,0.13797],[86,-0.4594,23.3029,0.13838],[87,-0.4688,23.5101,0.1388],[88,-0.4781,23.7182,0.13923],[89,-0.4873,23.9272,0.13969],[90,-0.4964,24.1371,0.14016],[91,-0.5053,24.3479,0.14065],[92,-0.5142,24.5595,0.14117],[93,-0.5229,24.7722,0.1417],[94,-0.5315,24.9858,0.14226],[95,-0.5399,25.2005,0.14284],[96,-0.5482,25.4163,0.14344],[97,-0.5564,25.6332,0.14407],[98,-0.5644,25.8513,0.14472],[99,-0.5722,26.0706,0.14539],[100,-0.5799,26.2911,0.14608],[101,-0.5873,26.5128,0.14679],[102,-0.5946,26.7358,0.14752],[103,-0.6017,26.9602,0.14828],[104,-0.6085,27.1861,0.14905],[105,-0.6152,27.4137,0.14984],[106,-0.6216,27.6432,0.15066],[107,-0.6278,27.875,0.15149],[108,-0.6337,28.1092,0.15233],[109,-0.6393,28.3459,0.15319],[110,-0.6446,28.5854,0.15406],[111,-0.6496,28.8277,0.15493],[112,-0.6543,29.0731,0.15581],[113,-0.6585,29.3217,0.1567],[114,-0.6624,29.5736,0.1576],[115,-0.6659,29.8289,0.1585],[116,-0.6689,30.0877,0.1594],[117,-0.6714,30.3501,0.16031],[118,-0.6735,30.616,0.16122],[119,-0.6752,30.8854,0.16213],[120,-0.6764,31.1586,0.16305]],"F":[[0,0.3809,3.2322,0.14171],[1,0.1727,4.1716,0.13738],[2,0.0959,5.1315,0.12998],[3,0.0407,5.8393,0.12622],[4,-0.0053,6.428,0.12401],[5,-0.0428,6.8959,0.12274],[6,-0.0759,7.3016,0.12204],[7,-0.1039,7.6416,0.12178],[8,-0.1284,7.9439,0.1218],[9,-0.1507,8.2259,0.12199],[10,-0.1698,8.4769,0.12222],[11,-0.1873,8.7207,0.12247],[12,-0.2022,8.9462,0.12267],[13,-0.216,9.1722,0.12283],[14,-0.2277,9.3861,0.12294],[15,-0.2385,9.6038,0.12299],[16,-0.2478,9.8124,0.12303],[17,-0.2561,10.0196,0.12305],[18,-0.2637,10.2324,0.12309],[19,-0.2702,10.4372,0.12315],[20,-0.2763,10.6481,0.12324],[21,-0.2814,10.8521,0.12335],[22,-0.2862,11.0633,0.12351],[23,-0.2903,11.2684,0.12369],[24,-0.2942,11.4809,0.1239],[25,-0.2975,11.6868,0.12414],[26,-0.3005,11.8922,0.12441],[27,-0.3033,12.1028,0.12472],[28,-0.3057,12.3042,0.12506],[29,-0.308,12.5093,0.12545],[30,-0.3101,12.7047,0.12587],[31,-0.312,12.9033,0.12634],[32,-0.3138,13.093,0.12683],[33,-0.3155,13.2809,0.12736],[34,-0.3171,13.4739,0.12794],[35,-0.3186,13.6599,0.12854],[36,-0.3201,13.8518,0.1292],[37,-0.3216,14.0373,0.12987],[38,-0.323,14.2288,0.1306],[39,-0.3243,14.4136,0.13134],[40,-0.3257,14.6041,0.13214],[41,-0.327,14.7877,0.13294],[42,-0.3283,14.9704,0.13375],[43,-0.3296,15.1584,0.13461],[44,-0.3309,15.3395,0.13544],[45,-0.3322,15.5259,0.13631],[46,-0.3335,15.7056,0.13715],[47,-0.3348,15.8908,0.13801],[48,-0.3361,16.0697,0.13884],[49,-0.3374,16.2485,0.13967],[50,-0.3387,16.433,0.14051],[51,-0.34,16.6114,0.14132],[52,-0.3414,16.7957,0.14214],[53,-0.3427,16.9737,0.14292],[54,-0.344,17.1573,0.14372],[55,-0.3453,17.3344,0.14448],[56,-0.3466,17.5107,0.14524],[57,-0.3479,17.692,0.146],[58,-0.3492,17.8664,0.14674],[59,-0.3505,18.0456,0.14749],[60,-0.3518,18.2179,0.14821],[61,-0.4681,18.2579,0.14295],[62,-0.4711,18.4329,0.1435],[63,-0.4742,18.6073,0.14404],[64,-0.4773,18.7811,0.14459],[65,-0.4803,18.9545,0.14514],[66,-0.4834,19.1276,0.14569],[67,-0.4864,19.3004,0.14624],[68,-0.4894,19.473,0.14679],[69,-0.4924,19.6455,0.14735],[70,-0.4954,19.818,0.1479],[71,-0.4984,19.9908,0.14845],[72,-0.5013,20.1639,0.149],[73,-0.5043,20.3377,0.14955],[74,-0.5072,20.5124,0.1501],[75,-0.51,20.6885,0.15065],[76,-0.5129,20.8661,0.1512],[77,-0.5157,21.0457,0.15175],[78,-0.5185,21.2274,0.1523],[79,-0.5213,21.4113,0.15284],[80,-0.524,21.5979,0.15339],[81,-0.5268,21.7872,0.15393],[82,-0.5294,21.9795,0.15448],[83,-0.5321,22.1751,0.15502],[84,-0.5347,22.374,0.15556],[85,-0.5372,22.5762,0.1561],[86,-0.5398,22.7816,0.15663],[87,-0.5423,22.9904,0.15717],[88,-0.5447,23.2025,0.1577],[89,-0.5471,23.418,0.15823],[90,-0.5495,23.6369,0.15876],[91,-0.5518,23.8593,0.15928],[92,-0.5541,24.0853,0.1598],[93,-0.5563,24.3149,0.16032],[94,-0.5585,24.5482,0.16084],[95,-0.5606,24.7853,0.16135],[96,-0.5627,25.0262,0.16186],[97,-0.5647,25.271,0.16237],[98,-0.5667,25.5197,0.16287],[99,-0.5686,25.7721,0.16337],[100,-0.5704,26.0284,0.16386],[101,-0.5722,26.2883,0.16435],[102,-0.574,26.5519,0.16483],[103,-0.5757,26.819,0.16532],[104,-0.5773,27.0896,0.16579],[105,-0.5789,27.3635,0.16626],[106,-0.5804,27.6406,0.16673],[107,-0.5819,27.9208,0.16719],[108,-0.5833,28.204,0.16764],[109,-0.5847,28.4901,0.16809],[110,-0.5859,28.7791,0.16854],[111,-0.5872,29.0711,0.16897],[112,-0.5883,29.3663,0.16941],[113,-0.5895,29.6646,0.16983],[114,-0.5905,29.9663,0.17025],[115,-0.5915,30.2715,0.17066],[116,-0.5925,30.5805,0.17107],[117,-0.5934,30.8934,0.17146],[118,-0.5942,31.2105,0.17186],[119,-0.595,31.5319,0.17224],[120,-0.5958,31.8578,0.17262]]},"height":{"M":[[0,1.0,49.8842,0.03795],[1,1.0,54.6645,0.03559],[2,1.0,58.4384,0.03423],[3,1.0,61.4013,0.03329],[4,1.0,63.9041,0.03257],[5,1.0,65.8912,0.03204],[6,1.0,67.6435,0.03165],[7,1.0,69.1615,0.03139],[8,1.0,70.5764,0.03124],[9,1.0,71.9714,0.03117],[10,1.0,73.2653,0.03118],[11,1.0,74.5464,0.03125],[12,1.0,75.7391,0.03137],[13,1.0,76.9304,0.03154],[14,1.0,78.0451,0.03174],[15,1.0,79.1613,0.03197],[16,1.0,80.2113,0.03222],[17,1.0,81.234,0.03249],[18,1.0,82.2628,0.03279],[19,1.0,83.2318,0.0331],[20,1.0,84.2074,0.03342],[21,1.0,85.1291,0.03375],[22,1.0,86.0589,0.0341],[23,1.0,86.9392,0.03445],[24,1.0,87.1303,0.03508],[25,1.0,87.9737,0.03542],[26,1.0,88.7964,0.03576],[27,1.0,89.6247,0.0361],[28,1.0,90.4056,0.03642],[29,1.0,91.1906,0.03674],[30,1.0,91.9297,0.03704],[31,1.0,92.6735,0.03733],[32,1.0,93.3753,0.03761],[33,1.0,94.0612,0.03787],[34,1.0,94.7559,0.03812],[35,1.0,95.4168,0.03836],[36,1.0,96.0889,0.03858],[37,1.0,96.7298,0.03879],[38,1.0,97.3827,0.039],[39,1.0,98.006,0.03919],[40,1.0,98.6412,0.03937],[41,1.0,99.2471,0.03954],[42,1.0,99.8441,0.0397],[43,1.0,100.4522,0.03986],[44,1.0,101.0326,0.04002],[45,1.0,101.6246,0.04017],[46,1.0,102.191,0.04031],[47,1.0,102.7706,0.04045],[48,1.0,103.3273,0.04059],[49,1.0,103.8806,0.04073],[50,1.0,104.4496,0.04086],[51,1.0,104.9984,0.041],[52,1.0,105.5641,0.04113],[53,1.0,106.1104,0.04126],[54,1.0,106.6736,0.04139],[55,1.0,107.2176,0.04152],[56,1.0,107.7607,0.04165],[57,1.0,108.3209,0.04177],[58,1.0,108.8621,0.0419],[59,1.0,109.4203,0.04202],[60,1.0,109.9593,0.04214],[61,1.0,110.2647,0.04164],[62,1.0,110.8006,0.04172],[63,1.0,111.3338,0.0418],[64,1.0,111.8636,0.04187],[65,1.0,112.3895,0.04195],[66,1.0,112.911,0.04203],[67,1.0,113.428,0.04211],[68,1.0,113.941,0.04218],[69,1.0,114.45,0.04226],[70,1.0,114.9547,0.04234],[71,1.0,115.4549,0.04241],[72,1.0,115.9509,0.04249],[73,1.0,116.4432,0.04257],[74,1.0,116.9325,0.04264],[75,1.0,117.4196,0.04272],[76,1.0,117.9046,0.0428],[77,1.0,118.388,0.04287],[78,1.0,118.87,0.04295],[79,1.0,119.3508,0.04303],[80,1.0,119.8303,0.04311],[81,1.0,120.3085,0.04318],[82,1.0,120.7853,0.04326],[83,1.0,121.2604,0.04334],[84,1.0,121.7338,0.04342],[85,1.0,122.2053,0.0435],[86,1.0,122.675,0.04358],[87,1.0,123.1429,0.04366],[88,1.0,123.6092,0.04374],[89,1.0,124.0736,0.04382],[90,1.0,124.5361,0.0439],[91,1.0,124.9964,0.04398],[92,1.0,125.4545,0.04406],[93,1.0,125.9104,0.04414],[94,1.0,126.364,0.04422],[95,1.0,126.8156,0.0443],[96,1.0,127.2651,0.04438],[97,1.0,127.7129,0.04446],[98,1.0,128.159,0.04454],[99,1.0,128.6034,0.04462],[100,1.0,129.0466,0.0447],[101,1.0,129.4887,0.04478],[102,1.0,129.93,0.04487],[103,1.0,130.3705,0.04495],[104,1.0,130.8103,0.04503],[105,1.0,131.2495,0.04511],[106,1.0,131.6884,0.04519],[107,1.0,132.1269,0.04527],[108,1.0,132.5652,0.04535],[109,1.0,133.0031,0.04543],[110,1.0,133.4404,0.04551],[111,1.0,133.877,0.04559],[112,1.0,134.313,0.04566],[113,1.0,134.7483,0.04574],[114,1.0,135.1829,0.04582],[115,1.0,135.6168,0.04589],[116,1.0,136.0501,0.04597],[117,1.0,136.4829,0.04604],[118,1.0,136.9153,0.04612],[119,1.0,137.3474,0.04619],[120,1.0,137.7795,0.04626],[121,1.0,138.2119,0.04633],[122,1.0,138.6452,0.0464],[123,1.0,139.0797,0.04647],[124,1.0,139.5158,0.04654],[125,1.0,139.954,0.04661],[126,1.0,140.3948,0.04667],[127,1.0,140.8387,0.04674],[128,1.0,141.2859,0.0468],[129,1.0,141.7368,0.04686],[130,1.0,142.1916,0.04692],[131,1.0,142.6501,0.04698],[132,1.0,143.1126,0.04703],[133,1.0,143.5795,0.04709],[134,1.0,144.0511,0.04714],[135,1.0,144.5276,0.04719],[136,1.0,145.0093,0.04723],[137,1.0,145.4964,0.04728],[138,1.0,145.9891,0.04732],[139,1.0,146.4878,0.04736],[140,1.0,146.9927,0.0474],[141,1.0,147.5041,0.04744],[142,1.0,148.0224,0.04747],[143,1.0,148.5478,0.0475],[144,1.0,149.0807,0.04753],[145,1.0,149.6212,0.04755],[146,1.0,150.1694,0.04758],[147,1.0,150.7256,0.04759],[148,1.0,151.2899,0.04761],[149,1.0,151.8623,0.04762],[150,1.0,152.4425,0.04763],[151,1.0,153.0298,0.04763],[152,1.0,153.6234,0.04764],[153,1.0,154.2223,0.04763],[154,1.0,154.8258,0.04763],[155,1.0,155.4329,0.04762],[156,1.0,156.0426,0.0476],[157,1.0,156.6539,0.04758],[158,1.0,157.266,0.04756],[159,1.0,157.8775,0.04754],[160,1.0,158.4871,0.04751],[161,1.0,159.0937,0.04747],[162,1.0,159.6962,0.04744],[163,1.0,160.2939,0.0474],[164,1.0,160.8861,0.04735],[165,1.0,161.472,0.0473],[166,1.0,162.0505,0.04725],[167,1.0,162.6207,0.0472],[168,1.0,163.1816,0.04714],[169,1.0,163.7321,0.04707],[170,1.0,164.2717,0.04701],[171,1.0,164.7994,0.04694],[172,1.0,165.3145,0.04687],[173,1.0,165.8165,0.04679],[174,1.0,166.305,0.04671],[175,1.0,166.7799,0.04663],[176,1.0,167.2415,0.04655],[177,1.0,167.6899,0.04646],[178,1.0,168.1255,0.04637],[179,1.0,168.5482,0.04628],[180,1.0,168.958,0.04619],[181,1.0,169.3549,0.04609],[182,1.0,169.7389,0.04599],[183,1.0,170.1099,0.04589],[184,1.0,170.468,0.04579],[185,1.0,170.8136,0.04569],[186,1.0,171.1468,0.04559],[187,1.0,171.468,0.04548],[188,1.0,171.7773,0.04538],[189,1.0,172.0748,0.04527],[190,1.0,172.3606,0.04516],[191,1.0,172.6345,0.04506],[192,1.0,172.8967,0.04495],[193,1.0,173.147,0.04484],[194,1.0,173.3856,0.04473],[195,1.0,173.6126,0.04462],[196,1.0,173.828,0.04451],[197,1.0,174.0321,0.0444],[198,1.0,174.2251,0.04429],[199,1.0,174.4071,0.04418],[200,1.0,174.5784,0.04407],[201,1.0,174.7392,0.04396],[202,1.0,174.8896,0.04385],[203,1.0,175.0301,0.04375],[204,1.0,175.1609,0.04364],[205,1.0,175.2824,0.04353],[206,1.0,175.3951,0.04343],[207,1.0,175.4995,0.04332],[208,1.0,175.5959,0.04322],[209,1.0,175.685,0.04311],[210,1.0,175.7672,0.04301],[211,1.0,175.8432,0.04291],[212,1.0,175.9133,0.04281],[213,1.0,175.9781,0.04271],[214,1.0,176.038,0.04261],[215,1.0,176.0935,0.04251],[216,1.0,176.1449,0.04241],[217,1.0,176.1925,0.04232],[218,1.0,176.2368,0.04222],[219,1.0,176.2779,0.04213],[220,1.0,176.3162,0.04204],[221,1.0,176.3518,0.04195],[222,1.0,176.3851,0.04185],[223,1.0,176.4162,0.04177],[224,1.0,176.4453,0.04168],[225,1.0,176.4724,0.04159],[226,1.0,176.4976,0.0415],[227,1.0,176.5211,0.04142],[228,1.0,176.5432,0.04134]],"F":[[0,1.0,49.1477,0.0379],[1,1.0,53.6326,0.03641],[2,1.0,57.0796,0.03568],[3,1.0,59.7773,0.0352],[4,1.0,62.1071,0.03486],[5,1.0,64.019,0.03463],[6,1.0,65.751,0.03448],[7,1.0,67.2842,0.03441],[8,1.0,68.7264,0.0344],[9,1.0,70.1463,0.03444],[10,1.0,71.4656,0.03452],[11,1.0,72.7788,0.03464],[12,1.0,74.0049,0.03479],[13,1.0,75.2297,0.03496],[14,1.0,76.377,0.03514],[15,1.0,77.5258,0.03534],[16,1.0,78.6055,0.03555],[17,1.0,79.6559,0.03576],[18,1.0,80.7121,0.03598],[19,1.0,81.708,0.0362],[20,1.0,82.7116,0.03643],[21,1.0,83.6595,0.03665],[22,1.0,84.6154,0.03689],[23,1.0,85.5184,0.03711],[24,1.0,85.7299,0.03764],[25,1.0,86.5922,0.03786],[26,1.0,87.4358,0.03808],[27,1.0,88.2881,0.0383],[28,1.0,89.0938,0.03851],[29,1.0,89.9072,0.03872],[30,1.0,90.6765,0.03893],[31,1.0,91.4539,0.03913],[32,1.0,92.1906,0.03933],[33,1.0,92.9135,0.03952],[34,1.0,93.6473,0.03971],[35,1.0,94.346,0.03989],[36,1.0,95.0572,0.04007],[37,1.0,95.7356,0.04024],[38,1.0,96.427,0.04041],[39,1.0,97.0871,0.04057],[40,1.0,97.7601,0.04074],[41,1.0,98.4028,0.04089],[42,1.0,99.0369,0.04105],[43,1.0,99.6834,0.0412],[44,1.0,100.3007,0.04135],[45,1.0,100.9301,0.0415],[46,1.0,101.5312,0.04164],[47,1.0,102.1446,0.04179],[48,1.0,102.7312,0.04193],[49,1.0,103.3113,0.04206],[50,1.0,103.9045,0.0422],[51,1.0,104.4727,0.04233],[52,1.0,105.0541,0.04247],[53,1.0,105.6114,0.04259],[54,1.0,106.1817,0.04272],[55,1.0,106.7284,0.04285],[56,1.0,107.2698,0.04297],[57,1.0,107.8238,0.0431],[58,1.0,108.3547,0.04322],[59,1.0,108.8981,0.04335],[60,1.0,109.4189,0.04346],[61,1.0,109.6016,0.04355],[62,1.0,110.1258,0.04364],[63,1.0,110.6451,0.04373],[64,1.0,111.1596,0.04382],[65,1.0,111.6696,0.0439],[66,1.0,112.1753,0.04399],[67,1.0,112.6767,0.04407],[68,1.0,113.174,0.04415],[69,1.0,113.6672,0.04423],[70,1.0,114.1565,0.04431],[71,1.0,114.6421,0.04439],[72,1.0,115.1244,0.04447],[73,1.0,115.6039,0.04454],[74,1.0,116.0812,0.04461],[75,1.0,116.5568,0.04469],[76,1.0,117.0311,0.04475],[77,1.0,117.5044,0.04482],[78,1.0,117.9769,0.04489],[79,1.0,118.4489,0.04495],[80,1.0,118.9208,0.04502],[81,1.0,119.3926,0.04508],[82,1.0,119.8648,0.04514],[83,1.0,120.3374,0.0452],[84,1.0,120.8105,0.04525],[85,1.0,121.2843,0.04531],[86,1.0,121.7587,0.04536],[87,1.0,122.2338,0.04542],[88,1.0,122.7098,0.04547],[89,1.0,123.1868,0.04551],[90,1.0,123.6646,0.04556],[91,1.0,124.1435,0.04561],[92,1.0,124.6234,0.04565],[93,1.0,125.1045,0.04569],[94,1.0,125.5869,0.04573],[95,1.0,126.0706,0.04577],[96,1.0,126.5558,0.04581],[97,1.0,127.0424,0.04585],[98,1.0,127.5304,0.04588],[99,1.0,128.0199,0.04591],[100,1.0,128.5109,0.04594],[101,1.0,129.0035,0.04597],[102,1.0,129.4975,0.046],[103,1.0,129.9932,0.04602],[104,1.0,130.4904,0.04604],[105,1.0,130.9891,0.04607],[106,1.0,131.4895,0.04608],[107,1.0,131.9912,0.0461],[108,1.0,132.4944,0.04612],[109,1.0,132.9989,0.04613],[110,1.0,133.5046,0.04614],[111,1.0,134.0118,0.04615],[112,1.0,134.5202,0.04616],[113,1.0,135.0299,0.04616],[114,1.0,135.541,0.04617],[115,1.0,136.0533,0.04617],[116,1.0,136.567,0.04616],[117,1.0,137.0821,0.04616],[118,1.0,137.5987,0.04616],[119,1.0,138.1167,0.04615],[120,1.0,138.6363,0.04614],[121,1.0,139.1575,0.04612],[122,1.0,139.6803,0.04611],[123,1.0,140.2049,0.04609],[124,1.0,140.7313,0.04607],[125,1.0,141.2594,0.04605],[126,1.0,141.7892,0.04603],[127,1.0,142.3206,0.046],[128,1.0,142.8534,0.04597],[129,1.0,143.3874,0.04594],[130,1.0,143.9222,0.04591],[131,1.0,144.4575,0.04588],[132,1.0,144.9929,0.04584],[133,1.0,145.528,0.0458],[134,1.0,146.0622,0.04576],[135,1.0,146.5951,0.04571],[136,1.0,147.1262,0.04567],[137,1.0,147.6548,0.04562],[138,1.0,148.1804,0.04557],[139,1.0,148.7023,0.04552],[140,1.0,149.2197,0.04546],[141,1.0,149.7322,0.04541],[142,1.0,150.239,0.04535],[143,1.0,150.7394,0.04529],[144,1.0,151.2327,0.04523],[145,1.0,151.7182,0.04516],[146,1.0,152.1951,0.0451],[147,1.0,152.6628,0.04503],[148,1.0,153.1206,0.04497],[149,1.0,153.5678,0.0449],[150,1.0,154.0041,0.04483],[151,1.0,154.429,0.04476],[152,1.0,154.8423,0.04468],[153,1.0,155.2437,0.04461],[154,1.0,155.633,0.04454],[155,1.0,156.0101,0.04446],[156,1.0,156.3748,0.04439],[157,1.0,156.7269,0.04431],[158,1.0,157.0666,0.04423],[159,1.0,157.3936,0.04415],[160,1.0,157.7082,0.04408],[161,1.0,158.0102,0.044],[162,1.0,158.2997,0.04392],[163,1.0,158.5771,0.04384],[164,1.0,158.8425,0.04376],[165,1.0,159.0961,0.04369],[166,1.0,159.3382,0.04361],[167,1.0,159.5691,0.04353],[168,1.0,159.789,0.04345],[169,1.0,159.9983,0.04337],[170,1.0,160.1971,0.0433],[171,1.0,160.3857,0.04322],[172,1.0,160.5643,0.04314],[173,1.0,160.7332,0.04307],[174,1.0,160.8927,0.04299],[175,1.0,161.043,0.04292],[176,1.0,161.1845,0.04284],[177,1.0,161.3176,0.04277],[178,1.0,161.4425,0.0427],[179,1.0,161.5596,0.04263],[180,1.0,161.6692,0.04255],[181,1.0,161.7717,0.04248],[182,1.0,161.8673,0.04241],[183,1.0,161.9564,0.04235],[184,1.0,162.0393,0.04228],[185,1.0,162.1164,0.04221],[186,1.0,162.188,0.04214],[187,1.0,162.2542,0.04208],[188,1.0,162.3154,0.04201],[189,1.0,162.3719,0.04195],[190,1.0,162.4239,0.04189],[191,1.0,162.4717,0.04182],[192,1.0,162.5156,0.04176],[193,1.0,162.556,0.0417],[194,1.0,162.5933,0.04164],[195,1.0,162.6276,0.04158],[196,1.0,162.6594,0.04152],[197,1.0,162.689,0.04147],[198,1.0,162.7165,0.04141],[199,1.0,162.7425,0.04136],[200,1.0,162.767,0.0413],[201,1.0,162.7904,0.04125],[202,1.0,162.8126,0.04119],[203,1.0,162.834,0.04114],[204,1.0,162.8545,0.04109],[205,1.0,162.8743,0.04104],[206,1.0,162.8935,0.04099],[207,1.0,162.912,0.04094],[208,1.0,162.93,0.04089],[209,1.0,162.9476,0.04084],[210,1.0,162.9649,0.0408],[211,1.0,162.9817,0.04075],[212,1.0,162.9983,0.04071],[213,1.0,163.0144,0.04066],[214,1.0,163.03,0.04062],[215,1.0,163.0451,0.04058],[216,1.0,163.0595,0.04053],[217,1.0,163.0733,0.04049],[218,1.0,163.0862,0.04045],[219,1.0,163.0982,0.04041],[220,1.0,163.1092,0.04037],[221,1.0,163.1192,0.04034],[222,1.0,163.1279,0.0403],[223,1.0,163.1355,0.04026],[224,1.0,163.1418,0.04023],[225,1.0,163.1469,0.04019],[226,1.0,163.1508,0.04016],[227,1.0,163.1534,0.04012],[228,1.0,163.1548,0.04009]]},"ofc":{"M":[[0,1.0,34.4618,0.03686],[1,1.0,37.2435,0.03135],[2,1.0,39.1349,0.02997],[3,1.0,40.5008,0.02918],[4,1.0,41.6401,0.02868],[5,1.0,42.5524,0.02837],[6,1.0,43.3393,0.02817],[7,1.0,43.9791,0.02804],[8,1.0,44.5217,0.02797],[9,1.0,45.0007,0.02792],[10,1.0,45.4004,0.0279],[11,1.0,45.7593,0.02789],[12,1.0,46.0637,0.02789],[13,1.0,46.3421,0.02789],[14,1.0,46.5834,0.02791],[15,1.0,46.809,0.02792],[16,1.0,47.0088,0.02795],[17,1.0,47.1936,0.02797],[18,1.0,47.3718,0.028],[19,1.0,47.5341,0.02803],[20,1.0,47.6931,0.02806],[21,1.0,47.8399,0.0281],[22,1.0,47.985,0.02814],[23,1.0,48.1198,0.02817],[24,1.0,48.2536,0.02821],[25,1.0,48.378,0.02825],[26,1.0,48.4974,0.0283],[27,1.0,48.6158,0.02834],[28,1.0,48.7255,0.02838],[29,1.0,48.8341,0.02843],[30,1.0,48.9347,0.02847],[31,1.0,49.0341,0.02851],[32,1.0,49.126,0.02855],[33,1.0,49.214,0.02859],[34,1.0,49.3011,0.02863],[35,1.0,49.3818,0.02867],[36,1.0,49.4619,0.02871],[37,1.0,49.5362,0.02875],[38,1.0,49.6101,0.02878],[39,1.0,49.679,0.02882],[40,1.0,49.7476,0.02886],[41,1.0,49.8117,0.02889],[42,1.0,49.8737,0.02893],[43,1.0,49.9357,0.02896],[44,1.0,49.9938,0.02899],[45,1.0,50.0518,0.02903],[46,1.0,50.1062,0.02906],[47,1.0,50.1606,0.02909],[48,1.0,50.2115,0.02912],[49,1.0,50.261,0.02915],[50,1.0,50.3107,0.02918],[51,1.0,50.3573,0.02921],[52,1.0,50.4043,0.02924],[53,1.0,50.4485,0.02927],[54,1.0,50.4931,0.0293],[55,1.0,50.5353,0.02932],[56,1.0,50.5766,0.02935],[57,1.0,50.6184,0.02938],[58,1.0,50.6582,0.0294],[59,1.0,50.6986,0.02943],[60,1.0,50.7372,0.02945]],"F":[[0,1.0,33.8787,0.03496],[1,1.0,36.5163,0.03211],[2,1.0,38.258,0.03168],[3,1.0,39.521,0.0314],[4,1.0,40.5895,0.03119],[5,1.0,41.454,0.03102],[6,1.0,42.2079,0.03087],[7,1.0,42.8278,0.03075],[8,1.0,43.3589,0.03063],[9,1.0,43.8309,0.03053],[10,1.0,44.2273,0.03044],[11,1.0,44.5865,0.03035],[12,1.0,44.894,0.03027],[13,1.0,45.1779,0.03019],[14,1.0,45.4255,0.03012],[15,1.0,45.6582,0.03005],[16,1.0,45.865,0.02999],[17,1.0,46.0571,0.02993],[18,1.0,46.2431,0.02987],[19,1.0,46.4135,0.02982],[20,1.0,46.5814,0.02977],[21,1.0,46.7375,0.02972],[22,1.0,46.8931,0.02967],[23,1.0,47.0388,0.02962],[24,1.0,47.1845,0.02957],[25,1.0,47.3207,0.02953],[26,1.0,47.452,0.02949],[27,1.0,47.5825,0.02945],[28,1.0,47.7035,0.02941],[29,1.0,47.8231,0.02937],[30,1.0,47.9336,0.02933],[31,1.0,48.0425,0.02929],[32,1.0,48.1432,0.02926],[33,1.0,48.2395,0.02922],[34,1.0,48.3347,0.02919],[35,1.0,48.423,0.02916],[36,1.0,48.5106,0.02912],[37,1.0,48.5921,0.02909],[38,1.0,48.6732,0.02906],[39,1.0,48.7487,0.02903],[40,1.0,48.824,0.029],[41,1.0,48.8942,0.02897],[42,1.0,48.9621,0.02894],[43,1.0,49.0298,0.02891],[44,1.0,49.0932,0.02888],[45,1.0,49.1566,0.02886],[46,1.0,49.2162,0.02883],[47,1.0,49.2759,0.0288],[48,1.0,49.3321,0.02878],[49,1.0,49.3869,0.02875],[50,1.0,49.4421,0.02873],[51,1.0,49.4942,0.0287],[52,1.0,49.5468,0.02868],[53,1.0,49.5966,0.02866],[54,1.0,49.647,0.02863],[55,1.0,49.6946,0.02861],[56,1.0,49.7413,0.02859],[57,1.0,49.7886,0.02856],[58,1.0,49.8335,0.02854],[59,1.0,49.8791,0.02852],[60,1.0,49.9225,0.0285]]},"bmi":{"M":[[0,-0.3053,13.4069,0.0956],[1,0.2738,14.914,0.09035],[2,0.1113,16.3231,0.08676],[3,0.0077,16.895,0.08496],[4,-0.0732,17.1594,0.08378],[5,-0.1366,17.2914,0.08297],[6,-0.1919,17.3424,0.08233],[7,-0.2384,17.3289,0.08183],[8,-0.2795,17.2661,0.08141],[9,-0.3177,17.1659,0.08102],[10,-0.3512,17.0503,0.08068],[11,-0.383,16.9231,0.08037],[12,-0.4113,16.7992,0.08009],[13,-0.4384,16.6731,0.07982],[14,-0.4629,16.5553,0.07958],[15,-0.4867,16.4393,0.07934],[16,-0.5082,16.3335,0.07913],[17,-0.5286,16.2343,0.07893],[18,-0.5485,16.1388,0.07873],[19,-0.5667,16.0536,0.07854],[20,-0.5847,15.9737,0.07836],[21,-0.6013,15.9043,0.07818],[22,-0.6176,15.8405,0.07802],[23,-0.6328,15.7853,0.07786],[24,-0.6187,16.0189,0.07785],[25,-0.584,15.9799,0.07792],[26,-0.5501,15.9418,0.07799],[27,-0.5164,15.9034,0.07809],[28,-0.4853,15.867,0.07818],[29,-0.4549,15.8303,0.07829],[30,-0.4275,15.7954,0.07841],[31,-0.4013,15.7601,0.07854],[32,-0.3782,15.7267,0.07867],[33,-0.3575,15.6939,0.07882],[34,-0.3388,15.6609,0.07897],[35,-0.3233,15.6297,0.07913],[36,-0.31,15.5986,0.07931],[37,-0.3,15.5695,0.07949],[38,-0.2927,15.5406,0.07969],[39,-0.2884,15.5141,0.0799],[40,-0.2869,15.4881,0.08013],[41,-0.2881,15.4645,0.08036],[42,-0.2918,15.4423,0.08061],[43,-0.2982,15.4209,0.08087],[44,-0.3066,15.4015,0.08114],[45,-0.3175,15.3825,0.08144],[46,-0.3302,15.3652,0.08174],[47,-0.3455,15.3483,0.08206],[48,-0.3622,15.3326,0.08238],[49,-0.3808,15.3176,0.08272],[50,-0.402,15.3029,0.08307],[51,-0.4243,15.2892,0.08343],[52,-0.449,15.2758,0.08381],[53,-0.4745,15.2634,0.08418],[54,-0.5022,15.2513,0.08457],[55,-0.5302,15.24,0.08496],[56,-0.5594,15.2293,0.08535],[57,-0.5906,15.2188,0.08577],[58,-0.6219,15.2092,0.08617],[59,-0.6554,15.2,0.08659],[60,-0.6889,15.1917,0.08699],[61,-0.7387,15.2641,0.0839],[62,-0.7621,15.2616,0.08414],[63,-0.7856,15.2604,0.08439],[64,-0.8089,15.2605,0.08464],[65,-0.8322,15.2619,0.0849],[66,-0.8554,15.2645,0.08516],[67,-0.8785,15.2684,0.08543],[68,-0.9015,15.2737,0.0857],[69,-0.9243,15.2801,0.08597],[70,-0.9471,15.2877,0.08625],[71,-0.9697,15.2965,0.08653],[72,-0.9921,15.3062,0.08682],[73,-1.0144,15.3169,0.08711],[74,-1.0365,15.3285,0.08741],[75,-1.0584,15.3408,0.08771],[76,-1.0801,15.354,0.08802],[77,-1.1017,15.3679,0.08833],[78,-1.123,15.3825,0.08865],[79,-1.1441,15.3978,0.08898],[80,-1.1649,15.4137,0.08931],[81,-1.1856,15.4302,0.08964],[82,-1.206,15.4473,0.08998],[83,-1.2261,15.465,0.09033],[84,-1.246,15.4832,0.09068],[85,-1.2656,15.5019,0.09103],[86,-1.2849,15.521,0.09139],[87,-1.304,15.5407,0.09176],[88,-1.3228,15.5608,0.09213],[89,-1.3414,15.5814,0.09251],[90,-1.3596,15.6023,0.09289],[91,-1.3776,15.6237,0.09327],[92,-1.3953,15.6455,0.09366],[93,-1.4126,15.6677,0.09406],[94,-1.4297,15.6903,0.09445],[95,-1.4464,15.7133,0.09486],[96,-1.4629,15.7368,0.09526],[97,-1.479,15.7606,0.09567],[98,-1.4947,15.7848,0.09609],[99,-1.5101,15.8094,0.09651],[100,-1.5252,15.8344,0.09693],[101,-1.5399,15.8597,0.09735],[102,-1.5542,15.8855,0.09778],[103,-1.5681,15.9116,0.09821],[104,-1.5817,15.9381,0.09864],[105,-1.5948,15.9651,0.09907],[106,-1.6076,15.9925,0.09951],[107,-1.6199,16.0205,0.09994],[108,-1.6318,16.049,0.10038],[109,-1.6433,16.0781,0.10082],[110,-1.6544,16.1078,0.10126],[111,-1.6651,16.1381,0.1017],[112,-1.6753,16.1692,0.10214],[113,-1.6851,16.2009,0.10259],[114,-1.6944,16.2333,0.10303],[115,-1.7032,16.2665,0.10347],[116,-1.7116,16.3004,0.10391],[117,-1.7196,16.3351,0.10435],[118,-1.7271,16.3704,0.10478],[119,-1.7341,16.4065,0.10522],[120,-1.7407,16.4433,0.10566],[121,-1.7468,16.4807,0.10609],[122,-1.7525,16.5189,0.10652],[123,-1.7578,16.5578,0.10695],[124,-1.7626,16.5974,0.10738],[125,-1.767,16.6376,0.1078],[126,-1.771,16.6786,0.10823],[127,-1.7745,16.7203,0.10865],[128,-1.7777,16.7628,0.10906],[129,-1.7804,16.8059,0.10948],[130,-1.7828,16.8497,0.10989],[131,-1.7847,16.8941,0.1103],[132,-1.7862,16.9392,0.1107],[133,-1.7873,16.985,0.1111],[134,-1.7881,17.0314,0.1115],[135,-1.7884,17.0784,0.11189],[136,-1.7884,17.1262,0.11228],[137,-1.788,17.1746,0.11266],[138,-1.7873,17.2236,0.11304],[139,-1.7861,17.2734,0.11342],[140,-1.7846,17.324,0.11379],[141,-1.7828,17.3752,0.11415],[142,-1.7806,17.4272,0.11451],[143,-1.778,17.4799,0.11487],[144,-1.7751,17.5334,0.11522],[145,-1.7719,17.5877,0.11556],[146,-1.7684,17.6427,0.1159],[147,-1.7645,17.6985,0.11623],[148,-1.7604,17.7551,0.11656],[149,-1.7559,17.8124,0.11688],[150,-1.7511,17.8704,0.1172],[151,-1.7461,17.9292,0.11751],[152,-1.7408,17.9887,0.11781],[153,-1.7352,18.0488,0.11811],[154,-1.7293,18.1096,0.11841],[155,-1.7232,18.171,0.11869],[156,-1.7168,18.233,0.11898],[157,-1.7102,18.2955,0.11925],[158,-1.7033,18.3586,0.11952],[159,-1.6962,18.4221,0.11979],[160,-1.6888,18.486,0.12005],[161,-1.6811,18.5502,0.1203],[162,-1.6732,18.6148,0.12055],[163,-1.6651,18.6795,0.12079],[164,-1.6568,18.7445,0.12102],[165,-1.6482,18.8095,0.12125],[166,-1.6394,18.8746,0.12148],[167,-1.6304,18.9398,0.1217],[168,-1.6211,19.005,0.12191],[169,-1.6116,19.0701,0.12212],[170,-1.602,19.1351,0.12233],[171,-1.5921,19.2,0.12253],[172,-1.5821,19.2648,0.12272],[173,-1.5719,19.3294,0.12291],[174,-1.5615,19.3937,0.1231],[175,-1.551,19.4578,0.12328],[176,-1.5403,19.5217,0.12346],[177,-1.5294,19.5853,0.12363],[178,-1.5185,19.6486,0.1238],[179,-1.5074,19.7117,0.12396],[180,-1.4961,19.7744,0.12412],[181,-1.4848,19.8367,0.12428],[182,-1.4733,19.8987,0.12443],[183,-1.4617,19.9603,0.12458],[184,-1.45,20.0215,0.12473],[185,-1.4382,20.0823,0.12487],[186,-1.4263,20.1427,0.12501],[187,-1.4143,20.2026,0.12514],[188,-1.4022,20.2621,0.12528],[189,-1.39,20.3211,0.12541],[190,-1.3777,20.3796,0.12554],[191,-1.3653,20.4376,0.12567],[192,-1.3529,20.4951,0.12579],[193,-1.3403,20.5521,0.12591],[194,-1.3277,20.6085,0.12603],[195,-1.3149,20.6644,0.12615],[196,-1.3021,20.7197,0.12627],[197,-1.2892,20.7745,0.12638],[198,-1.2762,20.8287,0.1265],[199,-1.2631,20.8824,0.12661],[200,-1.2499,20.9355,0.12672],[201,-1.2366,20.9881,0.12683],[202,-1.2233,21.04,0.12694],[203,-1.2098,21.0914,0.12704],[204,-1.1962,21.1423,0.12715],[205,-1.1826,21.1925,0.12726],[206,-1.1688,21.2423,0.12736],[207,-1.155,21.2914,0.12746],[208,-1.141,21.34,0.12756],[209,-1.127,21.388,0.12767],[210,-1.1129,21.4354,0.12777],[211,-1.0986,21.4822,0.12787],[212,-1.0843,21.5285,0.12797],[213,-1.0699,21.5742,0.12807],[214,-1.0553,21.6193,0.12816],[215,-1.0407,21.6638,0.12826],[216,-1.026,21.7077,0.12836],[217,-1.0112,21.751,0.12845],[218,-0.9962,21.7937,0.12855],[219,-0.9812,21.8358,0.12864],[220,-0.9661,21.8773,0.12874],[221,-0.9509,21.9182,0.12883],[222,-0.9356,21.9585,0.12893],[223,-0.9202,21.9982,0.12902],[224,-0.9048,22.0374,0.12911],[225,-0.8892,22.076,0.1292],[226,-0.8735,22.114,0.1293],[227,-0.8578,22.1514,0.12939],[228,-0.8419,22.1883,0.12948]],"F":[[0,-0.0631,13.3363,0.09272],[1,0.3481,14.5422,0.09559],[2,0.1743,15.7713,0.09371],[3,0.0652,16.3531,0.09255],[4,-0.0197,16.6722,0.09166],[5,-0.086,16.8379,0.09096],[6,-0.1436,16.9086,0.09035],[7,-0.1915,16.9021,0.08984],[8,-0.2337,16.8417,0.08939],[9,-0.2726,16.7404,0.08898],[10,-0.3064,16.62,0.08862],[11,-0.3382,16.4867,0.08827],[12,-0.3665,16.3578,0.08797],[13,-0.3934,16.2298,0.08768],[14,-0.4176,16.1132,0.08741],[15,-0.441,16.0013,0.08716],[16,-0.4623,15.9017,0.08693],[17,-0.4823,15.8108,0.08671],[18,-0.5018,15.726,0.0865],[19,-0.5197,15.6524,0.08631],[20,-0.5374,15.585,0.08611],[21,-0.5536,15.5281,0.08594],[22,-0.5697,15.4782,0.08576],[23,-0.5846,15.4381,0.0856],[24,-0.5684,15.6881,0.08454],[25,-0.5684,15.6589,0.08452],[26,-0.5684,15.6311,0.08449],[27,-0.5684,15.6036,0.08446],[28,-0.5684,15.5779,0.08444],[29,-0.5684,15.5521,0.08443],[30,-0.5684,15.5277,0.08444],[31,-0.5684,15.503,0.08448],[32,-0.5684,15.4798,0.08455],[33,-0.5684,15.4575,0.08467],[34,-0.5684,15.4355,0.08484],[35,-0.5684,15.4157,0.08506],[36,-0.5684,15.3966,0.08535],[37,-0.5684,15.3797,0.08569],[38,-0.5684,15.3636,0.08609],[39,-0.5684,15.3493,0.08654],[40,-0.5684,15.3356,0.08704],[41,-0.5684,15.3233,0.08757],[42,-0.5684,15.3117,0.08813],[43,-0.5684,15.3006,0.08872],[44,-0.5684,15.2906,0.08931],[45,-0.5684,15.2813,0.08992],[46,-0.5684,15.2732,0.0905],[47,-0.5684,15.266,0.0911],[48,-0.5684,15.2602,0.09168],[49,-0.5684,15.2557,0.09227],[50,-0.5684,15.2523,0.09287],[51,-0.5684,15.2503,0.09345],[52,-0.5684,15.2496,0.09404],[53,-0.5684,15.2502,0.0946],[54,-0.5684,15.2519,0.09516],[55,-0.5684,15.2543,0.09567],[56,-0.5684,15.2575,0.09617],[57,-0.5684,15.2612,0.09665],[58,-0.5684,15.2653,0.09708],[59,-0.5684,15.2698,0.0975],[60,-0.5684,15.2747,0.09789],[61,-0.8886,15.2441,0.09692],[62,-0.9068,15.2434,0.09738],[63,-0.9248,15.2433,0.09783],[64,-0.9427,15.2438,0.09829],[65,-0.9605,15.2448,0.09875],[66,-0.978,15.2464,0.0992],[67,-0.9954,15.2487,0.09966],[68,-1.0126,15.2516,0.10012],[69,-1.0296,15.2551,0.10058],[70,-1.0464,15.2592,0.10104],[71,-1.063,15.2641,0.10149],[72,-1.0794,15.2697,0.10195],[73,-1.0956,15.276,0.10241],[74,-1.1115,15.2831,0.10287],[75,-1.1272,15.2911,0.10333],[76,-1.1427,15.2998,0.10379],[77,-1.1579,15.3095,0.10425],[78,-1.1728,15.32,0.10471],[79,-1.1875,15.3314,0.10517],[80,-1.2019,15.3439,0.10562],[81,-1.216,15.3572,0.10608],[82,-1.2298,15.3717,0.10654],[83,-1.2433,15.3871,0.107],[84,-1.2565,15.4036,0.10746],[85,-1.2693,15.4211,0.10792],[86,-1.2819,15.4397,0.10837],[87,-1.2941,15.4593,0.10883],[88,-1.306,15.4798,0.10929],[89,-1.3175,15.5014,0.10974],[90,-1.3287,15.524,0.1102],[91,-1.3395,15.5476,0.11065],[92,-1.3499,15.5723,0.1111],[93,-1.36,15.5979,0.11156],[94,-1.3697,15.6246,0.11201],[95,-1.379,15.6523,0.11246],[96,-1.388,15.681,0.11291],[97,-1.3966,15.7107,0.11335],[98,-1.4047,15.7415,0.1138],[99,-1.4125,15.7732,0.11424],[100,-1.4199,15.8058,0.11469],[101,-1.427,15.8394,0.11513],[102,-1.4336,15.8738,0.11557],[103,-1.4398,15.909,0.11601],[104,-1.4456,15.9451,0.11644],[105,-1.4511,15.9818,0.11688],[106,-1.4561,16.0194,0.11731],[107,-1.4607,16.0575,0.11774],[108,-1.465,16.0964,0.11816],[109,-1.4688,16.1358,0.11859],[110,-1.4723,16.1759,0.11901],[111,-1.4753,16.2166,0.11943],[112,-1.478,16.258,0.11985],[113,-1.4803,16.2999,0.12026],[114,-1.4823,16.3425,0.12067],[115,-1.4838,16.3858,0.12108],[116,-1.485,16.4298,0.12148],[117,-1.4859,16.4746,0.12188],[118,-1.4864,16.52,0.12228],[119,-1.4866,16.5663,0.12268],[120,-1.4864,16.6133,0.12307],[121,-1.4859,16.6612,0.12346],[122,-1.4851,16.71,0.12384],[123,-1.4839,16.7595,0.12422],[124,-1.4825,16.81,0.1246],[125,-1.4807,16.8614,0.12497],[126,-1.4787,16.9136,0.12534],[127,-1.4763,16.9667,0.12571],[128,-1.4737,17.0208,0.12607],[129,-1.4708,17.0757,0.12643],[130,-1.4677,17.1316,0.12678],[131,-1.4642,17.1883,0.12713],[132,-1.4606,17.2459,0.12748],[133,-1.4567,17.3044,0.12782],[134,-1.4526,17.3637,0.12816],[135,-1.4482,17.4238,0.12849],[136,-1.4436,17.4847,0.12882],[137,-1.4389,17.5464,0.12914],[138,-1.4339,17.6088,0.12946],[139,-1.4288,17.6719,0.12978],[140,-1.4235,17.7357,0.13009],[141,-1.418,17.8001,0.1304],[142,-1.4123,17.8651,0.1307],[143,-1.4065,17.9306,0.13099],[144,-1.4006,17.9966,0.13129],[145,-1.3945,18.063,0.13158],[146,-1.3883,18.1297,0.13186],[147,-1.3819,18.1967,0.13214],[148,-1.3755,18.2639,0.13241],[149,-1.3689,18.3312,0.13268],[150,-1.3621,18.3986,0.13295],[151,-1.3553,18.466,0.13321],[152,-1.3483,18.5333,0.13347],[153,-1.3413,18.6006,0.13372],[154,-1.3341,18.6677,0.13397],[155,-1.3269,18.7346,0.13421],[156,-1.3195,18.8012,0.13445],[157,-1.3121,18.8675,0.13469],[158,-1.3046,18.9335,0.13492],[159,-1.297,18.9991,0.13514],[160,-1.2894,19.0642,0.13537],[161,-1.2816,19.1289,0.13559],[162,-1.2739,19.1931,0.1358],[163,-1.2661,19.2567,0.13601],[164,-1.2583,19.3197,0.13622],[165,-1.2504,19.382,0.13642],[166,-1.2425,19.4437,0.13662],[167,-1.2345,19.5045,0.13681],[168,-1.2266,19.5647,0.137],[169,-1.2186,19.624,0.13719],[170,-1.2107,19.6824,0.13738],[171,-1.2027,19.74,0.13756],[172,-1.1947,19.7966,0.13774],[173,-1.1867,19.8523,0.13791],[174,-1.1788,19.907,0.13808],[175,-1.1708,19.9607,0.13825],[176,-1.1629,20.0133,0.13841],[177,-1.1549,20.0648,0.13858],[178,-1.147,20.1152,0.13873],[179,-1.139,20.1644,0.13889],[180,-1.1311,20.2125,0.13904],[181,-1.1232,20.2595,0.1392],[182,-1.1153,20.3053,0.13934],[183,-1.1074,20.3499,0.13949],[184,-1.0996,20.3934,0.13963],[185,-1.0917,20.4357,0.13977],[186,-1.0838,20.4769,0.13991],[187,-1.076,20.517,0.14005],[188,-1.0681,20.556,0.14018],[189,-1.0603,20.5938,0.14031],[190,-1.0525,20.6306,0.14044],[191,-1.0447,20.6663,0.14057],[192,-1.0368,20.7008,0.1407],[193,-1.029,20.7344,0.14082],[194,-1.0212,20.7668,0.14094],[195,-1.0134,20.7982,0.14106],[196,-1.0055,20.8286,0.14118],[197,-0.9977,20.858,0.1413],[198,-0.9898,20.8863,0.14142],[199,-0.9819,20.9137,0.14153],[200,-0.974,20.9401,0.14164],[201,-0.9661,20.9656,0.14176],[202,-0.9582,20.9901,0.14187],[203,-0.9503,21.0138,0.14198],[204,-0.9423,21.0367,0.14208],[205,-0.9344,21.0587,0.14219],[206,-0.9264,21.0801,0.1423],[207,-0.9184,21.1007,0.1424],[208,-0.9104,21.1206,0.1425],[209,-0.9024,21.1399,0.14261],[210,-0.8944,21.1586,0.14271],[211,-0.8863,21.1768,0.14281],[212,-0.8783,21.1944,0.14291],[213,-0.8703,21.2116,0.14301],[214,-0.8623,21.2282,0.14311],[215,-0.8542,21.2444,0.1432],[216,-0.8462,21.2603,0.1433],[217,-0.8382,21.2757,0.1434],[218,-0.8301,21.2908,0.14349],[219,-0.8221,21.3055,0.14359],[220,-0.814,21.32,0.14368],[221,-0.806,21.3341,0.14377],[222,-0.798,21.348,0.14386],[223,-0.7899,21.3617,0.14396],[224,-0.7819,21.3752,0.14405],[225,-0.7738,21.3884,0.14414],[226,-0.7658,21.4014,0.14423],[227,-0.7577,21.4143,0.14432],[228,-0.7496,21.4269,0.14441]]}};
+
+/* ---------- utilitaires ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Math.random().toString(36).slice(2, 10);
+const DAY = 864e5, MONTH_DAYS = 30.4375;
+const pad = n => String(n).padStart(2, "0");
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseD = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+const addMonths = (d, m) => { const r = new Date(d); r.setMonth(r.getMonth() + m); return r; };
+const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; }; // sûr lors des changements d'heure
+const fmtD = (s, opt={day:"numeric",month:"short",year:"numeric"}) => (typeof s==="string"?parseD(s):s).toLocaleDateString("fr-CA", opt);
+const fmtT = ts => new Date(ts).toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"});
+const fmtDur = ms => { const m = Math.round(ms/60000); return m < 60 ? `${m} min` : `${Math.floor(m/60)} h ${pad(m%60)}`; };
+const fmtMin = m => m < 60 ? `${Math.round(m)} min` : `${Math.floor(m/60)} h${m%60?" "+pad(Math.round(m%60)):""}`;
+const localInput = ts => { const d = new Date(ts); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); };
+const fmtNum = (v, dp=1) => Number(v).toLocaleString("fr-CA",{minimumFractionDigits:dp,maximumFractionDigits:dp});
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+/* ---------- âge ---------- */
+const ageMonths = (dob, at = today()) => (at - parseD(dob)) / DAY / MONTH_DAYS;
+// Âge corrigé : si AG < 37 SA, on retire (40 SA − AG) ; appliqué jusqu'à 24 mois d'âge chronologique.
+function correction(c){ const g = (Number(c.gaW)||40)*7 + (Number(c.gaD)||0); return g >= 259 ? 0 : (280 - g)/MONTH_DAYS; }
+const usesCorrected = (c, at = today()) => correction(c) > 0 && ageMonths(c.dob, at) < 24;
+const effAge = (c, at = today(), chrono=false) => { const a = ageMonths(c.dob, at); return (!chrono && usesCorrected(c, at)) ? Math.max(0, a - correction(c)) : a; };
+function ageLabel(m){
+  if (m < 0) return "pas encore né";
+  const days = Math.round(m * MONTH_DAYS);
+  if (days < 14) return `${days} jour${days>1?"s":""}`;
+  if (m < 3) { const w = Math.floor(days/7); return `${w} semaine${w>1?"s":""}`; }
+  if (m < 24) { const mm = Math.floor(m), w = Math.floor((m-mm)*MONTH_DAYS/7); return `${mm} mois${w?` ${w} sem.`:""}`; }
+  const y = Math.floor(m/12), r = Math.floor(m - y*12);
+  return `${y} an${y>1?"s":""}${r && y<6 ? ` ${r} mois` : ""}`;
+}
+const mLabel = m => m < 24 ? `${Math.round(m)} mois` : (m % 12 === 0 ? `${m/12} ans` : `${fmtNum(m/12, 1)} ans`);
+const STAGES = [
+  {max:12, id:"nour", label:"Nourrisson", color:"peach"},
+  {max:36, id:"bamb", label:"Bambin", color:"butter"},
+  {max:72, id:"pres", label:"Préscolaire", color:"mint"},
+  {max:144, id:"scol", label:"Âge scolaire", color:"sky"},
+  {max:9999, id:"ado", label:"Adolescent·e", color:"lilac"},
+];
+const stageOf = m => STAGES.find(s => m < s.max);
+const lookOf = c => (c.look && c.look !== "auto") ? STAGES.find(s => s.id === c.look) : stageOf(ageMonths(c.dob));
+
+/* ---------- moteur OMS (LMS) ---------- */
+const MEAS = {
+  weight:{label:"Poids", unit:"kg", dp:2},
+  height:{label:"Taille", unit:"cm", dp:1},
+  ofc:{label:"Périmètre crânien", unit:"cm", dp:1},
+  bmi:{label:"IMC", unit:"kg/m²", dp:1},
+};
+function lmsAt(meas, sex, m){
+  const t = LMS[meas]?.[sex]; if (!t) return null;
+  if (m < 0 || m > t[t.length-1][0]) return null;
+  const i = Math.min(Math.floor(m), t.length-2), f = m - t[i][0], a = t[i], b = t[i+1];
+  return { L: a[1] + (b[1]-a[1])*f, M: a[2] + (b[2]-a[2])*f, S: a[3] + (b[3]-a[3])*f };
+}
+// X = M·(1 + L·S·z)^(1/L), ou M·exp(S·z) si L = 0
+const xAtZ = ({L,M,S}, z) => Math.abs(L) < 1e-7 ? M*Math.exp(S*z) : M*Math.pow(1 + L*S*z, 1/L);
+// z = ((X/M)^L − 1)/(L·S) ; correction OMS au-delà de ±3 DS pour poids et IMC
+function zScore(meas, sex, m, x){
+  const p = lmsAt(meas, sex, m); if (!p || !(x > 0)) return null;
+  const {L,M,S} = p;
+  let z = Math.abs(L) < 1e-7 ? Math.log(x/M)/S : (Math.pow(x/M, L) - 1)/(L*S);
+  if (meas === "weight" || meas === "bmi"){
+    if (z > 3){ const s3 = xAtZ(p,3), s2 = xAtZ(p,2); z = 3 + (x - s3)/(s3 - s2); }
+    else if (z < -3){ const s3 = xAtZ(p,-3), s2 = xAtZ(p,-2); z = -3 - (s3 - x)/(s2 - s3); }
+  }
+  return z;
+}
+function normCdf(z){ // Abramowitz & Stegun 7.1.26
+  const t = 1/(1 + 0.3275911*Math.abs(z)/Math.SQRT2);
+  const y = 1 - (((((1.061405429*t - 1.453152027)*t) + 1.421413741)*t - 0.284496736)*t + 0.254829592)*t*Math.exp(-z*z/2);
+  return 0.5*(1 + Math.sign(z)*y);
+}
+const pctLabel = z => { const p = normCdf(z)*100; return p < 0.1 ? "<0,1" : p > 99.9 ? ">99,9" : fmtNum(p, p<1||p>99?1:0); };
+const PCT_LINES = [{p:3,z:-1.8808},{p:15,z:-1.0364},{p:50,z:0},{p:85,z:1.0364},{p:97,z:1.8808}];
+const linesCrossed = (z1, z2) => PCT_LINES.filter(l => l.z > Math.min(z1,z2) && l.z < Math.max(z1,z2)).length;
+
+function growthPoints(c, meas, chrono=false){
+  return c.growth.map(g => {
+    let x = meas === "bmi" ? (g.weight && g.height ? g.weight / Math.pow(g.height/100, 2) : null) : g[meas];
+    x = x ? Number(x) : null; if (!x) return null;
+    const m = effAge(c, parseD(g.date), chrono);
+    return { date:g.date, m, x, z: zScore(meas, c.sex, m, x) };
+  }).filter(Boolean).sort((a,b) => a.m - b.m);
+}
+function growthAlerts(c){
+  const out = [];
+  for (const meas of ["weight","height","ofc","bmi"]){
+    const pts = growthPoints(c, meas).filter(p => p.z != null);
+    if (pts.length < 2) continue;
+    const last = pts[pts.length-1];
+    let worst = null;
+    for (const p of pts.filter(p => last.m - p.m <= 12 && p !== last)){ const n = linesCrossed(p.z, last.z); if (n >= 2 && (!worst || n > worst.n)) worst = {n, from:p}; }
+    if (worst) out.push({meas, n:worst.n, dir: last.z < worst.from.z ? "baisse" : "hausse", from:worst.from, last});
+    if (last.z < -1.8808 || last.z > 1.8808) out.push({meas, out:true, last});
+  }
+  return out;
+}
+// Taille cible parentale (Tanner) : (père + mère ± 13)/2, ±8,5 cm
+function midParental(c){
+  const f = Number(c.hFather), m = Number(c.hMother); if (!f || !m) return null;
+  const t = c.sex === "M" ? (f + m + 13)/2 : (f + m - 13)/2;
+  const ref = lmsAt("height", c.sex, 228);
+  return { t, lo: t - 8.5, hi: t + 8.5, z: zScore("height", c.sex, 228, t), ref };
+}
+/* Projection de taille adulte (estimation statistique simple) :
+   1) on suppose que l'enfant garde son z-score actuel jusqu'à 19 ans ;
+   2) incertitude : écart-type résiduel √(1−r²), r = corrélation entre le z actuel et le z adulte,
+      qui augmente avec l'âge (≈0,6 avant 2 ans → ≈0,85 après 10 ans) ; intervalle à 80 % = ±1,28 DS ;
+   3) si la taille parentale est connue, estimation combinée = moyenne des deux z. */
+function heightProjection(c){
+  const pts = growthPoints(c, "height").filter(p => p.z != null);
+  if (!pts.length) return null;
+  const last = pts[pts.length-1];
+  const r = last.m < 24 ? 0.6 : last.m < 48 ? 0.7 : last.m < 120 ? 0.8 : 0.85;
+  const sdRes = Math.sqrt(1 - r*r), half = 1.28*sdRes;
+  const adult = lmsAt("height", c.sex, 228);
+  const mp = midParental(c);
+  const zComb = mp ? (last.z + mp.z)/2 : null;
+  const curve = [];
+  for (let m = Math.ceil(last.m); m <= 228; m += 1){
+    const p = lmsAt("height", c.sex, m); if (!p) continue;
+    const w = half * (m - last.m) / Math.max(1, 228 - last.m);
+    curve.push({m, x:xAtZ(p, last.z), lo:xAtZ(p, last.z - w), hi:xAtZ(p, last.z + w), comb: zComb!=null ? xAtZ(p, last.z + (zComb-last.z)*(m-last.m)/Math.max(1,228-last.m)) : null});
+  }
+  return { last, r, adult:xAtZ(adult, last.z), lo:xAtZ(adult, last.z-half), hi:xAtZ(adult, last.z+half), comb: zComb!=null ? xAtZ(adult, zComb) : null, mp, curve };
+}
+// Vitesse de croissance (cm/an) entre la dernière mesure et une mesure ≥ 4 mois plus tôt
+function heightVelocity(c){
+  const pts = growthPoints(c, "height", true); if (pts.length < 2) return null;
+  const last = pts[pts.length-1];
+  const prev = [...pts].reverse().find(p => last.m - p.m >= 4); if (!prev) return null;
+  return { v: (last.x - prev.x) / ((last.m - prev.m)/12), from:prev, to:last };
+}
+
+/* ---------- PIQ — calendrier régulier (quebec.ca, 2025-2026) ---------- */
+const PIQ = [
+  {age:0, label:"Naissance", note:"Anticorps contre le VRS si né·e pendant la saison (automne-hiver).", doses:[{id:"vrs", name:"Anticorps monoclonal VRS", short:"VRS", seasonal:true}]},
+  {age:2, label:"2 mois", doses:[{id:"dcat2", name:"DCaT-HB-VPI-Hib", short:"Diphtérie, coqueluche, tétanos, hépatite B, polio, Hib"},{id:"pneu2", name:"Pneumocoque conjugué", short:"Pneu-C"},{id:"rota2", name:"Rotavirus (oral)", short:"Rota"}]},
+  {age:4, label:"4 mois", doses:[{id:"dcat4", name:"DCaT-HB-VPI-Hib", short:"Diphtérie, coqueluche, tétanos, hépatite B, polio, Hib"},{id:"pneu4", name:"Pneumocoque conjugué", short:"Pneu-C"},{id:"rota4", name:"Rotavirus (oral)", short:"Rota"}]},
+  {age:12, label:"12 mois", doses:[{id:"dcat12", name:"DCaT-VPI-Hib", short:"Diphtérie, coqueluche, tétanos, polio, Hib"},{id:"pneu12", name:"Pneumocoque conjugué", short:"Pneu-C"},{id:"rrov12", name:"RRO-Var", short:"Rougeole, rubéole, oreillons, varicelle"}]},
+  {age:18, label:"18 mois", doses:[{id:"men18", name:"Méningocoque", short:"Men-C"},{id:"rrov18", name:"RRO-Var", short:"Rougeole, rubéole, oreillons, varicelle"},{id:"hahb18", name:"HAHB", short:"Hépatite A et B"}]},
+  {age:48, label:"4 à 6 ans", window:24, doses:[{id:"dcat4a", name:"dcaT-VPI", short:"Diphtérie, coqueluche, tétanos, polio"}]},
+  {age:111, label:"4e année du primaire", window:12, note:"Donné à l'école (vers 9-10 ans).", doses:[{id:"ha4p", name:"Hépatite A", short:"HA"},{id:"vph4p", name:"VPH", short:"Virus du papillome humain"}]},
+  {age:171, label:"3e secondaire", window:12, note:"Donné à l'école (vers 14-15 ans).", doses:[{id:"dt3s", name:"dT", short:"Diphtérie, tétanos"},{id:"men3s", name:"Méningocoque", short:"Men-C-ACYW"},{id:"hb3s", name:"Hépatite B", short:"HB"}]},
+];
+function vaxStatus(c, g){
+  const due = addMonths(parseD(c.dob), g.age), lateAfter = addMonths(due, g.window || (g.age === 0 ? 3 : 1)), t = today();
+  return g.doses.map(d => {
+    const rec = c.vaccines[d.id]; let st;
+    if (rec) st = "fait";
+    else if (d.seasonal && ageMonths(c.dob) > 8) st = "na";
+    else if (t > lateAfter) st = "retard";
+    else if (t >= addDays(due,-14)) st = "du";
+    else st = "avenir";
+    return { ...d, due, st, rec };
+  });
+}
+function nextVaccines(c){
+  for (const g of PIQ){ const s = vaxStatus(c, g).filter(d => ["retard","du","avenir"].includes(d.st)); if (s.length) return { group:g, doses:s, due:s[0].due }; }
+  return null;
+}
+const VSTAT = { fait:["mint","Reçu"], du:["butter","À donner"], retard:["danger","En retard"], avenir:["sky","À venir"], na:["", "Non applicable"] };
+
+/* Visites préventives suggérées (grille Rourke, puis aux 1-2 ans) */
+const VISITS = [0.25,1,2,4,6,9,12,15,18,24,36,48,60,84,108,132,156,180,204];
+function nextVisit(c){
+  const m = ageMonths(c.dob); const v = VISITS.find(a => a >= m - 0.3);
+  return v == null ? null : { age:v, date: addDays(parseD(c.dob), Math.round(v*MONTH_DAYS)) };
+}
+
+/* ---------- JALONS : [domaine, texte, début de plage (mois), fin de plage, âge d'alerte | null]
+   Motricité globale : fenêtres d'acquisition OMS (MGRS 2006, 1er-99e percentile).
+   Autres sphères : plages usuelles (Denver II, CDC 2022, grille Rourke). Indicatif seulement. */
+const DOMAINS = {
+  gm:{label:"Motricité globale", short:"Globale", color:"peach"},
+  fm:{label:"Motricité fine", short:"Fine", color:"butter"},
+  lang:{label:"Langage et communication", short:"Langage", color:"sky"},
+  soc:{label:"Social, émotionnel et autonomie", short:"Social", color:"lilac"},
+  cog:{label:"Cognitif et jeu", short:"Cognitif", color:"mint"},
+};
+const MS = [
+  ["gm","Lève la tête à 45° couché sur le ventre",1,3,4],
+  ["gm","Tient sa tête droite, bien stable",2,4,5],
+  ["gm","Pousse sur ses avant-bras sur le ventre",2,4,6],
+  ["gm","Se retourne du ventre au dos",3,6,7],
+  ["gm","Se retourne du dos au ventre",4,7,8],
+  ["gm","Assis sans appui",3.8,9.2,9],
+  ["gm","Debout avec appui",4.8,11.4,12],
+  ["gm","Marche à quatre pattes",5.2,13.5,null],
+  ["gm","Marche en se tenant aux meubles",5.9,13.7,15],
+  ["gm","Debout seul quelques secondes",6.9,16.9,null],
+  ["gm","Marche seul",8.2,17.6,18],
+  ["gm","Monte les escaliers avec aide",14,24,null],
+  ["gm","Court",16,24,30],
+  ["gm","Frappe un ballon du pied",15,24,null],
+  ["gm","Saute à pieds joints",22,36,36],
+  ["gm","Pédale un tricycle",30,48,null],
+  ["gm","Monte l'escalier en alternant les pieds",30,48,null],
+  ["gm","Se tient sur un pied 5 secondes",36,60,60],
+  ["gm","Saute sur un pied",40,60,null],
+  ["gm","Attrape un ballon avec les mains",48,72,null],
+  ["fm","Mains ouvertes la plupart du temps",1,4,4],
+  ["fm","Agrippe et secoue un hochet",3,5,6],
+  ["fm","Porte les objets à la bouche",3,6,null],
+  ["fm","Transfère un objet d'une main à l'autre",5,8,9],
+  ["fm","Ramasse en « râteau » avec toute la main",6,9,null],
+  ["fm","Pince pouce-index (petits morceaux)",9,14,15],
+  ["fm","Tape deux objets l'un contre l'autre",8,12,null],
+  ["fm","Met des objets dans un contenant",10,14,null],
+  ["fm","Gribouille spontanément",12,18,24],
+  ["fm","Empile 2 cubes",13,20,null],
+  ["fm","Empile 4 cubes ou plus",18,26,null],
+  ["fm","Tourne les pages une à une",24,36,null],
+  ["fm","Copie un cercle",30,40,48],
+  ["fm","Coupe avec des ciseaux d'enfant",36,48,null],
+  ["fm","Copie une croix",40,54,null],
+  ["fm","Dessine un bonhomme en 3 parties",42,60,null],
+  ["fm","Copie un carré",48,66,null],
+  ["fm","Écrit son prénom",54,72,null],
+  ["lang","Gazouille (sons de voyelles)",1,3,4],
+  ["lang","Rit aux éclats",3,5,6],
+  ["lang","Se tourne vers une voix",3,6,6],
+  ["lang","Babille en syllabes (« ba-ba », « ma-ma »)",5,10,12],
+  ["lang","Répond à son prénom",6,10,12],
+  ["lang","Comprend « non »",7,12,null],
+  ["lang","Pointe du doigt pour montrer",9,14,15],
+  ["lang","Dit un premier mot avec sens",10,14,16],
+  ["lang","Suit une consigne simple avec geste",12,15,18],
+  ["lang","Dit au moins 5 mots",12,18,18],
+  ["lang","Montre des parties du corps nommées",15,24,null],
+  ["lang","Combine 2 mots (« encore lait »)",18,24,24],
+  ["lang","Dit environ 50 mots",20,26,30],
+  ["lang","Fait des phrases de 3 mots",24,36,36],
+  ["lang","Pose des questions (« pourquoi ? »)",30,42,null],
+  ["lang","Compris aux trois quarts par un inconnu",30,48,48],
+  ["lang","Raconte une courte histoire",42,60,60],
+  ["lang","Utilise le passé et le futur",48,60,null],
+  ["lang","Compte jusqu'à 10",48,66,null],
+  ["soc","Fixe les visages",0,2,2],
+  ["soc","Sourit en réponse à votre sourire",1,3,3],
+  ["soc","S'excite en voyant son parent",3,5,null],
+  ["soc","Reconnaît les visages familiers",4,7,null],
+  ["soc","Se méfie des inconnus",6,10,null],
+  ["soc","Joue à « coucou »",7,11,null],
+  ["soc","Fait « bye-bye »",9,13,null],
+  ["soc","Regarde où vous pointez (attention conjointe)",9,14,15],
+  ["soc","Imite les gestes du quotidien",12,18,null],
+  ["soc","Boit au verre, mange à la cuillère",13,20,null],
+  ["soc","Joue à faire semblant",15,24,24],
+  ["soc","Aide à se déshabiller",18,30,null],
+  ["soc","Joue à côté d'autres enfants",24,36,null],
+  ["soc","Joue avec d'autres, attend son tour",30,48,48],
+  ["soc","Propre le jour",24,48,null],
+  ["soc","S'habille seul",42,60,null],
+  ["soc","Suit les règles d'un jeu",48,66,null],
+  ["cog","Suit un objet des yeux de gauche à droite",1,3,4],
+  ["cog","Explore les objets avec les mains et la bouche",3,6,null],
+  ["cog","Cherche un objet tombé",6,9,null],
+  ["cog","Trouve un objet caché sous un tissu",8,12,null],
+  ["cog","Utilise les objets correctement (brosse, téléphone)",12,18,null],
+  ["cog","Fait un encastrement simple",18,30,null],
+  ["cog","Associe des objets pareils (couleurs, formes)",24,36,null],
+  ["cog","Dit son prénom et son âge",30,42,null],
+  ["cog","Compte 3 objets",36,48,null],
+  ["cog","Nomme 4 couleurs",36,54,null],
+  ["cog","Comprend « pareil » et « différent »",36,54,54],
+  ["cog","Distingue le réel de l'imaginaire",48,66,null],
+  ["cog","Reconnaît des lettres, dont celles de son prénom",48,72,null],
+].map(([d,t,a,b,al]) => ({d, t, a, b, al, k:`${d}|${t}`}));
+const BANDS = [2,4,6,9,12,15,18,24,30,36,48,60,72];
+const bandOf = it => BANDS.find(b => b >= it.b - 0.5) || 72;
+const bandLabel = b => b < 24 ? `${b} mois` : b % 12 ? `${b/12} ans`.replace(".5"," ½") : `${b/12} ans`;
+const GENERAL_FLAGS = [
+  "Perte d'une habileté déjà acquise (à tout âge)",
+  "Préférence nette d'une main avant 12 mois, ou un côté qui bouge moins",
+  "Raideur ou mollesse marquée du corps",
+  "Marche persistante sur la pointe des pieds après 2 ans",
+  "Peu de contact visuel ou d'intérêt pour les personnes",
+  "Inquiétude persistante du parent : elle compte, parlez-en",
+];
+
+/* ---------- repères 6-18 ans ---------- */
+const OLDER = {
+  scol:[
+    {t:"Sommeil", d:"9 à 11 h par nuit entre 5 et 13 ans, avec des heures de coucher et de lever régulières."},
+    {t:"Activité physique", d:"60 min par jour d'activité modérée à intense ; activités intenses et de renforcement 3 jours par semaine."},
+    {t:"Écrans", d:"Au plus 2 h par jour de loisirs à l'écran. Pas d'écran dans la chambre la nuit."},
+    {t:"Apprentissages", d:"Difficultés persistantes de lecture, d'écriture, d'attention ou de coordination : un bilan précoce aide."},
+    {t:"Puberté", d:"Début habituel : 8 à 13 ans chez la fille, 9 à 14 ans chez le garçon. Consultez si signes avant 8 ans (fille) ou 9 ans (garçon)."},
+    {t:"Amitiés", d:"Avoir au moins un ami proche protège. Un enfant isolé ou intimidé a besoin qu'on en parle."},
+  ],
+  ado:[
+    {t:"Sommeil", d:"8 à 10 h par nuit entre 14 et 17 ans. Les ados s'endorment naturellement plus tard : protégez les heures de sommeil."},
+    {t:"Santé mentale", d:"Changements durables d'humeur, retrait, chute des notes ou du sommeil : parlez-en sans juger."},
+    {t:"Puberté", d:"Consultez si aucun signe à 13 ans (fille) ou 14 ans (garçon), ou pas de règles 3 ans après le début des seins."},
+    {t:"Autonomie", d:"Préparez la transition : prendre ses rendez-vous, connaître ses médicaments, sa carte RAMQ, ses allergies."},
+    {t:"Écrans et réseaux", d:"Convenez ensemble de règles : téléphone hors de la chambre la nuit, vie privée en ligne, temps de jeu."},
+    {t:"Prévention", d:"Consentement, alcool, cannabis, vapotage, conduite : abordez ces sujets tôt, souvent, sans dramatiser."},
+  ],
+};
+
+/* ---------- Mouvement sur 24 h (lignes directrices canadiennes) ---------- */
+function guide(m){
+  if (m < 4)   return {sleep:[14,17], act:30, actLbl:"Temps sur le ventre", screen:0, read:10};
+  if (m < 12)  return {sleep:[12,16], act:30, actLbl:"Jeu au sol et ventre", screen:0, read:10};
+  if (m < 24)  return {sleep:[11,14], act:180, actLbl:"Activité, toutes intensités", screen:0, read:15};
+  if (m < 36)  return {sleep:[11,14], act:180, actLbl:"Activité, toutes intensités", screen:60, read:15};
+  if (m < 60)  return {sleep:[10,13], act:180, actLbl:"Activité, dont 60 min énergique", screen:60, read:15};
+  if (m < 168) return {sleep:[9,11], act:60, actLbl:"Activité modérée à intense", screen:120, read:20};
+  return {sleep:[8,10], act:60, actLbl:"Activité modérée à intense", screen:120, read:20};
+}
+
+/* ---------- dents, allergènes ---------- */
+const TEETH = [
+  {id:"li", n:"Incisives centrales du bas", age:"6-10 mois"},{id:"ui", n:"Incisives centrales du haut", age:"8-12 mois"},
+  {id:"ul", n:"Incisives latérales du haut", age:"9-13 mois"},{id:"ll", n:"Incisives latérales du bas", age:"10-16 mois"},
+  {id:"um1", n:"Premières molaires du haut", age:"13-19 mois"},{id:"lm1", n:"Premières molaires du bas", age:"14-18 mois"},
+  {id:"uc", n:"Canines du haut", age:"16-22 mois"},{id:"lc", n:"Canines du bas", age:"17-23 mois"},
+  {id:"lm2", n:"Deuxièmes molaires du bas", age:"23-31 mois"},{id:"um2", n:"Deuxièmes molaires du haut", age:"25-33 mois"},
+];
+const ALLERGENS = ["Arachides","Œufs","Lait de vache","Noix","Soya","Sésame","Blé","Poisson","Crustacés et mollusques","Moutarde"];
+
+/* ---------- CONSEILS : [catégorie, âge min (mois), âge max, titre, texte] ---------- */
+const TIPCAT = {
+  sommeil:["Sommeil","lilac"], alim:["Alimentation","mint"], secu:["Sécurité","butter"], sante:["Santé","rose"],
+  dev:["Éveil et développement","peach"], ecrans:["Écrans","sky"], activite:["Activité et sport","mint"],
+  emotions:["Émotions et relations","lilac"], ecole:["École","sky"], puberte:["Puberté","rose"], prevention:["Prévention ado","butter"],
+};
+const TIPS = [
+  ["sommeil",0,12,"Sommeil sécuritaire","Toujours sur le dos, seul dans son lit, sans oreiller, bordure ni peluche. Chambre entre 18 et 20 °C, près des parents les 6 premiers mois."],
+  ["sommeil",4,36,"Routine du dodo","Bain, pyjama, histoire, câlin : la même séquence chaque soir aide l'enfant à s'endormir."],
+  ["sommeil",36,144,"Heure de coucher stable","Une heure de coucher régulière, même la fin de semaine, protège l'humeur et l'attention."],
+  ["sommeil",144,999,"Ados et sommeil","Les écrans hors de la chambre la nuit sont la mesure la plus efficace pour le sommeil des ados."],
+  ["alim",0,6,"Allaitement et vitamine D","400 UI de vitamine D par jour pour les bébés allaités, partiellement ou complètement."],
+  ["alim",4,12,"Début des aliments solides","Vers 6 mois, quand bébé tient assis et montre de l'intérêt. Pas avant 4 mois."],
+  ["alim",4,24,"Allergènes tôt et souvent","Offrez arachides, œufs et autres allergènes dès le début des solides, puis plusieurs fois par semaine."],
+  ["alim",0,12,"Pas de miel avant 1 an","Risque de botulisme infantile, même cuit dans un aliment."],
+  ["alim",6,36,"Haut-le-cœur ou étouffement ?","Un haut-le-cœur est bruyant et protecteur. Un enfant qui s'étouffe est silencieux, ne tousse pas efficacement et peut bleuir : 911."],
+  ["alim",12,72,"Toux aux repas","Toux fréquente, voix mouillée ou pneumonies à répétition aux repas peuvent signaler un trouble de déglutition : parlez-en au médecin."],
+  ["alim",12,144,"Le parent décide quoi, l'enfant décide combien","Offrez des repas variés à heures fixes et laissez l'enfant écouter sa faim, sans forcer ni récompenser."],
+  ["alim",144,999,"Ados et alimentation","Déjeuner, eau plutôt que boissons sucrées ou énergisantes. Restrictions ou pesées répétées : soyez attentifs."],
+  ["secu",0,48,"Siège d'auto","Orienté vers l'arrière le plus longtemps possible, jusqu'aux limites indiquées par le fabricant."],
+  ["secu",48,144,"Siège d'appoint","Jusqu'à 145 cm ou 9 ans selon la loi québécoise."],
+  ["secu",6,60,"Maison sécuritaire","Barrières d'escalier, médicaments et produits ménagers hors de portée, arrêts de fenêtre."],
+  ["secu",12,144,"Eau et baignade","Toujours à portée de bras d'un adulte. Cours de natation dès que possible, veste de flottaison en bateau."],
+  ["secu",36,999,"Casque","Vélo, trottinette, planche, ski : casque bien ajusté à chaque sortie."],
+  ["sante",0,3,"Fièvre avant 3 mois","Une température rectale de plus de 38,0 °C chez un bébé de moins de 3 mois demande une consultation rapide."],
+  ["sante",0,999,"Info-Santé 811","Une infirmière répond 24 h/24 pour vous aider à décider s'il faut consulter."],
+  ["sante",6,999,"Dents","Brossage deux fois par jour avec dentifrice fluoré. Visite chez le dentiste chaque année, couverte par la RAMQ jusqu'à 10 ans."],
+  ["sante",36,84,"Vision","Un examen de la vue est recommandé avant l'entrée à l'école, couvert par la RAMQ."],
+  ["dev",0,12,"Parler à bébé","Décrivez ce que vous faites, chantez, répondez à ses sons : c'est la base du langage."],
+  ["dev",0,999,"Lire chaque jour","Lire avec l'enfant dès la naissance enrichit le vocabulaire et le lien. À l'école, 20 minutes par jour."],
+  ["dev",12,72,"Jouer, c'est apprendre","Blocs, pâte à modeler, jeu libre dehors : mieux que les jouets électroniques pour le développement."],
+  ["dev",0,12,"Temps sur le ventre","Plusieurs fois par jour, éveillé et surveillé, dès la naissance, pour la force du cou et prévenir la tête plate."],
+  ["ecrans",0,24,"Pas d'écran avant 2 ans","Sauf les appels vidéo avec la famille."],
+  ["ecrans",24,60,"Écrans de 2 à 5 ans","Moins d'une heure par jour, contenu de qualité, regardé avec un adulte."],
+  ["ecrans",60,999,"Plan familial des écrans","Écrans éteints aux repas et 1 h avant le coucher, appareils hors de la chambre la nuit."],
+  ["activite",12,72,"Bouger 3 heures par jour","Les 1-4 ans devraient être actifs au moins 180 minutes réparties dans la journée."],
+  ["activite",60,144,"Essayer plusieurs sports","Avant 12 ans, varier les sports réduit les blessures et l'abandon. Évitez la spécialisation précoce."],
+  ["activite",72,999,"Douleur qui fait boiter","Une douleur au genou, au talon ou au dos qui persiste ou fait boiter chez un jeune sportif mérite une évaluation."],
+  ["activite",72,999,"Commotion cérébrale","Après un coup à la tête : arrêt immédiat du jeu, aucun retour le même jour, retour progressif selon un protocole."],
+  ["emotions",12,60,"Crises de colère","Normales vers 2-3 ans. Restez calme, nommez l'émotion, gardez la limite."],
+  ["emotions",60,999,"Un moment seul à seul","Quelques minutes par jour d'attention exclusive renforcent le lien et la coopération."],
+  ["emotions",72,999,"Intimidation","Changements d'humeur, objets perdus, refus d'aller à l'école : demandez directement, sans minimiser."],
+  ["ecole",48,84,"Entrée à la maternelle","Autonomie aux toilettes, ouvrir sa boîte à lunch, s'habiller : pratiquez l'été avant."],
+  ["ecole",72,999,"Devoirs","Un coin calme, un horaire fixe, et votre intérêt plus que vos corrections."],
+  ["puberte",96,168,"En parler avant","Expliquez les changements du corps avant qu'ils arrivent : règles, mues, odeurs, émotions."],
+  ["puberte",108,216,"Image corporelle","Parlez du corps en termes de santé et de force plutôt que de poids ou d'apparence."],
+  ["prevention",144,999,"Consentement et relations","Parlez de respect, de consentement et des relations saines, en personne et en ligne."],
+  ["prevention",144,999,"Substances","Alcool, cannabis, vapotage : informez sans dramatiser, et dites à votre ado qu'il peut toujours vous appeler pour revenir."],
+  ["prevention",168,999,"Conduite","Pas de téléphone au volant, pas de conduite après consommation. Le permis graduel protège les jeunes conducteurs."],
+  ["prevention",144,999,"Santé mentale","Tel-jeunes et le 988 sont accessibles par texto. Gardez les numéros dans le téléphone de votre ado."],
+];
+const tipsFor = (c, m) => TIPS.filter(t => m >= t[1] && m < t[2] && !(c.hideTips||[]).includes(t[0]));
+
+/* ---------- MODULES (masquables par enfant) ---------- */
+const MODULES = [
+  {k:"feeding", l:"Boires et tétées", d:"Sein, biberon, minuterie", def:m => m < 18},
+  {k:"solids", l:"Aliments et allergènes", d:"Repas, introduction des allergènes", def:m => m >= 4 && m < 36},
+  {k:"diapers", l:"Couches", d:"Pipi, selles", def:m => m < 42},
+  {k:"tummy", l:"Temps sur le ventre", d:"Pour les tout-petits", def:m => m < 9},
+  {k:"teeth", l:"Dents de lait", d:"Poussée dentaire", def:m => m >= 3 && m < 42},
+  {k:"milestones", l:"Jalons du développement", d:"0 à 6 ans", def:m => m < 78},
+  {k:"older", l:"Repères 6-18 ans", d:"Sommeil, puberté, santé mentale", def:m => m >= 60},
+  {k:"ofc", l:"Périmètre crânien", d:"Courbe de la tête", def:m => m < 36},
+  {k:"projection", l:"Projection de taille", d:"Estimation de taille adulte", def:m => m >= 12},
+  {k:"sports", l:"Sports et activités", d:"Horaire hebdomadaire, sports", def:m => m >= 36},
+  {k:"reading", l:"Lecture", d:"Minutes et livres", def:m => true},
+  {k:"screen", l:"Écrans", d:"Minutes de loisirs à l'écran", def:m => m >= 18},
+  {k:"mood", l:"Humeur", d:"Suivi de l'humeur", def:m => m >= 48},
+  {k:"firsts", l:"Premières fois", d:"Souvenirs", def:m => true},
+];
+const mod = (c, k) => { const o = c.modules?.[k]; if (o === true || o === false) return o; const M = MODULES.find(x => x.k === k); return M ? M.def(ageMonths(c.dob)) : true; };
+
+/* ---------- état et stockage local ---------- */
+const KEY = "care.v1";
+let S;
+const blankKid = () => ({vaccines:{}, milestones:{}, teeth:{}, allergensLog:{}, growth:[], logs:[], firsts:[], events:[], activities:[], modules:{}, hideTips:[], look:"auto", photo:null, nick:""});
+function demoState(){
+  const t = today(), n = Date.now(), H = 36e5;
+  const dob1 = iso(addDays(t, -232));
+  const kid1 = {...blankKid(), id:uid(), name:"Léa", dob:dob1, sex:"F", gaW:35, gaD:2, color:"peach", hFather:178, hMother:164,
+    allergies:"", conditions:"", meds:"Vitamine D", doctor:"Dre Tremblay, GMF du Plateau", pharmacy:""};
+  const d1 = parseD(dob1), at = mm => iso(addMonths(d1, mm));
+  kid1.vaccines = { vrs:{date:iso(addDays(d1,2)),lot:"VR2241",site:"Cuisse gauche",reactions:""},
+    dcat2:{date:at(2),lot:"A81K",site:"Cuisse gauche",reactions:"Fièvre légère le soir"}, pneu2:{date:at(2),lot:"P553",site:"Cuisse droite",reactions:""}, rota2:{date:at(2),lot:"R19",site:"Oral",reactions:""},
+    dcat4:{date:at(4),lot:"A90B",site:"Cuisse gauche",reactions:""}, pneu4:{date:at(4),lot:"P601",site:"Cuisse droite",reactions:""}, rota4:{date:at(4),lot:"R22",site:"Oral",reactions:""} };
+  kid1.teeth = {li:iso(addDays(t,-12))};
+  kid1.allergensLog = {"Arachides":[iso(addDays(t,-20)),iso(addDays(t,-13)),iso(addDays(t,-6))],"Œufs":[iso(addDays(t,-18)),iso(addDays(t,-9))]};
+  kid1.growth = [[0,2.45,46,32],[0.5,2.7,47.2,32.8],[1,3.2,49.5,34.2],[2,4.3,53.5,36.4],[4,5.6,59.5,39.4],[6,6.6,63.4,41.2],[7.5,7.1,65.6,42]]
+    .map(([m,w,h,c]) => ({id:uid(), date:iso(addDays(d1, Math.round(m*MONTH_DAYS))), weight:w, height:h, ofc:c}));
+  MS.filter(it => it.b <= 6.5 || ["Assis sans appui","Transfère un objet d'une main à l'autre","Babille en syllabes (« ba-ba », « ma-ma »)"].includes(it.t)).forEach(it => kid1.milestones[it.k] = iso(addDays(t,-20)));
+  const logs1 = [];
+  for (let d=0; d<7; d++){
+    const base = today().getTime() - d*DAY;
+    logs1.push({id:uid(), type:"sleep", t:base - 3.5*H, end:base + 6.5*H, data:{}});
+    logs1.push({id:uid(), type:"sleep", t:base + 13*H, end:base + (14.2 + (d%3)*0.3)*H, data:{}});
+    logs1.push({id:uid(), type:"tummy", t:base + 10*H, data:{min:15 + (d%4)*5}});
+    logs1.push({id:uid(), type:"read", t:base + 19*H, data:{min:10 + (d%2)*5, title:"Imagier des animaux"}});
+  }
+  logs1.push({id:uid(), type:"feed", t:n-1.2*H, end:n-1.2*H+15*6e4, data:{mode:"Sein gauche"}},
+    {id:uid(), type:"diaper", t:n-1.5*H, data:{kind:"Pipi"}}, {id:uid(), type:"feed", t:n-4.6*H, data:{mode:"Biberon", ml:150}},
+    {id:uid(), type:"solid", t:n-5.5*H, data:{food:"Purée de patate douce"}}, {id:uid(), type:"diaper", t:n-6*H, data:{kind:"Pipi et selle"}});
+  kid1.logs = logs1.filter(l => l.t < n);
+  kid1.firsts = [{id:uid(), date:iso(addDays(t,-60)), title:"Premier vrai éclat de rire", note:"En regardant le chat."},{id:uid(), date:iso(addDays(t,-12)), title:"Première dent", note:"Incisive du bas."}];
+  kid1.events = [{id:uid(), date:iso(addDays(t,9)), time:"09:30", title:"Suivi 9 mois, Dre Tremblay", type:"medecin"},{id:uid(), date:iso(addDays(t,3)), time:"10:00", title:"Halte-garderie, essai", type:"garde"}];
+
+  const dob2 = "2013-05-14", d2 = parseD(dob2);
+  const kid2 = {...blankKid(), id:uid(), name:"Noah", dob:dob2, sex:"M", gaW:39, gaD:4, color:"sky", hFather:178, hMother:164,
+    allergies:"Arachides (anaphylaxie, auto-injecteur)", conditions:"Asthme léger", meds:"Salbutamol au besoin", doctor:"Dre Tremblay", pharmacy:""};
+  PIQ.forEach(g => { if (g.age < 160) g.doses.forEach(d => { if (!d.seasonal) kid2.vaccines[d.id] = {date:iso(addMonths(d2, g.age)), lot:"", site:"", reactions:""}; }); });
+  kid2.growth = [[24,12.4,87],[48,16.5,103],[72,21,116.5],[96,26,128],[108,29.5,134],[120,33.2,140],[132,37.6,145.5],[144,42.5,152],[156,48,159]].map(([m,w,h]) => ({id:uid(), date:iso(addMonths(d2, m)), weight:w, height:h}));
+  const logs2 = [];
+  for (let d=0; d<7; d++){
+    const base = today().getTime() - d*DAY;
+    logs2.push({id:uid(), type:"sleep", t:base - 1.5*H + (d%3)*0.5*H, end:base + 7*H, data:{}});
+    logs2.push({id:uid(), type:"screen", t:base + 17*H, data:{min:[95,140,80,160,110,70,130][d]}});
+    if (d%2===0) logs2.push({id:uid(), type:"activity", t:base + 18*H, data:{what:d%4===0?"Soccer":"Vélo", min:d%4===0?75:40, intensity:"Intense"}});
+    else logs2.push({id:uid(), type:"activity", t:base + 15.5*H, data:{what:"Marche vers l'école", min:25, intensity:"Modérée"}});
+    logs2.push({id:uid(), type:"read", t:base + 21*H, data:{min:[20,15,30,0,25,20,10][d], title:"Roman graphique"}});
+    logs2.push({id:uid(), type:"mood", t:base + 20*H, data:{mood:["Bien","Super","Bien","Moyen","Bien","Super","Bien"][d]}});
+  }
+  kid2.logs = logs2.filter(l => l.t < n && !(l.type==="read" && !l.data.min));
+  kid2.events = [{id:uid(), date:iso(addDays(t,14)), time:"16:00", title:"Dentiste", type:"dentiste"}];
+  kid2.activities = [{id:uid(), name:"Soccer", days:[2,4], time:"18:00", place:"Parc Laurier"},{id:uid(), name:"Natation", days:[6], time:"10:00", place:"Piscine du quartier"}];
+  return {children:[kid1, kid2], active:kid1.id, demo:true, timer:null, theme:null};
+}
+function load(){ try { const r = localStorage.getItem(KEY) || localStorage.getItem("poussin.v1"); if (r) return JSON.parse(r); } catch(e){} return null; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){ toast("Stockage plein : retirez la photo ou faites une sauvegarde"); } }
+S = load() || demoState();
+S.children.forEach(c => { const b = blankKid(); for (const k in b) if (c[k] === undefined) c[k] = b[k]; });
+
+const UI = { view:"home", sub:{sante:"vaccins", courbes:"weight"}, msMode:"concis", msAll:false, chrono:false, range:null, calMonth:null, calSel:null };
+try { const h = location.hash.slice(1); if (["home","quotidien","courbes","sante","agenda","plus"].includes(h)) UI.view = h; } catch(e){}
+const child = () => S.children.find(c => c.id === S.active) || S.children[0];
+
+/* ---------- icônes ---------- */
+const I = {
+  home:'<path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z"/>',
+  sunrise:'<path d="M4 18h16M7 18a5 5 0 0 1 10 0M12 6v3M5.6 10.6l1.5 1.5M18.4 10.6l-1.5 1.5"/>',
+  chart:'<path d="M4 19c4-1 6-5 9-9s5-5 7-5"/><path d="M4 19h16M4 5v14"/>',
+  heart:'<path d="M12 19s-7-4.4-7-9.5A3.8 3.8 0 0 1 12 7a3.8 3.8 0 0 1 7 2.5C19 14.6 12 19 12 19z"/>',
+  cal:'<rect x="4" y="5.5" width="16" height="14" rx="3"/><path d="M4 10h16M9 3.5v4M15 3.5v4"/>',
+  more:'<circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/>',
+  bottle:'<path d="M9.5 3h5M10 3v3l-2 2.5V19a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V8.5L14 6V3"/><path d="M8 12h8M8 15.5h8"/>',
+  moon:'<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>',
+  drop:'<path d="M12 4s-6 6.5-6 10.5a6 6 0 0 0 12 0C18 10.5 12 4 12 4z"/>',
+  thermo:'<path d="M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 9v7"/>',
+  pill:'<rect x="3.5" y="9" width="17" height="6" rx="3" transform="rotate(-35 12 12)"/><path d="m9.5 8.5 5 7"/>',
+  spoon:'<ellipse cx="12" cy="7" rx="3.5" ry="4"/><path d="M12 11v10"/>',
+  smile:'<circle cx="12" cy="12" r="8"/><path d="M9 14c1.6 1.6 4.4 1.6 6 0M9.5 10h0M14.5 10h0"/>',
+  screen:'<rect x="4" y="5" width="16" height="11" rx="2"/><path d="M9 20h6M12 16v4"/>',
+  run:'<circle cx="14" cy="5" r="2"/><path d="m6 20 3-5 3 2 2-5 3 3h2M9 15l1-5 4-1"/>',
+  book:'<path d="M4 5.5C6.5 4 9.5 4 12 6c2.5-2 5.5-2 8-.5V19c-2.5-1.5-5.5-1.5-8 .5-2.5-2-5.5-2-8-.5z"/><path d="M12 6v13.5"/>',
+  tummy:'<circle cx="7" cy="12" r="3"/><path d="M10 14h9a2 2 0 0 0 0-4h-6"/><path d="M4 18h16"/>',
+  ball:'<circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16M6.3 6.3c3 3 3 8.4 0 11.4M17.7 6.3c-3 3-3 8.4 0 11.4"/>',
+  note:'<path d="M5 19 6 15 15.5 5.5a2 2 0 0 1 3 3L9 18z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  syringe:'<path d="m18 6-2-2M15 5l4 4M17 7l-8.5 8.5-3 .5.5-3L14.5 4.5M9.5 10.5l2 2M7.5 12.5l2 2M4 20l2.5-2.5"/>',
+  star:'<path d="m12 4 2.3 4.8 5.2.7-3.8 3.6.9 5.2L12 15.8l-4.6 2.5.9-5.2-3.8-3.6 5.2-.7z"/>',
+  tooth:'<path d="M7 4c-2 0-3 1.8-3 4 0 3 1.5 4 2 7 .4 2.5 1 5 2.3 5 1.4 0 1.4-4.5 3.7-4.5s2.3 4.5 3.7 4.5c1.3 0 1.9-2.5 2.3-5 .5-3 2-4 2-7 0-2.2-1-4-3-4-1.8 0-3 1-5 1S8.8 4 7 4z"/>',
+  phone:'<path d="M6.5 4h3l1.5 4-2 1.5a10 10 0 0 0 5.5 5.5L16 13l4 1.5v3A2 2 0 0 1 18 19.5 15.5 15.5 0 0 1 4.5 6 2 2 0 0 1 6.5 4z"/>',
+  doc:'<path d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"/><path d="M14 3.5V8h4M9 13h6M9 16.5h6"/>',
+  db:'<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
+  info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h0"/>',
+  alert:'<path d="M12 4 21 19H3z"/><path d="M12 10v4M12 17h0"/>',
+  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  x:'<path d="M6 6l12 12M18 6 6 18"/>',
+  left:'<path d="m14.5 6-6 6 6 6"/>', right:'<path d="m9.5 6 6 6-6 6"/>',
+  edit:'<path d="M5 19 6 15 15.5 5.5a2 2 0 0 1 3 3L9 18z"/>',
+  trash:'<path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
+  auto:'<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>',
+  copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  user:'<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  sliders:'<path d="M5 7h9M18 7h1M5 17h3M12 17h7"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  bulb:'<path d="M9 17h6M10 20h4M12 4a5.5 5.5 0 0 0-3.2 10c.7.5 1.2 1.3 1.2 2v1h4v-1c0-.7.5-1.5 1.2-2A5.5 5.5 0 0 0 12 4z"/>',
+};
+const icon = (n, cls="") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" class="${cls}" aria-hidden="true">${I[n]}</svg>`;
+
+/* Avatar : photo si présente, sinon petite tête ronde (initiale pour les ados) */
+function avatar(c, size=32){
+  if (c.photo) return `<img class="avatar" src="${c.photo}" alt="" style="width:${size}px;height:${size}px">`;
+  const col = c.color || "peach", st = lookOf(c).id;
+  if (st === "ado" || st === "scol") return `<svg class="avatar" style="width:${size}px;height:${size}px" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="var(--${col})"/><text x="32" y="42" text-anchor="middle" font-family="${st==="ado"?"Outfit":"Fredoka"},sans-serif" font-weight="600" font-size="28" fill="#2A1A10">${esc((c.name||"?")[0].toUpperCase())}</text></svg>`;
+  const tuft = st === "nour" ? `<path d="M30 10c-3-4 2-8 6-5" stroke="var(--${col}-ink)" stroke-width="2.5" fill="none" stroke-linecap="round"/>` : "";
+  return `<svg class="avatar" style="width:${size}px;height:${size}px" viewBox="0 0 64 64" aria-hidden="true">
+    <circle cx="14" cy="17" r="8" fill="var(--${col})"/><circle cx="50" cy="17" r="8" fill="var(--${col})"/>
+    <circle cx="14" cy="17" r="4" fill="var(--${col}-bg)"/><circle cx="50" cy="17" r="4" fill="var(--${col}-bg)"/>
+    <circle cx="32" cy="35" r="24" fill="var(--${col})"/>${tuft}
+    <ellipse cx="32" cy="41" rx="13" ry="10" fill="var(--${col}-bg)"/>
+    <circle cx="24" cy="32" r="2.6" fill="#2A2340"/><circle cx="40" cy="32" r="2.6" fill="#2A2340"/>
+    <path d="M28 42c2.4 2 5.6 2 8 0" stroke="#2A2340" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <circle cx="19" cy="39" r="3" fill="var(--rose)" opacity=".55"/><circle cx="45" cy="39" r="3" fill="var(--rose)" opacity=".55"/></svg>`;
+}
+const mascot = (s=34) => `<svg viewBox="0 0 64 64" width="${s}" height="${s}" aria-hidden="true"><path d="M32 8c13 0 22 10 22 24 0 13-9 24-22 24S10 45 10 32C10 18 19 8 32 8z" fill="var(--butter)"/><path d="M28 9c-2-4 3-7 6-4" stroke="var(--butter-ink)" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="25" cy="29" r="2.8" fill="#2A2340"/><circle cx="39" cy="29" r="2.8" fill="#2A2340"/><path d="M29 35l3 3 3-3z" fill="var(--peach)"/><circle cx="20" cy="36" r="3" fill="var(--rose)" opacity=".5"/><circle cx="44" cy="36" r="3" fill="var(--rose)" opacity=".5"/></svg>`;
+
+/* ---------- AMBIANCE PAR ÂGE : décor de fond + illustration du héros ---------- */
+const star = (x,y,r,f) => { let p=""; for (let i=0;i<10;i++){ const a = Math.PI/5*i - Math.PI/2, rr = i%2 ? r*.45 : r; p += `${i?"L":"M"}${(x+Math.cos(a)*rr).toFixed(1)},${(y+Math.sin(a)*rr).toFixed(1)}`; } return `<path d="${p}Z" fill="${f}"/>`; };
+const cloud = (x,y,s,f) => `<g transform="translate(${x} ${y}) scale(${s})" fill="${f}"><circle cx="0" cy="10" r="22"/><circle cx="28" cy="0" r="30"/><circle cx="60" cy="12" r="22"/><rect x="-10" y="10" width="80" height="22" rx="11"/></g>`;
+function decoSVG(st){
+  const W = 1200, H = 900; let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">`;
+  if (st === "nour"){
+    s += cloud(80,120,1.4,"var(--sky-bg)") + cloud(900,80,1.8,"var(--lilac-bg)") + cloud(1020,620,1.3,"var(--peach-bg)") + cloud(180,700,1.6,"var(--mint-bg)");
+    [[300,90,12],[640,60,9],[1100,300,14],[60,420,10],[520,820,12],[860,420,8],[1150,820,10],[400,500,7]].forEach(([x,y,r],i)=> s += star(x,y,r, i%2?"var(--butter)":"var(--lilac)"));
+    s += `<path d="M1120 140a46 46 0 1 1-36-70 36 36 0 0 0 36 70z" fill="var(--butter)"/>`;
+  } else if (st === "bamb"){
+    const cols = ["var(--peach)","var(--butter)","var(--mint)","var(--sky)","var(--lilac)","var(--rose)"];
+    [[90,140,40],[1080,110,56],[260,760,48],[980,720,40],[620,60,26],[40,520,30],[1160,460,34],[520,860,30]].forEach(([x,y,r],i)=>{
+      const f = cols[i%6];
+      s += i%3===0 ? `<circle cx="${x}" cy="${y}" r="${r}" fill="${f}" opacity=".35"/>` : i%3===1 ? `<rect x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="${r*.35}" fill="${f}" opacity=".35" transform="rotate(${i*13} ${x} ${y})"/>` : `<path d="M${x} ${y-r}L${x+r} ${y+r*.8}H${x-r}Z" fill="${f}" opacity=".35" stroke-linejoin="round"/>`;
+    });
+  } else if (st === "pres"){
+    s += `<g fill="none" stroke-width="22" stroke-linecap="round" opacity=".35"><path d="M-40 900a280 280 0 0 1 560 0" stroke="var(--rose)"/><path d="M0 900a240 240 0 0 1 480 0" stroke="var(--butter)"/><path d="M40 900a200 200 0 0 1 400 0" stroke="var(--mint)"/><path d="M80 900a160 160 0 0 1 320 0" stroke="var(--sky)"/></g>`;
+    s += `<circle cx="1080" cy="130" r="60" fill="var(--butter)" opacity=".5"/>`;
+    for (let i=0;i<10;i++){ const a = i*Math.PI/5; s += `<line x1="${1080+Math.cos(a)*80}" y1="${130+Math.sin(a)*80}" x2="${1080+Math.cos(a)*104}" y2="${130+Math.sin(a)*104}" stroke="var(--butter)" stroke-width="8" stroke-linecap="round" opacity=".5"/>`; }
+    s += `<path d="M700 60c40-30 80 30 120 0s80 30 120 0" stroke="var(--lilac)" stroke-width="8" fill="none" stroke-linecap="round" opacity=".4"/><path d="M900 780c40-30 80 30 120 0s80 30 120 0" stroke="var(--peach)" stroke-width="8" fill="none" stroke-linecap="round" opacity=".4"/>`;
+  } else if (st === "scol"){
+    s += `<defs><pattern id="nb" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M0 39.5H40" stroke="var(--sky)" stroke-width="1" opacity=".35"/></pattern></defs><rect width="${W}" height="${H}" fill="url(#nb)"/><line x1="90" y1="0" x2="90" y2="${H}" stroke="var(--rose)" stroke-width="2" opacity=".35"/>`;
+    [[1040,140,22],[1140,520,16],[260,820,18]].forEach(([x,y,r],i)=> s += star(x,y,r, ["var(--butter)","var(--mint)","var(--lilac)"][i]));
+    s += `<g transform="translate(960 700) rotate(-30)" opacity=".5"><rect width="200" height="26" rx="5" fill="var(--butter)"/><path d="M200 0l34 13-34 13z" fill="var(--peach)"/><rect x="-24" width="24" height="26" rx="5" fill="var(--rose)"/></g>`;
+  } else {
+    s += `<defs><filter id="bl"><feGaussianBlur stdDeviation="70"/></filter></defs><g filter="url(#bl)" opacity=".55"><circle cx="1050" cy="120" r="230" fill="var(--lilac)"/><circle cx="120" cy="780" r="220" fill="var(--sky)"/><circle cx="700" cy="900" r="160" fill="var(--rose)"/></g>`;
+    s += `<g stroke="var(--soft)" stroke-width="1" opacity=".3">${Array.from({length:14},(_,i)=>`<line x1="${i*90}" y1="0" x2="${i*90-300}" y2="${H}"/>`).join("")}</g>`;
+  }
+  return s + `</svg>`;
+}
+function heroIllu(st){
+  const v = `<svg class="hero-illu" viewBox="0 0 150 120" aria-hidden="true">`;
+  if (st === "nour") return v + `<line x1="20" y1="10" x2="130" y2="10" stroke="var(--kid-ink)" stroke-width="3" stroke-linecap="round"/><line x1="40" y1="10" x2="40" y2="45" stroke="var(--kid-ink)" stroke-width="1.5"/><line x1="75" y1="10" x2="75" y2="65" stroke="var(--kid-ink)" stroke-width="1.5"/><line x1="110" y1="10" x2="110" y2="40" stroke="var(--kid-ink)" stroke-width="1.5"/>${star(40,55,13,"var(--butter)")}<path d="M88 78a17 17 0 1 1-13-25 13 13 0 0 0 13 25z" fill="var(--lilac)"/>${cloud(97,46,.36,"var(--surface)")}</svg>`;
+  if (st === "bamb") return v + `<rect x="20" y="70" width="40" height="40" rx="8" fill="var(--peach)"/><text x="40" y="99" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="24" fill="#2A1A10">A</text><rect x="64" y="70" width="40" height="40" rx="8" fill="var(--sky)"/><text x="84" y="99" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="24" fill="#10243A">B</text><rect x="42" y="26" width="40" height="40" rx="8" fill="var(--mint)" transform="rotate(-8 62 46)"/><text x="62" y="55" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="24" fill="#0E3B2A" transform="rotate(-8 62 46)">C</text><circle cx="124" cy="94" r="16" fill="var(--butter)"/></svg>`;
+  if (st === "pres") return v + `<g fill="none" stroke-width="10" stroke-linecap="round"><path d="M20 110a55 55 0 0 1 110 0" stroke="var(--rose)"/><path d="M33 110a42 42 0 0 1 84 0" stroke="var(--butter)"/><path d="M46 110a29 29 0 0 1 58 0" stroke="var(--mint)"/></g>${cloud(10,92,.3,"var(--surface)")}${cloud(112,92,.3,"var(--surface)")}<circle cx="125" cy="22" r="12" fill="var(--butter)"/></svg>`;
+  if (st === "scol") return v + `<rect x="38" y="28" width="74" height="84" rx="16" fill="var(--sky)"/><rect x="50" y="62" width="50" height="34" rx="8" fill="var(--sky-bg)"/><path d="M58 28v-8a17 17 0 0 1 34 0v8" stroke="var(--sky-ink)" stroke-width="5" fill="none"/><rect x="50" y="62" width="50" height="10" rx="4" fill="var(--butter)"/>${star(124,30,10,"var(--butter)")}</svg>`;
+  return v + `<path d="M30 70a45 45 0 0 1 90 0" fill="none" stroke="var(--kid-ink)" stroke-width="7" stroke-linecap="round"/><rect x="20" y="62" width="22" height="36" rx="10" fill="var(--kid)"/><rect x="108" y="62" width="22" height="36" rx="10" fill="var(--kid)"/><path d="M58 92l8-18 8 26 8-16 8 8" fill="none" stroke="var(--rose)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+function applyLook(){
+  const c = child(); const r = document.documentElement;
+  const col = c?.color || "peach";
+  r.style.setProperty("--kid", `var(--${col})`); r.style.setProperty("--kid-bg", `var(--${col}-bg)`); r.style.setProperty("--kid-ink", `var(--${col}-ink)`);
+  const st = c ? lookOf(c).id : "nour";
+  if (r.dataset.stage !== st){ r.dataset.stage = st; $("#deco").innerHTML = decoSVG(st); }
+  if (S.theme) r.dataset.theme = S.theme; else delete r.dataset.theme;
+}
+
+/* ---------- navigation ---------- */
+const NAV = [
+  {id:"home", label:"Accueil", ic:"home"},
+  {id:"quotidien", label:"Quotidien", ic:"sunrise"},
+  {id:"courbes", label:"Croissance", ic:"chart"},
+  {id:"sante", label:"Santé", ic:"heart"},
+  {id:"agenda", label:"Agenda", ic:"cal"},
+];
+function renderNav(){
+  const btn = n => `<button class="nav-btn" data-act="nav" data-v="${n.id}" ${UI.view===n.id?'aria-current="page"':""}>${icon(n.ic)}<span>${n.label}</span></button>`;
+  $("#sidenav").innerHTML = NAV.map(btn).join("") + btn({id:"plus", label:"Plus", ic:"more"});
+  $("#bottomnav").innerHTML = NAV.map(btn).join("");
+  $("#brand").innerHTML = `${mascot()}<span style="display:flex;flex-direction:column;line-height:1.05"><b>Care</b><span class="tiny muted" style="letter-spacing:.04em">Croissance · Activité · Rendez-vous · Éveil</span></span>`;
+  $("#sidefoot").innerHTML = `<button class="nav-btn" data-act="urgence">${icon("phone")}<span>Urgence · 811</span></button>`;
+}
+const themeIcon = () => S.theme === "dark" ? "moon" : S.theme === "light" ? "sun" : "auto";
+function topbar(){
+  return `<div class="top">
+    <div class="kids" role="group" aria-label="Enfants">
+      ${S.children.map(c => `<button class="kid-pill" data-act="kid" data-v="${c.id}" aria-pressed="${c.id===S.active}">${avatar(c)}${esc(c.nick||c.name)}</button>`).join("")}
+      <button class="add-kid" data-act="kidForm">+ Enfant</button>
+    </div>
+    <button class="icon-btn" data-act="theme" title="Thème : ${S.theme==="dark"?"sombre":S.theme==="light"?"clair":"automatique"}" aria-label="Changer le thème">${icon(themeIcon())}</button>
+    <button class="icon-btn" data-act="urgence" title="Urgence et ressources" aria-label="Urgence et ressources" style="color:var(--danger)">${icon("phone")}</button>
+    <button class="icon-btn" data-act="nav" data-v="plus" title="Plus" aria-label="Plus d'options">${icon("more")}</button>
+  </div>`;
+}
+
+/* ---------- rendu ---------- */
+function render(){
+  applyLook(); renderNav();
+  const c = child();
+  let html = topbar();
+  if (S.demo) html += `<div class="banner info">${icon("info")}<div>Vous voyez des <b>données d'exemple</b> (Léa, 7 mois, et Noah, 13 ans). <button class="btn sm ghost" data-act="clearDemo" style="margin-left:6px">Commencer avec mes enfants</button></div></div>`;
+  if (!c){ $("#main").innerHTML = html + `<div class="card"><div class="empty">${mascot(80)}<h2>Bienvenue dans Care</h2><p class="small"><b>C</b>roissance · <b>A</b>ctivité · <b>R</b>endez-vous · <b>É</b>veil<br><span class="muted">Childhood · Activity · Routines · Evolution</span></p><p>Ajoutez votre premier enfant pour commencer.</p><button class="btn kid" data-act="kidForm">Ajouter un enfant</button></div></div>`; return; }
+  html += timerBar(c);
+  html += ({home, quotidien, courbes, sante, agenda, plus}[UI.view] || home)(c);
+  $("#main").innerHTML = html;
+  if (UI.view === "courbes") { drawChart(c); drawProjection(c); }
+}
+function timerBar(c){
+  const t = S.timer; if (!t || t.kid !== c.id) return "";
+  return `<div class="timer"><span class="pulse"></span><div style="flex:1"><div class="small" style="font-weight:700">${t.type==="sleep"?"Dodo en cours":`Tétée · ${t.side}`}</div><div class="t num" id="timerVal">${fmtDur(Date.now()-t.start)}</div></div><button class="btn sm" data-act="stopTimer">Arrêter et noter</button></div>`;
+}
+const tipCard = t => `<div class="tipcard" style="background:var(--${TIPCAT[t[0]][1]}-bg)"><span class="dom" style="color:var(--${TIPCAT[t[0]][1]}-ink)">${TIPCAT[t[0]][0]}</span><b>${t[3]}</b><p class="small">${t[4]}</p></div>`;
+
+/* ======== ACCUEIL ======== */
+function home(c){
+  const m = ageMonths(c.dob), st = lookOf(c), corr = usesCorrected(c);
+  const nv = nextVaccines(c), vis = nextVisit(c), alerts = growthAlerts(c);
+  const lastG = [...c.growth].sort((a,b)=>a.date<b.date?1:-1)[0];
+  const upcoming = allEvents(c).filter(e => e.date >= iso(today()) && e.type !== "sport").sort(evSort).slice(0,3);
+  const tips = tipsFor(c, m); const dayN = Math.floor(today()/DAY);
+  const tipsShown = tips.length ? [0,1,2].map(i => tips[(dayN*3 + i) % tips.length]).filter((t,i,a)=>a.indexOf(t)===i) : [];
+  let h = `<section class="hero">
+    <div>${avatar(c, 88)}</div>
+    <div class="stack" style="gap:6px;min-width:0">
+      <div class="row"><span class="chip ${stageOf(m).color}">${stageOf(m).label}</span>${corr?`<span class="chip lilac">Prématuré·e · ${c.gaW} SA ${c.gaD||0} j</span>`:""}</div>
+      <h1>${esc(c.name)}</h1>
+      <div class="age">${ageLabel(m)}${corr?` <span class="muted small">· âge corrigé ${ageLabel(effAge(c))}</span>`:""}</div>
+      <div class="row"><button class="btn sm ghost" data-act="kidForm" data-v="${c.id}">${icon("edit")}Profil</button><button class="btn sm ghost" data-act="modules">${icon("sliders")}Personnaliser</button></div>
+    </div>${heroIllu(st.id)}</section>`;
+  h += feverAlert(c);
+  h += `<div class="grid">`;
+  h += `<div class="card c12"><div class="card-h"><h2>Aujourd'hui</h2><button class="btn sm ghost" data-act="nav" data-v="quotidien">Tout le quotidien</button></div>${quickButtons(c)}${ringsCard(c)}</div>`;
+  // vaccins / visite
+  h += `<div class="card c4"><div class="card-h"><span class="eyebrow">Santé à venir</span>${icon("syringe")}</div>`;
+  if (nv){
+    const late = nv.doses.some(d => d.st === "retard");
+    h += `<div class="stat"><span class="muted tiny">Prochains vaccins</span><div class="v">${nv.group.label}</div><div class="muted small">Vers le ${fmtD(nv.due)}</div></div>
+      <div class="row">${nv.doses.map(d=>`<span class="chip ${VSTAT[d.st][0]}">${esc(d.name)}</span>`).join("")}</div>
+      ${late?`<div class="banner alert">${icon("alert")}<div>Une dose est en retard. Le CLSC peut faire le calendrier de rattrapage.</div></div>`:""}`;
+  } else h += `<div class="banner ok">${icon("check")}<div>Calendrier régulier complété.</div></div>`;
+  if (vis) h += `<div class="sep"></div><div class="stat"><span class="muted tiny">Visite de suivi suggérée</span><div class="v" style="font-size:1.15rem">${vis.age<1?"1 semaine":mLabel(vis.age)}</div><div class="muted small">Vers le ${fmtD(vis.date)}</div></div>`;
+  h += `<div class="row"><a class="btn sm kid" href="https://portal3.clicsante.ca/" target="_blank" rel="noopener">Clic Santé</a><button class="btn sm ghost" data-act="go" data-v="sante" data-s="vaccins">Carnet</button></div></div>`;
+  // croissance
+  h += `<div class="card c4"><div class="card-h"><span class="eyebrow">Dernières mesures</span><button class="btn sm ghost" data-act="growthForm">${icon("plus")}Mesure</button></div>`;
+  if (lastG){
+    const am = effAge(c, parseD(lastG.date));
+    h += `<div class="stats">${["weight","height","ofc"].filter(k => lastG[k] && (k!=="ofc"||mod(c,"ofc"))).map(k => { const z = zScore(k, c.sex, am, Number(lastG[k]));
+      return `<div class="stat"><span class="muted tiny">${MEAS[k].label}</span><div class="v num">${fmtNum(lastG[k], k==="weight"?2:1)}<small>${MEAS[k].unit}</small></div>${z!=null?`<span class="small muted">${pctLabel(z)}<sup>e</sup> perc.</span>`:""}</div>`; }).join("")}</div><div class="muted tiny">Mesuré le ${fmtD(lastG.date)}</div>`;
+    const pj = mod(c,"projection") ? heightProjection(c) : null;
+    if (pj) h += `<div class="banner info">${icon("chart")}<div>Taille adulte estimée : <b class="num">${fmtNum(pj.comb ?? pj.adult,0)} cm</b> <span class="small">(${fmtNum(pj.lo,0)}–${fmtNum(pj.hi,0)})</span></div></div>`;
+  } else h += `<p class="muted">Aucune mesure pour l'instant.</p>`;
+  if (alerts.length) h += `<div class="banner warn">${icon("info")}<div>${alerts.length} point${alerts.length>1?"s":""} à surveiller sur les courbes. <button class="btn sm ghost" data-act="nav" data-v="courbes">Voir</button></div></div>`;
+  h += `</div>`;
+  // agenda
+  h += `<div class="card c4"><div class="card-h"><span class="eyebrow">À venir</span><button class="btn sm ghost" data-act="eventForm">${icon("plus")}Ajouter</button></div>${upcoming.length ? `<div class="list">${upcoming.map(eventRow).join("")}</div>` : `<p class="muted">Rien de prévu.</p>`}</div>`;
+  if (mod(c,"milestones") && m < 78) h += `<div class="card c7">${devPreview(c)}</div>`;
+  else if (mod(c,"older")) h += `<div class="card c7"><div class="card-h"><h2>Repères ${m>=144?"ado":"6-12 ans"}</h2><button class="btn sm ghost" data-act="go" data-v="sante" data-s="dev">Tout voir</button></div><div class="list">${OLDER[m>=144?"ado":"scol"].slice(0,3).map(o=>`<div class="li"><div class="grow"><div class="li-title">${o.t}</div><p class="small muted">${o.d}</p></div></div>`).join("")}</div></div>`;
+  h += `<div class="card ${mod(c,"milestones")||mod(c,"older")?"c5":"c12"}"><div class="card-h"><h2>Conseils du jour</h2><button class="btn sm ghost" data-act="go" data-v="sante" data-s="conseils">Tous</button></div><div class="stack">${tipsShown.map(tipCard).join("") || '<p class="muted small">Toutes les catégories sont masquées.</p>'}</div></div>`;
+  return h + `</div>`;
+}
+function devPreview(c){
+  const em = effAge(c);
+  const band = BANDS.find(b => b >= em) || 72;
+  const items = MS.filter(it => bandOf(it) === band);
+  const done = items.filter(it => c.milestones[it.k]).length;
+  const late = MS.filter(it => it.al && em > it.al && !c.milestones[it.k]);
+  return `<div class="card-h"><div><span class="eyebrow">Jalons à observer</span><h2>D'ici ${bandLabel(band)}</h2></div><span class="chip mint num">${done}/${items.length}</span></div>
+    ${late.length?`<div class="banner warn">${icon("info")}<div>${late.length} jalon${late.length>1?"s":""} habituellement acquis à cet âge ne ${late.length>1?"sont":"est"} pas coché${late.length>1?"s":""}. <button class="btn sm ghost" data-act="go" data-v="sante" data-s="dev">Voir</button></div></div>`:""}
+    <div>${items.slice(0,6).map(it => msRow(c,it)).join("")}</div>
+    <button class="btn sm ghost" data-act="go" data-v="sante" data-s="dev" style="align-self:flex-start">Vue détaillée avec les plages d'âge</button>`;
+}
+function msRow(c, it, showRange=true){
+  const on = !!c.milestones[it.k];
+  return `<div class="ms"><button class="check" role="checkbox" aria-checked="${on}" aria-label="${esc(it.t)}" data-act="ms" data-v="${esc(it.k)}">${on?icon("check"):""}</button><div style="flex:1;min-width:0"><div class="dom" style="color:var(--${DOMAINS[it.d].color}-ink)">${DOMAINS[it.d].label}</div><div>${esc(it.t)}</div><div class="tiny muted">${showRange?`Habituellement ${rangeTxt(it)}`:""}${on?` · observé le ${fmtD(c.milestones[it.k])}`:""}</div></div></div>`;
+}
+const rangeTxt = it => it.b < 24 ? `entre ${fmtNum(it.a, it.a%1?1:0)} et ${fmtNum(it.b, it.b%1?1:0)} mois` : `entre ${mLabel(it.a)} et ${mLabel(it.b)}`.replace(/(\d+) mois et (\d+) ans/,"$1 mois et $2 ans");
+function feverAlert(c){
+  const r = c.logs.filter(l => l.type === "temp" && Date.now() - l.t < 24*36e5).sort((a,b)=>b.t-a.t)[0];
+  if (!r) return "";
+  const v = Number(r.data.temp), site = r.data.site;
+  const thr = site === "Buccale" ? 37.5 : site === "Axillaire" ? 37.3 : 38.0;
+  if (!(v > thr)) return "";
+  if (ageMonths(c.dob) < 3) return `<div class="banner alert">${icon("alert")}<div><b>Fièvre chez un bébé de moins de 3 mois (${fmtNum(v)} °C, ${site.toLowerCase()}).</b> Consultez rapidement à l'urgence, ou appelez le 811 pour être orienté.</div></div>`;
+  return `<div class="banner warn">${icon("thermo")}<div><b>Fièvre notée (${fmtNum(v)} °C, ${site.toLowerCase()}).</b> Consultez si l'enfant est très somnolent, respire difficilement, a des taches sur la peau, ou si la fièvre dure plus de 72 h. Info-Santé : 811.</div></div>`;
+}
+
+/* ======== QUOTIDIEN (journal + bien-être) ======== */
+const LOGT = {
+  feed:{label:"Boire", ic:"bottle", c:"peach", mod:"feeding"}, solid:{label:"Manger", ic:"spoon", c:"mint", mod:"solids"},
+  sleep:{label:"Dodo", ic:"moon", c:"lilac"}, diaper:{label:"Couche", ic:"drop", c:"sky", mod:"diapers"},
+  tummy:{label:"Sur le ventre", ic:"tummy", c:"butter", mod:"tummy"}, activity:{label:"Activité", ic:"run", c:"mint"},
+  read:{label:"Lecture", ic:"book", c:"peach", mod:"reading"}, screen:{label:"Écran", ic:"screen", c:"sky", mod:"screen"},
+  mood:{label:"Humeur", ic:"smile", c:"butter", mod:"mood"}, temp:{label:"Température", ic:"thermo", c:"rose"},
+  med:{label:"Médicament", ic:"pill", c:"butter"}, note:{label:"Note", ic:"note", c:"lilac"},
+};
+const typesFor = c => Object.keys(LOGT).filter(t => !LOGT[t].mod || mod(c, LOGT[t].mod)).filter(t => !(t === "activity" && ageMonths(c.dob) < 9 && mod(c,"tummy")));
+const quickButtons = c => `<div class="quick">${typesFor(c).map(t => `<button class="qbtn" style="background:var(--${LOGT[t].c}-bg);color:var(--${LOGT[t].c}-ink)" data-act="log" data-v="${t}">${icon(LOGT[t].ic)}${LOGT[t].label}</button>`).join("")}</div>`;
+// Totaux d'une journée (le sommeil est compté le jour où il se termine)
+function dayTotals(c, d){
+  const s = d.getTime(), e = s + DAY, T = {sleep:0, act:0, screen:0, read:0, feeds:0, ml:0, diapers:0};
+  c.logs.forEach(l => {
+    const mins = Number(l.data?.min)||0;
+    if (l.type === "sleep" && l.end && l.end >= s && l.end < e) T.sleep += (l.end - l.t)/6e4;
+    if (l.t < s || l.t >= e) return;
+    if (l.type === "activity" || l.type === "tummy") T.act += mins;
+    if (l.type === "screen") T.screen += mins;
+    if (l.type === "read") T.read += mins;
+    if (l.type === "feed"){ T.feeds++; T.ml += Number(l.data.ml)||0; }
+    if (l.type === "diaper") T.diapers++;
+  });
+  return T;
+}
+function ring(pct, col, over=false){
+  const r = 21, C = 2*Math.PI*r, p = clamp(pct,0,1);
+  return `<svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="${r}" fill="none" stroke="var(--line)" stroke-width="6"/><circle cx="26" cy="26" r="${r}" fill="none" stroke="${over?"var(--danger)":`var(--${col})`}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(C*p).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 26 26)"/></svg>`;
+}
+function ringsCard(c){
+  const m = ageMonths(c.dob), g = guide(m), T = dayTotals(c, today());
+  const y = dayTotals(c, addDays(today(), -1));
+  const sleepH = Math.max(T.sleep, 0)/60;
+  const cells = [];
+  if (mod(c,"feeding")) { const lastF = c.logs.filter(l=>l.type==="feed").sort((a,b)=>b.t-a.t)[0];
+    cells.push(`<div class="ring">${ring(T.feeds/8,"peach")}<div><div class="tiny muted">Boires</div><div class="v num">${T.feeds}${T.ml?` · ${T.ml} ml`:""}</div><div class="tiny muted">${lastF?`dernier il y a ${fmtDur(Date.now()-lastF.t)}`:"aucun"}</div></div></div>`); }
+  cells.push(`<div class="ring">${ring(sleepH/g.sleep[0],"lilac")}<div><div class="tiny muted">Sommeil</div><div class="v num">${sleepH?fmtMin(T.sleep):"—"}</div><div class="tiny muted">cible ${g.sleep[0]}-${g.sleep[1]} h</div></div></div>`);
+  cells.push(`<div class="ring">${ring(T.act/g.act,"mint")}<div><div class="tiny muted">${m<12?"Ventre / sol":"Activité"}</div><div class="v num">${fmtMin(T.act)}</div><div class="tiny muted">cible ${fmtMin(g.act)}</div></div></div>`);
+  if (mod(c,"screen")) cells.push(`<div class="ring">${ring(g.screen?T.screen/g.screen:(T.screen?1:0),"sky",T.screen>g.screen)}<div><div class="tiny muted">Écran</div><div class="v num">${fmtMin(T.screen)}</div><div class="tiny muted">${g.screen?`max ${fmtMin(g.screen)}`:"aucun avant 2 ans"}</div></div></div>`);
+  if (mod(c,"reading")) cells.push(`<div class="ring">${ring(T.read/g.read,"peach")}<div><div class="tiny muted">Lecture</div><div class="v num">${fmtMin(T.read)}</div><div class="tiny muted">objectif ${g.read} min</div></div></div>`);
+  if (mod(c,"diapers")) cells.push(`<div class="ring">${ring(T.diapers/6,"sky")}<div><div class="tiny muted">Couches</div><div class="v num">${T.diapers}</div><div class="tiny muted">hier : ${y.diapers}</div></div></div>`);
+  return `<div class="rings">${cells.join("")}</div>`;
+}
+function weekBars(c, key, target, col, isMax=false, unitH=false){
+  const days = Array.from({length:7}, (_,i) => addDays(today(), i-6));
+  const vals = days.map(d => dayTotals(c, d)[key] / (unitH?60:1));
+  const max = Math.max(target*1.25, ...vals, 1);
+  const avg = vals.reduce((a,b)=>a+b,0)/7;
+  return `<div style="position:relative"><div class="weekbars">${days.map((d,i) => { const v = vals[i]; const bad = isMax ? v > target : v < target*0.8;
+    return `<div class="wb" title="${fmtD(d,{weekday:"long"})} : ${unitH?fmtNum(v,1)+" h":Math.round(v)+" min"}"><i style="height:${(v/max*72).toFixed(1)}px;background:var(--${bad&&isMax?"danger":col})${bad&&!isMax?";opacity:.5":""}"></i><span>${d.toLocaleDateString("fr-CA",{weekday:"narrow"})}</span></div>`; }).join("")}</div>
+    <div style="position:absolute;left:0;right:0;bottom:${(18 + target/max*72).toFixed(1)}px;border-top:2px dashed var(--soft)" aria-hidden="true"></div></div>
+    <div class="tiny muted">Moyenne 7 jours : <b class="num">${unitH?fmtNum(avg,1)+" h":fmtMin(avg)}</b> · ${isMax?"maximum":"cible"} ${unitH?target+" h":fmtMin(target)}</div>`;
+}
+function quotidien(c){
+  const m = ageMonths(c.dob), g = guide(m);
+  let h = `<div class="card"><div class="card-h"><div><span class="eyebrow">${esc(c.nick||c.name)} · ${ageLabel(m)}</span><h2>Noter</h2></div><button class="btn sm ghost" data-act="modules">${icon("sliders")}Choisir les boutons</button></div>${quickButtons(c)}</div>`;
+  h += `<div class="card"><div class="card-h"><div><span class="eyebrow">Mouvement sur 24 h</span><h2>Bien-être d'aujourd'hui</h2></div></div>${ringsCard(c)}
+    <p class="tiny muted">Cibles des Directives canadiennes en matière de mouvement sur 24 heures pour cet âge : sommeil ${g.sleep[0]} à ${g.sleep[1]} h${m<12?" (siestes comprises)":""}, ${g.actLbl.toLowerCase()} ${fmtMin(g.act)}, écran ${g.screen?`au plus ${fmtMin(g.screen)}`:"aucun"}. Lecture : objectif suggéré.</p></div>`;
+  h += `<div class="grid"><div class="card c6"><h3>Sommeil, 7 jours</h3>${weekBars(c,"sleep",g.sleep[0],"lilac",false,true)}</div>
+    <div class="card c6"><h3>${m<12?"Temps sur le ventre":"Activité physique"}, 7 jours</h3>${weekBars(c,"act",g.act,"mint")}</div>
+    ${mod(c,"screen")?`<div class="card c6"><h3>Écran, 7 jours</h3>${weekBars(c,"screen",Math.max(g.screen,1),"sky",true)}</div>`:""}
+    ${mod(c,"reading")?`<div class="card c6"><h3>Lecture, 7 jours</h3>${weekBars(c,"read",g.read,"peach")}${booksList(c)}</div>`:""}</div>`;
+  if (mod(c,"mood")) h += moodCard(c);
+  if (mod(c,"sports")) h += sportsCard(c);
+  if (mod(c,"solids")) h += allergenCard(c);
+  const days = [];
+  for (let i=0;i<7;i++){ const d = addDays(today(), -i); const L = dayLogs(c, d); if (L.length) days.push([d,L]); }
+  h += `<div class="card"><div class="card-h"><h2>Journal, 7 derniers jours</h2></div>`;
+  if (!days.length) h += `<div class="empty">${icon("sunrise")}<p>Aucune entrée cette semaine. Utilisez les boutons ci-dessus.</p></div>`;
+  days.forEach(([d,L]) => { h += `<div class="eyebrow" style="margin-top:6px">${dayName(d)}</div><div class="list">${L.map(logLine).join("")}</div>`; });
+  return h + `</div>`;
+}
+function dayLogs(c, d){ const s = d.getTime(), e = s + DAY; return c.logs.filter(l => l.t >= s && l.t < e).sort((a,b)=>b.t-a.t); }
+const dayName = d => { const diff = Math.round((today()-d)/DAY); return diff===0?"Aujourd'hui":diff===1?"Hier":fmtD(d,{weekday:"long",day:"numeric",month:"long"}); };
+function booksList(c){
+  const titles = {}; c.logs.filter(l => l.type==="read" && l.data.title).forEach(l => titles[l.data.title] = (titles[l.data.title]||0) + (Number(l.data.min)||0));
+  const arr = Object.entries(titles).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  return arr.length ? `<div class="row">${arr.map(([t,mn])=>`<span class="chip peach">${icon("book").replace("<svg",'<svg style="width:14px;height:14px"')}${esc(t)} · ${fmtMin(mn)}</span>`).join("")}</div>` : "";
+}
+function moodCard(c){
+  const order = ["Difficile","Moyen","Bien","Super"], cols = ["rose","butter","mint","sky"];
+  const days = Array.from({length:14}, (_,i) => addDays(today(), i-13));
+  const cells = days.map(d => { const l = dayLogs(c, d).find(x => x.type==="mood"); const i = l ? order.indexOf(l.data.mood) : -1;
+    return `<div title="${fmtD(d,{day:"numeric",month:"short"})}${l?` : ${l.data.mood}`:""}" style="flex:1;min-width:0;height:${i<0?8:14+i*12}px;border-radius:6px;background:${i<0?"var(--surface2)":`var(--${cols[i]})`}"></div>`; }).join("");
+  return `<div class="card"><div class="card-h"><h3>Humeur, 14 jours</h3><div class="legend">${order.map((o,i)=>`<span><i style="background:var(--${cols[i]});width:10px;height:10px;border-radius:3px"></i>${o}</span>`).join("")}</div></div><div style="display:flex;gap:4px;align-items:flex-end;height:56px">${cells}</div><p class="tiny muted">Plusieurs jours difficiles de suite ? Prenez un moment pour en parler. LigneParents : 1-800-361-5085.</p></div>`;
+}
+const WD = ["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
+function sportsCard(c){
+  const m = ageMonths(c.dob);
+  const sugg = m < 72 ? "Jeu libre dehors, natation parent-enfant, vélo à pousser, danse, parc" : m < 144 ? "Varier : natation, vélo, soccer, gymnastique, arts martiaux, ski, escalade" : "Un sport d'équipe, une activité d'endurance et un renforcement musculaire 3 fois par semaine";
+  const weekMin = Array.from({length:7},(_,i)=>dayTotals(c, addDays(today(), -i)).act).reduce((a,b)=>a+b,0);
+  return `<div class="card"><div class="card-h"><div><span class="eyebrow">Sports et activités</span><h2>Horaire de la semaine</h2></div><button class="btn sm kid" data-act="activityForm">${icon("plus")}Activité</button></div>
+    ${c.activities.length?`<div class="list">${c.activities.map(a=>`<div class="li"><div class="ic" style="background:var(--mint-bg);color:var(--mint-ink)">${icon("ball")}</div><div class="grow"><div class="li-title">${esc(a.name)}</div><div class="small muted">${a.days.map(d=>WD[d]).join(", ")}${a.time?` · ${a.time}`:""}${a.place?` · ${esc(a.place)}`:""}</div></div><button class="icon-btn flat" data-act="delActivity" data-v="${a.id}" aria-label="Supprimer">${icon("trash")}</button></div>`).join("")}</div>`:`<p class="small muted">Aucune activité régulière. Elles apparaîtront aussi dans l'agenda.</p>`}
+    <div class="banner ok">${icon("run")}<div><b class="num">${fmtMin(weekMin)}</b> d'activité notée sur 7 jours. Idées pour cet âge : ${sugg}.</div></div></div>`;
+}
+function logLine(l){
+  const T = LOGT[l.type] || LOGT.note, d = l.data || {};
+  let txt = T.label, sub = "";
+  if (l.type === "feed") { txt = d.mode || "Boire"; sub = [d.ml?`${d.ml} ml`:"", l.end?fmtDur(l.end-l.t):""].filter(Boolean).join(" · "); }
+  if (l.type === "sleep") sub = l.end ? `${fmtT(l.t)} → ${fmtT(l.end)} · ${fmtDur(l.end-l.t)}` : "en cours";
+  if (l.type === "diaper") txt = `Couche · ${d.kind}`;
+  if (l.type === "solid") { txt = d.food || "Repas"; sub = d.allergen ? `Allergène : ${d.allergen}${d.reaction?` · réaction : ${d.reaction}`:""}` : ""; }
+  if (l.type === "temp") { txt = `${fmtNum(d.temp)} °C`; sub = d.site; }
+  if (l.type === "med") { txt = d.name || "Médicament"; sub = d.dose || ""; }
+  if (l.type === "mood") txt = `Humeur · ${d.mood}`;
+  if (l.type === "screen") txt = `Écran · ${fmtMin(d.min)}`;
+  if (l.type === "tummy") txt = `Sur le ventre · ${fmtMin(d.min)}`;
+  if (l.type === "read") { txt = `Lecture · ${fmtMin(d.min)}`; sub = d.title || ""; }
+  if (l.type === "activity") { txt = `${d.what || "Activité"} · ${fmtMin(d.min)}`; sub = d.intensity || ""; }
+  if (l.type === "note") txt = d.text;
+  if (d.note && l.type!=="note") sub = [sub, d.note].filter(Boolean).join(" · ");
+  return `<div class="li"><div class="ic" style="background:var(--${T.c}-bg);color:var(--${T.c}-ink)">${icon(T.ic)}</div><div class="grow"><div class="li-title">${esc(txt)}</div>${sub?`<div class="small muted">${esc(sub)}</div>`:""}</div><span class="small muted num">${fmtT(l.t)}</span><button class="icon-btn flat" data-act="delLog" data-v="${l.id}" aria-label="Supprimer">${icon("trash")}</button></div>`;
+}
+function allergenCard(c){
+  const log = c.allergensLog || {};
+  return `<div class="card"><div class="card-h"><div><span class="eyebrow">Introduction des allergènes</span><h2>Exposition régulière</h2></div><span class="chip mint num">${ALLERGENS.filter(a=>(log[a]||[]).length).length}/${ALLERGENS.length} introduits</span></div>
+  <p class="small muted">Une fois introduit sans réaction, gardez l'aliment au menu quelques fois par semaine. Urticaire étendue, vomissements répétés ou difficulté à respirer : 911.</p>
+  <div class="tbl"><table><thead><tr><th>Aliment</th><th>Fois</th><th>Dernière</th><th></th></tr></thead><tbody>
+  ${ALLERGENS.map(a => { const L = (log[a]||[]).slice().sort(); const last = L[L.length-1]; const stale = last && (today()-parseD(last))/DAY > 10;
+    return `<tr><td style="font-weight:600">${a}</td><td><span class="kbd-num">${L.length}</span></td><td class="small" style="color:var(--${stale?"butter-ink":"muted"})">${last?fmtD(last,{day:"numeric",month:"short"})+(stale?" · à redonner":""):"—"}</td><td><button class="btn sm ghost" data-act="allergen" data-v="${esc(a)}">+ Aujourd'hui</button></td></tr>`; }).join("")}
+  </tbody></table></div></div>`;
+}
+
+/* ======== CROISSANCE ======== */
+function courbes(c){
+  const m = ageMonths(c.dob);
+  const avail = Object.keys(MEAS).filter(k => k !== "ofc" || (mod(c,"ofc") && m < 66)).filter(k => k !== "weight" || m < 126);
+  if (!avail.includes(UI.sub.courbes)) UI.sub.courbes = avail.includes("weight") ? "weight" : "height";
+  const k = UI.sub.courbes;
+  const alerts = growthAlerts(c).filter(a => a.meas === k);
+  const mp = k === "height" ? midParental(c) : null;
+  const vel = heightVelocity(c);
+  let h = `<div class="card"><div class="card-h"><h2>Courbes de croissance OMS</h2><button class="btn kid sm" data-act="growthForm">${icon("plus")}Nouvelle mesure</button></div>
+    <div class="row between"><div class="seg" role="group" aria-label="Mesure">${avail.map(x=>`<button data-act="meas" data-v="${x}" aria-pressed="${x===k}">${MEAS[x].label}</button>`).join("")}</div>
+    ${correction(c)>0?`<div class="seg"><button data-act="chrono" data-v="0" aria-pressed="${!UI.chrono}">Âge corrigé</button><button data-act="chrono" data-v="1" aria-pressed="${UI.chrono}">Chronologique</button></div>`:""}</div>
+    <div class="seg" role="group" aria-label="Période" id="rangeSeg"></div>
+    <div class="chart-wrap" id="chart"></div>
+    <div class="legend"><span><i style="background:var(--soft)"></i>3e et 97e</span><span><i style="background:var(--soft);opacity:.6"></i>15e et 85e</span><span><i style="background:var(--muted)"></i>50e</span><span><i style="background:var(--kid);height:8px;width:8px;border-radius:50%"></i>${esc(c.name)}</span></div>
+    ${alerts.map(a => a.out
+      ? `<div class="banner warn">${icon("info")}<div>La dernière mesure est ${a.last.z<0?"sous le 3e":"au-dessus du 97e"} percentile. Ce n'est pas forcément anormal ; montrez la courbe au médecin.</div></div>`
+      : `<div class="banner warn">${icon("info")}<div><b>Changement de couloir.</b> Depuis le ${fmtD(a.from.date)}, la courbe a franchi ${a.n} lignes de percentiles à la ${a.dir}. À montrer au médecin à la prochaine visite.</div></div>`).join("")}
+    ${usesCorrected(c)&&!UI.chrono?`<p class="small muted">Âge corrigé utilisé jusqu'à 24 mois (né·e à ${c.gaW} SA ${c.gaD||0} j).</p>`:""}
+  </div>`;
+  if (k === "height" || k === "weight"){
+    h += `<div class="grid">`;
+    if (vel && k === "height"){ const slow = m > 36 && m < 120 && vel.v < 4;
+      h += `<div class="card c6"><span class="eyebrow">Vitesse de croissance</span><div class="stat"><div class="v num">${fmtNum(vel.v,1)}<small>cm / an</small></div><span class="small muted">du ${fmtD(vel.from.date)} au ${fmtD(vel.to.date)}</span></div>
+      ${slow?`<div class="banner warn">${icon("info")}<div>Moins de 4 cm par an entre 3 ans et la puberté : à vérifier avec le médecin.</div></div>`:`<p class="small muted">Repère : environ 25 cm la 1re année, 12 cm la 2e, puis 5 à 7 cm par an jusqu'à la puberté.</p>`}</div>`; }
+    if (mp) h += `<div class="card c6"><span class="eyebrow">Taille cible parentale</span><div class="stat"><div class="v num">${fmtNum(mp.t,0)}<small>cm</small></div><span class="small muted">Intervalle habituel ${fmtNum(mp.lo,0)} à ${fmtNum(mp.hi,0)} cm · ${pctLabel(mp.z)}e percentile adulte</span></div></div>`;
+    h += `</div>`;
+  }
+  if (mod(c,"projection")) h += `<div class="card"><div class="card-h"><div><span class="eyebrow">Modèle prédictif</span><h2>Projection de la taille adulte</h2></div></div><div id="proj"></div></div>`;
+  h += `<div class="card"><div class="card-h"><h2>Historique</h2></div>`;
+  if (!c.growth.length) h += `<div class="empty">${icon("chart")}<p>Ajoutez une première mesure.</p></div>`;
+  else h += `<div class="tbl"><table><thead><tr><th>Date</th><th>Âge</th><th>Poids</th><th>Taille</th>${mod(c,"ofc")?"<th>PC</th>":""}<th>IMC</th><th></th></tr></thead><tbody>${[...c.growth].sort((a,b)=>a.date<b.date?1:-1).map(g => {
+    const am = effAge(c, parseD(g.date));
+    const cell = (key, val, dp) => { if (!val) return `<td class="muted">—</td>`; const z = zScore(key, c.sex, am, val); return `<td><b>${fmtNum(val,dp)}</b>${z!=null?`<div class="tiny muted">P${pctLabel(z)} · z ${z>=0?"+":""}${fmtNum(z,2)}</div>`:""}</td>`; };
+    const bmi = g.weight && g.height ? g.weight/Math.pow(g.height/100,2) : null;
+    return `<tr><td>${fmtD(g.date)}</td><td class="small">${ageLabel(ageMonths(c.dob, parseD(g.date)))}</td>${cell("weight",Number(g.weight),2)}${cell("height",Number(g.height),1)}${mod(c,"ofc")?cell("ofc",Number(g.ofc),1):""}${cell("bmi",bmi,1)}<td><button class="icon-btn flat" data-act="delGrowth" data-v="${g.id}" aria-label="Supprimer">${icon("trash")}</button></td></tr>`; }).join("")}</tbody></table></div>`;
+  return h + `<p class="tiny muted">Normes OMS de croissance (0-5 ans) et référence OMS 2007 (5-19 ans), recommandées au Canada. Taille couchée avant 2 ans.</p></div>`;
+}
+function ranges(k){
+  const r = [{id:"0-2", a:0, b:24, l:"0-2 ans"}, {id:"2-5", a:24, b:60, l:"2-5 ans"}];
+  if (k === "weight") r.push({id:"5-10", a:60, b:120, l:"5-10 ans"});
+  if (k === "height" || k === "bmi") r.push({id:"5-19", a:60, b:228, l:"5-19 ans"});
+  return r;
+}
+const niceStep = v => { const e = Math.pow(10, Math.floor(Math.log10(v))); const f = v/e; return (f<1.5?1:f<3.5?2:f<7.5?5:10)*e; };
+function chartFrame(W, H, P, R, lo, hi){
+  const X = m => P.l + (m-R.a)/(R.b-R.a)*(W-P.l-P.r), Y = v => H-P.b - (v-lo)/(hi-lo)*(H-P.t-P.b);
+  return {X, Y};
+}
+function drawChart(c){
+  const k = UI.sub.courbes, rs = ranges(k), am = effAge(c, today(), UI.chrono);
+  const R = rs.find(r => r.id === UI.range) || rs.find(r => am < r.b) || rs[rs.length-1];
+  $("#rangeSeg").innerHTML = rs.map(r => `<button data-act="range" data-v="${r.id}" aria-pressed="${r.id===R.id}">${r.l}</button>`).join("");
+  const pts = growthPoints(c, k, UI.chrono).filter(p => p.m >= R.a - 0.01 && p.m <= R.b + 0.01);
+  const W = 720, H = 380, P = {l:46, r:44, t:18, b:34}, step = (R.b - R.a) <= 24 ? 0.5 : 1;
+  const curves = PCT_LINES.map(L => { const arr=[]; for (let m=R.a; m<=R.b+1e-9; m+=step){ const p = lmsAt(k, c.sex, m); if (p) arr.push([m, xAtZ(p, L.z)]); } return {...L, arr}; });
+  let lo = Infinity, hi = -Infinity;
+  curves.forEach(cv => cv.arr.forEach(([,y]) => { lo = Math.min(lo,y); hi = Math.max(hi,y); }));
+  pts.forEach(p => { lo = Math.min(lo,p.x); hi = Math.max(hi,p.x); });
+  const ys = niceStep((hi-lo)*1.12/6); lo = Math.max(0, Math.floor((lo-(hi-lo)*.06)/ys)*ys); hi = Math.ceil((hi+(hi-lo)*.06)/ys)*ys;
+  const {X, Y} = chartFrame(W, H, P, R, lo, hi);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Courbe ${MEAS[k].label} de ${esc(c.name)}" style="font-family:var(--body)">`;
+  for (let v=lo; v<=hi+1e-9; v+=ys) s += `<line x1="${P.l}" x2="${W-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P.l-8}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmtNum(v, ys<1?1:0)}</text>`;
+  const xs = (R.b-R.a) <= 24 ? 3 : (R.b-R.a) <= 36 ? 6 : 12;
+  for (let m=R.a; m<=R.b; m+=xs) s += `<line x1="${X(m)}" x2="${X(m)}" y1="${P.t}" y2="${H-P.b}" stroke="var(--line)" stroke-dasharray="2 4"/><text x="${X(m)}" y="${H-P.b+18}" text-anchor="middle" font-size="11" fill="var(--muted)">${R.b<=24?m+" m":(m/12)+" a"}</text>`;
+  const c15 = curves[1].arr, c85 = curves[3].arr;
+  s += `<path d="M${c15.map(([m,v])=>`${X(m)},${Y(v)}`).join("L")}L${c85.slice().reverse().map(([m,v])=>`${X(m)},${Y(v)}`).join("L")}Z" fill="var(--kid-bg)"/>`;
+  curves.forEach(cv => { const main = cv.p === 50, outer = cv.p === 3 || cv.p === 97;
+    s += `<path d="M${cv.arr.map(([m,v])=>`${X(m).toFixed(1)},${Y(v).toFixed(1)}`).join("L")}" fill="none" stroke="${main?"var(--muted)":"var(--soft)"}" stroke-width="${main?2:outer?1.5:1.2}" ${outer||main?"":'stroke-dasharray="5 4"'}/>`;
+    const last = cv.arr[cv.arr.length-1]; s += `<text x="${W-P.r+6}" y="${Y(last[1])+4}" font-size="11" fill="var(--muted)" font-weight="${main?700:500}">${cv.p}e</text>`; });
+  if (pts.length){
+    s += `<path d="M${pts.map(p=>`${X(p.m).toFixed(1)},${Y(p.x).toFixed(1)}`).join("L")}" fill="none" stroke="var(--kid-ink)" stroke-width="2.5" stroke-linejoin="round"/>`;
+    pts.forEach((p,i) => { const last = i === pts.length-1;
+      s += `<circle cx="${X(p.m)}" cy="${Y(p.x)}" r="${last?7:5}" fill="var(--kid)" stroke="var(--surface)" stroke-width="2.5"><title>${fmtD(p.date)} · ${fmtNum(p.x, MEAS[k].dp)} ${MEAS[k].unit}${p.z!=null?` · ${pctLabel(p.z)}e percentile`:""}</title></circle>`;
+      if (last) s += `<text x="${Math.min(X(p.m)+10, W-P.r-70)}" y="${Y(p.x)-12}" font-size="12" font-weight="700" fill="var(--kid-ink)">${fmtNum(p.x, MEAS[k].dp)} · P${p.z!=null?pctLabel(p.z):"?"}</text>`; });
+  } else s += `<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="var(--muted)">Aucune mesure dans cette période</text>`;
+  $("#chart").innerHTML = s + `<text x="${P.l}" y="${P.t-6}" font-size="11" fill="var(--muted)">${MEAS[k].unit}</text></svg>`;
+}
+function drawProjection(c){
+  const el = $("#proj"); if (!el) return;
+  const pj = heightProjection(c);
+  if (!pj){ el.innerHTML = `<p class="small muted">Ajoutez au moins une mesure de taille pour voir la projection.</p>`; return; }
+  const W = 720, H = 360, P = {l:46, r:64, t:18, b:34}, R = {a:0, b:228};
+  const ref = [-1.8808, 0, 1.8808].map(z => { const arr=[]; for (let m=0; m<=228; m+=2){ const p = lmsAt("height", c.sex, m); if (p) arr.push([m, xAtZ(p, z)]); } return arr; });
+  const lo = 40, hi = Math.ceil(Math.max(ref[2][ref[2].length-1][1], pj.hi, pj.mp?pj.mp.hi:0)/10)*10 + 5;
+  const {X, Y} = chartFrame(W, H, P, R, lo, hi);
+  const pts = growthPoints(c, "height");
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Projection de taille adulte" style="font-family:var(--body)">`;
+  for (let v=50; v<=hi; v+=20) s += `<line x1="${P.l}" x2="${W-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P.l-8}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}</text>`;
+  for (let m=0; m<=228; m+=24) s += `<text x="${X(m)}" y="${H-P.b+18}" text-anchor="middle" font-size="11" fill="var(--muted)">${m/12} a</text>`;
+  ref.forEach((arr,i) => s += `<path d="M${arr.map(([m,v])=>`${X(m).toFixed(1)},${Y(v).toFixed(1)}`).join("L")}" fill="none" stroke="${i===1?"var(--muted)":"var(--soft)"}" stroke-width="${i===1?1.6:1.2}"/>`);
+  // bande d'incertitude
+  s += `<path d="M${pj.curve.map(p=>`${X(p.m).toFixed(1)},${Y(p.lo).toFixed(1)}`).join("L")}L${pj.curve.slice().reverse().map(p=>`${X(p.m).toFixed(1)},${Y(p.hi).toFixed(1)}`).join("L")}Z" fill="var(--kid)" opacity=".22"/>`;
+  s += `<path d="M${X(pj.last.m)},${Y(pj.last.x)}L${pj.curve.map(p=>`${X(p.m).toFixed(1)},${Y(p.x).toFixed(1)}`).join("L")}" fill="none" stroke="var(--kid-ink)" stroke-width="2" stroke-dasharray="6 5"/>`;
+  if (pj.comb != null) s += `<path d="M${X(pj.last.m)},${Y(pj.last.x)}L${pj.curve.map(p=>`${X(p.m).toFixed(1)},${Y(p.comb).toFixed(1)}`).join("L")}" fill="none" stroke="var(--lilac-ink)" stroke-width="2" stroke-dasharray="2 4"/>`;
+  if (pj.mp) s += `<rect x="${W-P.r+8}" y="${Y(pj.mp.hi)}" width="10" height="${Y(pj.mp.lo)-Y(pj.mp.hi)}" rx="5" fill="var(--lilac)" opacity=".7"/><circle cx="${W-P.r+13}" cy="${Y(pj.mp.t)}" r="5" fill="var(--lilac-ink)"/><text x="${W-P.r+24}" y="${Y(pj.mp.t)+4}" font-size="11" fill="var(--lilac-ink)" font-weight="700">cible</text>`;
+  s += `<path d="M${pts.map(p=>`${X(p.m).toFixed(1)},${Y(p.x).toFixed(1)}`).join("L")}" fill="none" stroke="var(--kid-ink)" stroke-width="2.5"/>`;
+  pts.forEach(p => s += `<circle cx="${X(p.m)}" cy="${Y(p.x)}" r="4.5" fill="var(--kid)" stroke="var(--surface)" stroke-width="2"/>`);
+  s += `<circle cx="${X(228)}" cy="${Y(pj.adult)}" r="6" fill="var(--kid-ink)"/><text x="${X(228)-8}" y="${Y(pj.adult)-10}" text-anchor="end" font-size="12" font-weight="700" fill="var(--kid-ink)">${fmtNum(pj.adult,0)} cm</text></svg>`;
+  const young = pj.last.m < 24;
+  el.innerHTML = `<div class="stats"><div class="stat"><span class="muted tiny">Si ${esc(c.name)} garde son couloir (P${pctLabel(pj.last.z)})</span><div class="v num">${fmtNum(pj.adult,0)}<small>cm</small></div><span class="small muted">80 % de chances entre ${fmtNum(pj.lo,0)} et ${fmtNum(pj.hi,0)} cm</span></div>
+    ${pj.mp?`<div class="stat"><span class="muted tiny">Taille cible parentale</span><div class="v num">${fmtNum(pj.mp.t,0)}<small>cm</small></div><span class="small muted">± 8,5 cm</span></div>`:`<div class="stat"><span class="muted tiny">Taille des parents</span><button class="btn sm ghost" data-act="kidForm" data-v="${c.id}">Ajouter pour affiner</button></div>`}
+    ${pj.comb!=null?`<div class="stat"><span class="muted tiny">Estimation combinée</span><div class="v num" style="color:var(--lilac-ink)">${fmtNum(pj.comb,0)}<small>cm</small></div><span class="small muted">moyenne des deux couloirs</span></div>`:""}</div>
+    <div class="chart-wrap">${s}</div>
+    <div class="legend"><span><i style="background:var(--kid-ink)"></i>Mesures</span><span><i style="background:var(--kid);opacity:.4;height:8px"></i>Couloir actuel prolongé (80 %)</span>${pj.comb!=null?`<span><i style="background:var(--lilac-ink)"></i>Combinée</span>`:""}<span><i style="background:var(--soft)"></i>3e, 50e, 97e</span></div>
+    <p class="tiny muted">${young?"Avant 2 ans, la projection est peu fiable : les bébés changent souvent de couloir. ":""}Modèle statistique simple fondé sur les courbes OMS et la taille des parents. La puberté (précoce ou tardive) peut modifier la trajectoire. Ce n'est pas une prédiction médicale.</p>`;
+}
+
+/* ======== SANTÉ ======== */
+function sante(c){
+  const tabs = [["vaccins","Vaccins"],["dev","Développement"],["dossier","Dossier"],["dents","Dents",mod(c,"teeth")],["conseils","Conseils"]].filter(t => t[2] !== false);
+  if (!tabs.some(t => t[0] === UI.sub.sante)) UI.sub.sante = "vaccins";
+  const t = UI.sub.sante;
+  let h = `<div class="seg" role="group" aria-label="Section santé">${tabs.map(([id,l])=>`<button data-act="sub" data-v="${id}" aria-pressed="${t===id}">${l}</button>`).join("")}</div>`;
+  return h + ({vaccins, dev, dossier, dents, conseils}[t])(c);
+}
+function vaccins(c){
+  const all = PIQ.flatMap(g => vaxStatus(c, g));
+  const done = all.filter(d => d.st === "fait").length, total = all.filter(d => d.st !== "na").length;
+  let h = `<div class="card"><div class="card-h"><div><span class="eyebrow">Programme québécois d'immunisation</span><h2>Carnet de vaccination</h2></div><span class="chip mint num">${done}/${total} doses</span></div>
+  <div class="row"><a class="btn sm kid" href="https://portal3.clicsante.ca/" target="_blank" rel="noopener">Rendez-vous · Clic Santé</a><a class="btn sm ghost" href="https://www.quebec.ca/sante/conseils-et-prevention/vaccination/programme-quebecois-d-immunisation" target="_blank" rel="noopener">Calendrier officiel</a></div><div>`;
+  PIQ.forEach(g => { const ds = vaxStatus(c, g);
+    h += `<div class="vgroup"><div><div class="vage">${g.label}</div><div class="tiny muted">${fmtD(ds[0].due,{month:"short",year:"numeric"})}</div></div><div>${g.note?`<p class="small muted" style="margin-bottom:6px">${g.note}</p>`:""}
+      ${ds.map(d => `<div class="vdose"><div class="grow"><div style="font-weight:700">${esc(d.name)}</div><div class="tiny muted">${esc(d.short)}${d.rec?` · ${fmtD(d.rec.date)}${d.rec.lot?` · lot ${esc(d.rec.lot)}`:""}${d.rec.site?` · ${esc(d.rec.site)}`:""}`:""}</div>${d.rec?.reactions?`<div class="tiny" style="color:var(--rose-ink)">Réaction : ${esc(d.rec.reactions)}</div>`:""}</div>
+        <span class="chip ${VSTAT[d.st][0]}">${VSTAT[d.st][1]}</span><button class="btn sm ${d.rec?"ghost":"line"}" data-act="vaxForm" data-v="${d.id}">${d.rec?"Modifier":"Noter"}</button></div>`).join("")}</div></div>`; });
+  return h + `</div><p class="tiny muted">Dates approximatives selon la date de naissance. En cas de retard, le CLSC établit le rattrapage selon les intervalles minimaux du PIQ.</p></div>`;
+}
+const AGIR_TOT = "https://www.quebec.ca/famille-et-soutien-aux-personnes/enfance/developpement-des-enfants/outils-ressources-developpement-enfants/programme-agir-tot-depister-tot-pour-mieux-repondre-aux-besoins-des-enfants";
+function dev(c){
+  const m = ageMonths(c.dob), em = effAge(c);
+  let h = "";
+  if (mod(c,"older") && m >= 60){
+    const k = m >= 144 ? "ado" : "scol";
+    h += `<div class="card"><div class="card-h"><h2>${k==="ado"?"Adolescence":"Âge scolaire"} : repères</h2></div><div class="list">${OLDER[k].map(o=>`<div class="li"><div class="grow"><div class="li-title">${o.t}</div><p class="small muted">${o.d}</p></div></div>`).join("")}</div></div>`;
+  }
+  if (!mod(c,"milestones")) return h || `<div class="card"><p class="muted">Les jalons sont masqués pour cet enfant. <button class="btn sm ghost" data-act="modules">Personnaliser</button></p></div>`;
+  h += `<div class="card"><div class="card-h"><div><span class="eyebrow">Jalons 0-6 ans</span><h2>Développement de ${esc(c.nick||c.name)}</h2></div>
+    <div class="seg" role="group" aria-label="Affichage"><button data-act="msMode" data-v="concis" aria-pressed="${UI.msMode==="concis"}">Concis</button><button data-act="msMode" data-v="detail" aria-pressed="${UI.msMode==="detail"}">Détaillé</button></div></div>
+    <p class="small muted">Chaque enfant a son rythme : les plages montrent l'âge où la plupart des enfants acquièrent chaque habileté. ${usesCorrected(c)?`<b>Âge corrigé utilisé : ${ageLabel(em)}.</b>`:""}</p>
+    ${domainSummary(c, em)}</div>`;
+  const late = MS.filter(it => it.al && em > it.al && !c.milestones[it.k]);
+  if (late.length) h += `<div class="banner warn">${icon("info")}<div><b>À discuter avec le médecin ou l'infirmière</b> (habituellement acquis à cet âge, pas encore coché) :<ul>${late.map(it=>`<li>${esc(it.t)} <span class="tiny">(attendu vers ${mLabel(it.al)})</span></li>`).join("")}</ul></div></div>`;
+  h += UI.msMode === "detail" ? msDetail(c, em) : msConcise(c, em);
+  h += `<div class="card"><h3>Signes à surveiller à tout âge</h3><ul class="small" style="margin:0;padding-left:18px">${GENERAL_FLAGS.map(f=>`<li>${f}</li>`).join("")}</ul></div>`;
+  h += `<div class="card tint"><h3>Une inquiétude ?</h3><p class="small">Le programme <b>Agir tôt</b> offre dépistage et services aux 0-5 ans, sans attendre un diagnostic. Communiquez avec votre CLSC, ou demandez au médecin ou à l'éducatrice de vous y diriger.</p><a class="btn sm kid" style="align-self:flex-start" href="${AGIR_TOT}" target="_blank" rel="noopener">Programme Agir tôt</a></div>`;
+  return h;
+}
+function domainSummary(c, em){
+  return `<div class="stack" style="gap:8px">${Object.entries(DOMAINS).map(([d,D]) => {
+    const exp = MS.filter(it => it.d === d && it.b <= em), ok = exp.filter(it => c.milestones[it.k]).length;
+    const cur = MS.filter(it => it.d === d && it.a <= em && it.b > em).length;
+    const p = exp.length ? ok/exp.length : 1;
+    return `<div><div class="row between small"><b style="color:var(--${D.color}-ink)">${D.label}</b><span class="muted num">${exp.length?`${ok}/${exp.length} attendus`:"rien d'attendu encore"}${cur?` · ${cur} en cours`:""}</span></div><div class="dombar"><i style="width:${(p*100).toFixed(0)}%;background:var(--${D.color})"></i></div></div>`; }).join("")}</div>`;
+}
+function msConcise(c, em){
+  const cur = BANDS.find(b => b >= em) || 72;
+  const idx = BANDS.indexOf(cur);
+  const show = UI.msAll ? BANDS : BANDS.slice(Math.max(0, idx-1), idx+2);
+  let h = show.map(b => {
+    const items = MS.filter(it => bandOf(it) === b); if (!items.length) return "";
+    const done = items.filter(it => c.milestones[it.k]).length;
+    const flags = MS.filter(it => it.al && it.al > (BANDS[BANDS.indexOf(b)-1]||0) && it.al <= b);
+    return `<div class="card" ${b===cur?'style="outline:2px solid var(--kid)"':""}><div class="card-h"><h2>D'ici ${bandLabel(b)}</h2><div class="row">${b===cur?'<span class="chip peach">Maintenant</span>':""}<span class="chip mint num">${done}/${items.length}</span></div></div>
+      <div>${items.map(it => msRow(c,it,false)).join("")}</div>
+      ${flags.length?`<div class="banner alert">${icon("alert")}<div><b>Consultez si pas encore acquis à ${bandLabel(b)} :</b><ul>${flags.map(f=>`<li>${esc(f.t)}</li>`).join("")}</ul></div></div>`:""}</div>`; }).join("");
+  return h + `<button class="btn ghost" data-act="msAll">${UI.msAll?"Voir seulement autour de l'âge actuel":"Voir tous les âges (2 mois à 6 ans)"}</button>`;
+}
+function msDetail(c, em){
+  let items = UI.msAll ? MS : MS.filter(it => it.a <= em + 12 && it.b >= em - 10); if (!items.length) items = MS;
+  const a0 = UI.msAll ? 0 : Math.max(0, Math.floor(Math.min(...items.map(i=>i.a)))), b0 = UI.msAll ? 72 : Math.ceil(Math.max(...items.map(i=>i.b), em + 2));
+  const X = m => clamp((m - a0)/(b0 - a0)*100, 0, 100);
+  const tickStep = (b0-a0) <= 18 ? 3 : (b0-a0) <= 36 ? 6 : 12;
+  const ticks = []; for (let t = Math.ceil(a0/tickStep)*tickStep; t <= b0; t += tickStep) ticks.push(t);
+  const axis = `<div class="axis">${ticks.map(t=>`<span style="left:${X(t)}%">${t<24?t+" m":t/12+" a"}</span>`).join("")}</div>`;
+  let h = Object.entries(DOMAINS).map(([d,D]) => {
+    const rows = items.filter(it => it.d === d).sort((a,b)=>a.a-b.a); if (!rows.length) return "";
+    return `<div class="card"><div class="card-h"><h2 style="color:var(--${D.color}-ink)">${D.label}</h2><span class="tiny muted">${a0<24?a0+" mois":mLabel(a0)} → ${mLabel(b0)}</span></div>${axis}
+      ${rows.map(it => { const on = !!c.milestones[it.k], late = it.al && em > it.al && !on, inWin = em >= it.a && em <= it.b;
+        const col = on ? "var(--mint)" : late ? "var(--danger)" : inWin ? `var(--${D.color})` : "var(--soft)";
+        return `<div class="tl-row"><button class="check" role="checkbox" aria-checked="${on}" aria-label="${esc(it.t)}" data-act="ms" data-v="${esc(it.k)}">${on?icon("check"):""}</button>
+          <div style="min-width:0"><div class="row between" style="gap:6px"><span style="font-weight:600">${esc(it.t)}</span><span class="tiny muted num">${rangeTxt(it)}${it.al?` · alerte ${mLabel(it.al)}`:""}</span></div>
+          <div class="track"><div class="bar" style="left:${X(it.a)}%;width:${Math.max(1.5, X(it.b)-X(it.a))}%;background:${col};opacity:${on?1:.75}"></div>${it.al && it.al<=b0?`<div class="flag" style="left:calc(${X(it.al)}% - 1px)" title="Âge d'alerte"></div>`:""}<div class="now" style="left:calc(${X(em)}% - 1px)" title="Âge actuel"></div></div></div></div>`; }).join("")}</div>`;
+  }).join("");
+  return `<div class="legend"><span><i style="background:var(--ink);width:3px;height:14px"></i>Âge actuel</span><span><i style="background:var(--mint)"></i>Acquis</span><span><i style="background:var(--soft)"></i>Plage habituelle</span><span><i style="background:var(--danger);width:3px;height:14px"></i>Âge d'alerte</span></div>` + h +
+    `<button class="btn ghost" data-act="msAll">${UI.msAll?"Voir seulement autour de l'âge actuel":"Voir toute la période 0-6 ans"}</button>
+    <p class="tiny muted">Motricité globale : fenêtres d'acquisition de l'OMS (étude multicentrique 2006). Autres sphères : plages usuelles des grilles Denver II, CDC et Rourke. Indicatif, ne remplace pas une évaluation.</p>`;
+}
+function dossier(c){
+  const f = (l,v) => `<div class="li"><div class="grow"><div class="tiny muted" style="font-weight:700">${l}</div><div class="li-title">${v?esc(v):'<span class="muted">—</span>'}</div></div></div>`;
+  return `<div class="grid"><div class="card c6"><div class="card-h"><h2>Dossier santé</h2><button class="btn sm ghost" data-act="kidForm" data-v="${c.id}">${icon("edit")}Modifier</button></div>
+    ${c.allergies?`<div class="banner alert">${icon("alert")}<div><b>Allergies :</b> ${esc(c.allergies)}</div></div>`:""}
+    <div class="list">${f("Allergies",c.allergies)}${f("Problèmes de santé",c.conditions)}${f("Médicaments réguliers",c.meds)}${f("Médecin ou IPS",c.doctor)}${f("Pharmacie",c.pharmacy)}${f("Naissance",`${fmtD(c.dob)} · ${c.gaW} SA ${c.gaD||0} j`)}</div></div>
+    <div class="card c6"><div class="card-h"><h2>Rapport pour la visite</h2>${icon("doc")}</div><p class="small muted">Résumé à montrer ou copier pour le médecin ou l'IPS : mesures et percentiles, vitesse de croissance, vaccins, jalons, sommeil et activité, allergies, fièvre et médicaments des 7 derniers jours.</p><button class="btn kid" data-act="report">Préparer le rapport</button></div></div>`;
+}
+function dents(c){
+  const n = TEETH.reduce((s,t)=>s+(c.teeth[t.id+"L"]?1:0)+(c.teeth[t.id+"R"]?1:0)+(c.teeth[t.id]?2:0),0);
+  return `<div class="card"><div class="card-h"><div><span class="eyebrow">Dents de lait</span><h2>${Math.min(n,20)} dent${n>1?"s":""} sur 20</h2></div>${icon("tooth")}</div>
+    <p class="small muted">Touchez G ou D quand une dent perce. L'ordre et l'âge varient beaucoup.</p>
+    <div class="stack" style="gap:6px">${TEETH.map(t => `<div class="tooth"><div style="min-width:0"><div style="font-weight:600">${t.n}</div><div class="tiny muted">${t.age}</div></div>${["L","R"].map(sd=>`<button class="tbtn" data-act="tooth" data-v="${t.id+sd}" aria-pressed="${!!(c.teeth[t.id]||c.teeth[t.id+sd])}">${sd==="L"?"G":"D"}</button>`).join("")}</div>`).join("")}</div></div>`;
+}
+function conseils(c){
+  const m = ageMonths(c.dob), hidden = c.hideTips || [];
+  const cats = Object.keys(TIPCAT).filter(k => TIPS.some(t => t[0]===k && m >= t[1] && m < t[2]));
+  let h = `<div class="card"><div class="card-h"><div><span class="eyebrow">Pour ${ageLabel(m)}</span><h2>Conseils</h2></div></div><p class="small muted">Touchez une catégorie pour la masquer ou l'afficher pour ${esc(c.nick||c.name)}.</p>
+    <div class="row">${cats.map(k=>`<button class="chip ${TIPCAT[k][1]}" data-act="tipCat" data-v="${k}" aria-pressed="${!hidden.includes(k)}">${TIPCAT[k][0]}</button>`).join("")}</div></div>`;
+  const shown = cats.filter(k => !hidden.includes(k));
+  h += shown.map(k => `<div class="card"><h3 style="color:var(--${TIPCAT[k][1]}-ink)">${TIPCAT[k][0]}</h3><div class="stack">${TIPS.filter(t=>t[0]===k && m>=t[1] && m<t[2]).map(t=>`<div><b>${t[3]}</b><p class="small">${t[4]}</p></div>`).join('<div class="sep"></div>')}</div></div>`).join("");
+  const futur = TIPS.filter(t => t[1] > m && t[1] <= m + 12 && !hidden.includes(t[0]));
+  if (futur.length) h += `<div class="card tint"><h3>Pour les prochains mois</h3><div class="stack">${futur.slice(0,4).map(t=>`<div><span class="dom" style="color:var(--${TIPCAT[t[0]][1]}-ink)">${TIPCAT[t[0]][0]} · dès ${mLabel(t[1])}</span><div><b>${t[3]}</b></div><p class="small">${t[4]}</p></div>`).join("")}</div></div>`;
+  return h;
+}
+
+/* ======== AGENDA ======== */
+const EVT = { medecin:["rose","Médecin / IPS"], dentiste:["mint","Dentiste"], vaccin:["butter","Vaccin"], garde:["sky","Garderie / école"], therapie:["lilac","Thérapie"], sport:["mint","Sport / activité"], autre:["peach","Autre"], anniv:["peach","Anniversaire"], visite:["rose","Visite suggérée"] };
+const evSort = (a,b) => (a.date+(a.time||"")) < (b.date+(b.time||"")) ? -1 : 1;
+function allEvents(c, from = addDays(today(), -45), to = addDays(today(), 400)){
+  const ev = c.events.map(e => ({...e, kid:c}));
+  PIQ.forEach(g => { const ds = vaxStatus(c, g).filter(d => d.st==="avenir"||d.st==="du"); if (ds.length && ds[0].due - today() < 365*DAY) ev.push({id:"v"+g.age, date:iso(ds[0].due), time:"", title:`Vaccins ${g.label}`, type:"vaccin", auto:true, kid:c}); });
+  const b = parseD(c.dob), y = today().getFullYear();
+  [y, y+1].forEach(yy => { const d = new Date(yy, b.getMonth(), b.getDate()); if (d > b) ev.push({id:"b"+yy, date:iso(d), time:"", title:`Anniversaire de ${c.nick||c.name} · ${yy-b.getFullYear()} an${yy-b.getFullYear()>1?"s":""}`, type:"anniv", auto:true, kid:c}); });
+  const nvz = nextVisit(c); if (nvz && !c.events.some(e => e.type==="medecin" && Math.abs(parseD(e.date) - nvz.date) < 45*DAY)) ev.push({id:"vis", date:iso(nvz.date), time:"", title:`Visite de suivi ${nvz.age<1?"1 semaine":mLabel(nvz.age)} (à planifier)`, type:"visite", auto:true, kid:c});
+  if (mod(c,"sports")) c.activities.forEach(a => { for (let i = -7; i <= 60; i++){ const d = addDays(today(), i); if (a.days.includes(d.getDay())) ev.push({id:"a"+a.id+iso(d), date:iso(d), time:a.time, title:a.name, type:"sport", auto:true, kid:c}); } });
+  return ev;
+}
+function eventRow(e){
+  const [col, lbl] = EVT[e.type] || EVT.autre, d = parseD(e.date);
+  return `<div class="li"><div class="ic" style="background:var(--${col}-bg);color:var(--${col}-ink);display:flex;flex-direction:column;justify-content:center;line-height:1"><b style="font-family:var(--display);font-size:1rem">${d.getDate()}</b><span style="font-size:.6rem;text-transform:uppercase;font-weight:700">${d.toLocaleDateString("fr-CA",{month:"short"}).replace(".","")}</span></div>
+    <div class="grow"><div class="li-title">${esc(e.title)}</div><div class="small muted">${lbl}${e.time?` · ${e.time}`:""}${S.children.length>1?` · ${esc(e.kid?.nick||e.kid?.name||"")}`:""}</div></div>
+    ${e.auto?"":`<button class="icon-btn flat" data-act="delEvent" data-v="${e.id}" aria-label="Supprimer">${icon("trash")}</button>`}</div>`;
+}
+function agenda(c){
+  const base = UI.calMonth ? parseD(UI.calMonth) : new Date(today().getFullYear(), today().getMonth(), 1);
+  const ev = S.children.flatMap(k => allEvents(k));
+  const first = new Date(base.getFullYear(), base.getMonth(), 1), start = addDays(first, -((first.getDay()+6)%7));
+  const sel = UI.calSel || iso(today());
+  let cells = "";
+  for (let i=0;i<42;i++){
+    const d = addDays(start, i), ds = iso(d), out = d.getMonth() !== base.getMonth();
+    if (i >= 35 && out && d.getDay()===1) break;
+    const de = ev.filter(e => e.date === ds);
+    cells += `<button class="day ${out?"out":""} ${ds===iso(today())?"today":""} ${ds===sel?"sel":""}" data-act="day" data-v="${ds}" aria-label="${fmtD(ds,{weekday:"long",day:"numeric",month:"long"})}${de.length?`, ${de.length} événement(s)`:""}"><span class="num">${d.getDate()}</span><span class="dots">${de.slice(0,4).map(e=>`<i style="background:var(--${(EVT[e.type]||EVT.autre)[0]})"></i>`).join("")}</span></button>`;
+  }
+  const selEv = ev.filter(e => e.date === sel).sort(evSort);
+  const up = ev.filter(e => e.date >= iso(today()) && e.type !== "sport").sort(evSort).slice(0,6);
+  return `<div class="grid"><div class="card c7"><div class="card-h"><h2 style="text-transform:capitalize">${base.toLocaleDateString("fr-CA",{month:"long",year:"numeric"})}</h2><div class="row"><button class="icon-btn" data-act="calNav" data-v="-1" aria-label="Mois précédent">${icon("left")}</button><button class="icon-btn" data-act="calNav" data-v="1" aria-label="Mois suivant">${icon("right")}</button></div></div>
+    <div class="cal">${["L","M","M","J","V","S","D"].map(d=>`<div class="dow">${d}</div>`).join("")}${cells}</div>
+    <div class="legend">${["medecin","dentiste","vaccin","garde","sport","therapie"].map(k=>`<span><i style="background:var(--${EVT[k][0]});width:8px;height:8px;border-radius:50%"></i>${EVT[k][1]}</span>`).join("")}</div></div>
+    <div class="card c5"><div class="card-h"><h2 style="text-transform:capitalize">${fmtD(sel,{weekday:"long",day:"numeric",month:"long"})}</h2><button class="btn sm kid" data-act="eventForm" data-v="${sel}">${icon("plus")}Ajouter</button></div>
+      ${selEv.length?`<div class="list">${selEv.map(eventRow).join("")}</div>`:`<p class="muted small">Rien ce jour-là.</p>`}
+      <div class="sep"></div><span class="eyebrow">Prochains rendez-vous · tous les enfants</span>
+      <div class="list">${up.map(eventRow).join("") || '<p class="muted small">Rien de prévu.</p>'}</div></div></div>`;
+}
+
+/* ======== PLUS ======== */
+function plus(c){
+  const firsts = [...c.firsts].sort((a,b)=>a.date<b.date?1:-1);
+  const short = [["kidForm","user","Profil de "+esc(c.name),"Photo, surnom, couleur, ambiance, santé"],["modules","sliders","Personnaliser les modules","Masquer couches, boires, jalons, etc."],["report","doc","Rapport pour le médecin","Résumé à montrer ou copier"],["urgence","phone","Urgence et ressources","811, 911, Centre antipoison, Tel-jeunes"],["theme","sun","Thème : "+(S.theme==="dark"?"sombre":S.theme==="light"?"clair":"automatique"),"Touchez pour changer"],["data","db","Mes données","Sauvegarde, import, effacement"]];
+  return `<div class="grid">
+    <div class="card c6"><div class="card-h"><h2>Réglages</h2></div><div class="list">${short.map(([a,ic,t,s])=>`<button class="li" data-act="${a}" ${a==="kidForm"?`data-v="${c.id}"`:""}><div class="ic" style="background:var(--kid-bg);color:var(--kid-ink)">${icon(ic)}</div><div class="grow"><div class="li-title">${t}</div><div class="small muted">${s}</div></div></button>`).join("")}</div></div>
+    ${mod(c,"firsts")?`<div class="card c6"><div class="card-h"><div><span class="eyebrow">Souvenirs</span><h2>Premières fois</h2></div><button class="btn sm kid" data-act="firstForm">${icon("plus")}Ajouter</button></div>
+      ${firsts.length?`<div class="list">${firsts.map(f=>`<div class="li"><div class="ic" style="background:var(--butter-bg);color:var(--butter-ink)">${icon("star")}</div><div class="grow"><div class="li-title">${esc(f.title)}</div><div class="small muted">${fmtD(f.date)} · ${ageLabel(ageMonths(c.dob, parseD(f.date)))}${f.note?` · ${esc(f.note)}`:""}</div></div><button class="icon-btn flat" data-act="delFirst" data-v="${f.id}" aria-label="Supprimer">${icon("trash")}</button></div>`).join("")}</div>`:`<div class="empty">${icon("star")}<p>Premier sourire, premiers pas, premier jour d'école, premier but…</p></div>`}</div>`:""}
+    <div class="card c12"><div class="row" style="gap:14px">${mascot(48)}<div><h2>Care</h2><p class="small"><b>C</b>roissance · <b>A</b>ctivité · <b>R</b>endez-vous · <b>É</b>veil</p><p class="small muted"><b>C</b>hildhood · <b>A</b>ctivity · <b>R</b>outines · <b>E</b>volution</p></div></div></div>
+    <div class="card c12 tint"><h3>Ressources du Québec</h3><div class="row">
+      ${[["Programme Agir tôt",AGIR_TOT],["Carnet santé Québec","https://carnetsante.gouv.qc.ca/"],["La Place 0-5","https://www.laplace0-5.com/"],["Naître et grandir","https://naitreetgrandir.com/"],["Clic Santé","https://portal3.clicsante.ca/"],["Tel-jeunes","https://www.teljeunes.com/"]].map(([l,u])=>`<a class="btn sm ghost" href="${u}" target="_blank" rel="noopener">${l}</a>`).join("")}
+    </div></div></div>`;
+}
+
+/* ---------- feuilles (formulaires) ---------- */
+function sheet(inner){
+  $("#layer").innerHTML = `<div class="scrim" data-act="closeSheet"><div class="sheet" role="dialog" aria-modal="true"><div class="sheet-grab"></div>${inner}</div></div>`;
+  const f = $("#layer input:not([type=radio]):not([type=checkbox]):not([type=file]), #layer select, #layer textarea"); if (f) setTimeout(()=>f.focus({preventScroll:true}), 60);
+}
+const close = () => { $("#layer").innerHTML = ""; };
+const fld = (id,l,inp) => `<div class="field"><label for="${id}">${l}</label>${inp}</div>`;
+const radios = (name, opts, sel) => `<div class="radio-row" role="radiogroup">${opts.map(o=>`<label><input type="radio" name="${name}" value="${esc(o)}" ${o===sel?"checked":""}><span>${esc(o)}</span></label>`).join("")}</div>`;
+const sheetHead = t => `<div class="row between"><h2>${t}</h2><button type="button" class="icon-btn" data-act="closeSheet" aria-label="Fermer">${icon("x")}</button></div>`;
+const numIn = (id, ph="", step=5) => `<input class="inp" id="${id}" type="number" inputmode="numeric" min="0" step="${step}" placeholder="${ph}">`;
+
+function logForm(type){
+  const c = child(), T = LOGT[type], m = ageMonths(c.dob); let body = "";
+  const time = fld("f-t","Heure",`<input class="inp" id="f-t" type="datetime-local" value="${localInput(Date.now())}">`);
+  if (type === "feed") body = `${radios("mode",["Sein gauche","Sein droit","Biberon"],"Sein gauche")}<div class="fgrid">${fld("f-ml","Quantité (ml)",numIn("f-ml","biberon"))}${fld("f-min","Durée (min)",numIn("f-min","",1))}</div>${time}<button type="button" class="btn ghost" data-act="startTimer" data-v="feed">${icon("bottle")}Démarrer une minuterie de tétée</button>`;
+  if (type === "sleep") body = `<button type="button" class="btn kid" data-act="startTimer" data-v="sleep">${icon("moon")}Démarrer le dodo maintenant</button><div class="sep"></div><p class="small muted">Ou noter un sommeil terminé :</p><div class="fgrid">${fld("f-t","Début",`<input class="inp" id="f-t" type="datetime-local" value="${localInput(Date.now()-(m>=36?9:1)*36e5)}">`)}${fld("f-end","Fin",`<input class="inp" id="f-end" type="datetime-local" value="${localInput(Date.now())}">`)}</div>`;
+  if (type === "diaper") body = `${radios("kind",["Pipi","Selle","Pipi et selle"],"Pipi")}${time}${fld("f-note","Note (couleur, consistance…)",`<input class="inp" id="f-note">`)}`;
+  if (type === "solid") body = `${fld("f-food","Aliment",`<input class="inp" id="f-food" placeholder="Ex. : purée de lentilles">`)}${fld("f-al","Contient un allergène ?",`<select class="inp" id="f-al"><option value="">Non</option>${ALLERGENS.map(a=>`<option>${a}</option>`).join("")}</select>`)}${fld("f-re","Réaction observée",`<input class="inp" id="f-re" placeholder="Aucune">`)}${time}`;
+  if (type === "temp") body = `${fld("f-temp","Température (°C)",`<input class="inp" id="f-temp" type="number" inputmode="decimal" step="0.1" min="34" max="43" placeholder="38,2">`)}${radios("site",["Rectale","Buccale","Axillaire","Tympanique"],m<24?"Rectale":"Buccale")}${time}<p class="tiny muted">Avant 2 ans, la mesure rectale est la plus fiable.</p>`;
+  if (type === "med") body = `${fld("f-name","Médicament",`<input class="inp" id="f-name" placeholder="Nom du produit">`)}${fld("f-dose","Dose donnée (selon l'étiquette ou la prescription)",`<input class="inp" id="f-dose" placeholder="Ex. : 2,5 ml">`)}${time}<p class="tiny muted">Pour la dose, suivez l'étiquette selon le poids de l'enfant, ou demandez au pharmacien.</p>`;
+  if (type === "mood") body = `${radios("mood",["Super","Bien","Moyen","Difficile"],"Bien")}${fld("f-note","Note",`<input class="inp" id="f-note">`)}${time}`;
+  if (type === "screen") body = `${fld("f-min","Minutes d'écran (loisirs)",numIn("f-min","60"))}${time}`;
+  if (type === "tummy") body = `${fld("f-min","Minutes sur le ventre",numIn("f-min","10"))}${time}`;
+  if (type === "read") body = `<div class="fgrid">${fld("f-min","Minutes de lecture",numIn("f-min","15"))}${fld("f-title","Livre",`<input class="inp" id="f-title" list="books">`)}</div><datalist id="books">${[...new Set(c.logs.filter(l=>l.type==="read"&&l.data.title).map(l=>l.data.title))].map(t=>`<option value="${esc(t)}">`).join("")}</datalist>${time}`;
+  if (type === "activity") body = `${fld("f-what","Activité",`<input class="inp" id="f-what" list="acts" placeholder="Parc, vélo, soccer…">`)}<datalist id="acts">${[...c.activities.map(a=>a.name),"Parc","Marche","Vélo","Natation","Jeu libre dehors"].map(t=>`<option value="${esc(t)}">`).join("")}</datalist><div class="fgrid">${fld("f-min","Minutes",numIn("f-min","30"))}</div>${radios("intensity",["Légère","Modérée","Intense"],"Modérée")}${time}`;
+  if (type === "note") body = `${fld("f-text","Note",`<textarea class="inp" id="f-text"></textarea>`)}${time}`;
+  sheet(`<form class="stack" data-form="log" data-type="${type}" style="gap:14px">${sheetHead(T.label)}${body}<button class="btn kid" type="submit">Enregistrer</button></form>`);
+}
+function growthForm(){
+  sheet(`<form class="stack" data-form="growth" style="gap:14px">${sheetHead("Nouvelle mesure")}
+    ${fld("g-date","Date",`<input class="inp" id="g-date" type="date" value="${iso(today())}" required>`)}
+    <div class="fgrid">${fld("g-w","Poids (kg)",`<input class="inp" id="g-w" type="number" inputmode="decimal" step="0.005" min="0.3" max="200">`)}${fld("g-h","Taille (cm)",`<input class="inp" id="g-h" type="number" inputmode="decimal" step="0.1" min="25" max="230">`)}${mod(child(),"ofc")?fld("g-c","Périmètre crânien (cm)",`<input class="inp" id="g-c" type="number" inputmode="decimal" step="0.1" min="20" max="65">`):""}</div>
+    <p class="tiny muted">Percentiles selon l'OMS${usesCorrected(child())?", avec l'âge corrigé":""}.</p><button class="btn kid" type="submit">Enregistrer</button></form>`);
+}
+function kidForm(id){
+  const c = S.children.find(k => k.id === id) || {...blankKid(), name:"", dob:"", sex:"F", gaW:40, gaD:0, color:"mint"};
+  const cols = ["peach","mint","butter","sky","lilac","rose"];
+  UI.photoDraft = c.photo || null;
+  sheet(`<form class="stack" data-form="kid" data-id="${id||""}" style="gap:14px">${sheetHead(id?"Profil":"Nouvel enfant")}
+    <div class="row"><div id="photoPrev">${avatar({...c, name:c.name||"?", dob:c.dob||iso(today())}, 72)}</div><div class="stack" style="gap:6px"><label class="btn sm ghost" style="cursor:pointer">Choisir une photo<input type="file" id="k-photo" accept="image/*" hidden></label>${c.photo?`<button type="button" class="btn sm line" data-act="rmPhoto">Retirer la photo</button>`:""}</div></div>
+    <div class="fgrid">${fld("k-name","Prénom",`<input class="inp" id="k-name" value="${esc(c.name)}" required>`)}${fld("k-nick","Surnom affiché (facultatif)",`<input class="inp" id="k-nick" value="${esc(c.nick||"")}">`)}${fld("k-dob","Date de naissance",`<input class="inp" id="k-dob" type="date" value="${c.dob}" max="${iso(today())}" required>`)}</div>
+    <div class="field"><label>Sexe biologique (pour les courbes OMS)</label>${radios("sex",["Fille","Garçon"],c.sex==="M"?"Garçon":"Fille")}</div>
+    <div class="fgrid">${fld("k-gaw","Âge gestationnel (semaines)",`<input class="inp" id="k-gaw" type="number" min="22" max="44" value="${c.gaW}">`)}${fld("k-gad","+ jours",`<input class="inp" id="k-gad" type="number" min="0" max="6" value="${c.gaD||0}">`)}</div>
+    <p class="tiny muted">Avant 37 semaines, Care utilise l'âge corrigé jusqu'à 2 ans.</p>
+    <div class="fgrid">${fld("k-hf","Taille du père (cm)",`<input class="inp" id="k-hf" type="number" value="${c.hFather||""}">`)}${fld("k-hm","Taille de la mère (cm)",`<input class="inp" id="k-hm" type="number" value="${c.hMother||""}">`)}</div>
+    <div class="field"><label>Couleur</label><div class="radio-row">${cols.map(col=>`<label><input type="radio" name="color" value="${col}" ${col===c.color?"checked":""}><span style="background:var(--${col});border-color:var(--${col});width:38px;height:34px;padding:0" aria-label="${col}"></span></label>`).join("")}</div></div>
+    <div class="field"><label>Ambiance de l'app</label>${radios("look",["Selon l'âge","Bébé","Bambin","Préscolaire","Scolaire","Ado"],({auto:"Selon l'âge",nour:"Bébé",bamb:"Bambin",pres:"Préscolaire",scol:"Scolaire",ado:"Ado"})[c.look||"auto"])}</div>
+    ${fld("k-al","Allergies",`<input class="inp" id="k-al" value="${esc(c.allergies||"")}">`)}${fld("k-co","Problèmes de santé",`<input class="inp" id="k-co" value="${esc(c.conditions||"")}">`)}
+    <div class="fgrid">${fld("k-me","Médicaments réguliers",`<input class="inp" id="k-me" value="${esc(c.meds||"")}">`)}${fld("k-dr","Médecin ou IPS",`<input class="inp" id="k-dr" value="${esc(c.doctor||"")}">`)}${fld("k-ph","Pharmacie",`<input class="inp" id="k-ph" value="${esc(c.pharmacy||"")}">`)}</div>
+    <div class="row"><button class="btn kid" type="submit" style="flex:1">Enregistrer</button>${id?`<button type="button" class="btn danger" data-act="askDelKid" data-v="${id}">Supprimer</button>`:""}</div><div id="delConfirm"></div></form>`);
+}
+function modulesSheet(){
+  const c = child(), m = ageMonths(c.dob);
+  sheet(`${sheetHead("Personnaliser pour "+esc(c.nick||c.name))}
+    <p class="small muted">Par défaut, Care affiche ce qui convient à ${ageLabel(m)}. Masquez ou ajoutez ce que vous voulez ; les boutons du quotidien suivent ces choix.</p>
+    <div>${MODULES.map(M => `<label class="switch"><input type="checkbox" data-mod="${M.k}" ${mod(c,M.k)?"checked":""}><span class="tg"></span><span style="flex:1;min-width:0"><b>${M.l}</b><span class="tiny muted" style="display:block">${M.d}${c.modules[M.k]!==undefined?" · réglé à la main":""}</span></span></label>`).join("")}</div>
+    <div class="row"><button class="btn ghost" data-act="resetModules">Revenir aux choix selon l'âge</button><button class="btn kid" data-act="closeSheet" style="flex:1">Terminé</button></div>`);
+}
+function vaxForm(doseId){
+  const c = child(), g = PIQ.find(g => g.doses.some(d=>d.id===doseId)), d = g.doses.find(d=>d.id===doseId);
+  const r = c.vaccines[doseId] || {date:iso(today()), lot:"", site:"", reactions:""};
+  sheet(`<form class="stack" data-form="vax" data-id="${doseId}" style="gap:14px">${sheetHead(esc(d.name))}<p class="small muted">${g.label} · ${esc(d.short)}</p>
+    <div class="fgrid">${fld("v-date","Date",`<input class="inp" id="v-date" type="date" value="${r.date}" required>`)}${fld("v-lot","Numéro de lot",`<input class="inp" id="v-lot" value="${esc(r.lot)}">`)}</div>
+    <div class="field"><label>Site</label>${radios("site",["Cuisse gauche","Cuisse droite","Bras gauche","Bras droit","Oral"],r.site||"")}</div>
+    ${fld("v-re","Réactions observées",`<input class="inp" id="v-re" value="${esc(r.reactions)}" placeholder="Fièvre, rougeur…">`)}
+    <div class="row"><button class="btn kid" type="submit" style="flex:1">Enregistrer</button>${c.vaccines[doseId]?`<button type="button" class="btn danger" data-act="delVax" data-v="${doseId}">Retirer</button>`:""}</div></form>`);
+}
+function eventForm(date){
+  sheet(`<form class="stack" data-form="event" style="gap:14px">${sheetHead("Nouvel événement")}
+    ${fld("e-title","Titre",`<input class="inp" id="e-title" required placeholder="Ex. : suivi 12 mois">`)}
+    <div class="fgrid">${fld("e-date","Date",`<input class="inp" id="e-date" type="date" value="${date||iso(today())}" required>`)}${fld("e-time","Heure",`<input class="inp" id="e-time" type="time">`)}</div>
+    <div class="field"><label>Type</label>${radios("type",["medecin","dentiste","vaccin","garde","therapie","autre"].map(k=>EVT[k][1]),"Médecin / IPS")}</div>
+    ${S.children.length>1?fld("e-kid","Enfant",`<select class="inp" id="e-kid">${S.children.map(k=>`<option value="${k.id}" ${k.id===S.active?"selected":""}>${esc(k.name)}</option>`).join("")}</select>`):""}
+    <button class="btn kid" type="submit">Ajouter</button></form>`);
+}
+function activityForm(){
+  sheet(`<form class="stack" data-form="activity" style="gap:14px">${sheetHead("Activité régulière")}
+    ${fld("a-name","Activité",`<input class="inp" id="a-name" required placeholder="Soccer, natation, danse…">`)}
+    <div class="field"><label>Jours</label><div class="radio-row">${[1,2,3,4,5,6,0].map(d=>`<label><input type="checkbox" name="days" value="${d}"><span>${WD[d]}</span></label>`).join("")}</div></div>
+    <div class="fgrid">${fld("a-time","Heure",`<input class="inp" id="a-time" type="time">`)}${fld("a-place","Lieu",`<input class="inp" id="a-place">`)}</div>
+    <button class="btn kid" type="submit">Ajouter</button></form>`);
+}
+function firstForm(){
+  sheet(`<form class="stack" data-form="first" style="gap:14px">${sheetHead("Une première fois")}
+    ${fld("p-title","Quoi ?",`<input class="inp" id="p-title" required placeholder="Premiers pas">`)}${fld("p-date","Date",`<input class="inp" id="p-date" type="date" value="${iso(today())}">`)}${fld("p-note","Détail",`<textarea class="inp" id="p-note"></textarea>`)}
+    <button class="btn kid" type="submit">Ajouter</button></form>`);
+}
+function urgence(){
+  const n = (l, num, sub, col) => `<div class="li"><div class="ic" style="background:var(--${col}-bg);color:var(--${col}-ink)">${icon("phone")}</div><div class="grow"><div class="small muted" style="font-weight:700">${l}</div><div class="phone num">${num}</div>${sub?`<div class="tiny muted">${sub}</div>`:""}</div><button class="btn sm ghost" data-act="copy" data-v="${num}" aria-label="Copier">${icon("copy")}</button><a class="btn sm ${col==="rose"?"danger":"ghost"}" href="tel:${num.replace(/[^0-9]/g,"")}">Appeler</a></div>`;
+  sheet(`${sheetHead("Urgence et ressources")}
+    <div class="banner alert">${icon("alert")}<div>Difficulté à respirer, lèvres bleues, convulsion, perte de conscience, étouffement : <b>911</b> immédiatement.</div></div>
+    <div class="list">${n("Urgence","911","","rose")}${n("Info-Santé · Info-Social","811","Infirmière 24 h/24 (option 1), intervenant psychosocial (option 2)","sky")}${n("Centre antipoison du Québec","1-800-463-5060","24 h/24","butter")}${n("Tel-jeunes","1-800-263-2266","Pour les jeunes. Texto : 514-600-1002","lilac")}${n("LigneParents","1-800-361-5085","Soutien aux parents, 24 h/24","mint")}${n("Ligne de crise suicide","988","Appel ou texto, 24 h/24","rose")}</div>`);
+}
+function report(){
+  const c = child(), m = ageMonths(c.dob), em = effAge(c), L = [];
+  L.push(`RAPPORT DE SUIVI — ${c.name.toUpperCase()}`, `Préparé par le parent le ${fmtD(today(),{day:"numeric",month:"long",year:"numeric"})} avec Care`, ``);
+  L.push(`Naissance : ${fmtD(c.dob)} · ${c.sex==="F"?"fille":"garçon"} · AG ${c.gaW} SA ${c.gaD||0} j`);
+  L.push(`Âge : ${ageLabel(m)}${usesCorrected(c)?` (corrigé : ${ageLabel(em)})`:""}`);
+  if (c.allergies) L.push(`ALLERGIES : ${c.allergies}`);
+  if (c.conditions) L.push(`Problèmes de santé : ${c.conditions}`);
+  if (c.meds) L.push(`Médicaments : ${c.meds}`);
+  L.push(``, `— CROISSANCE (OMS${usesCorrected(c)?", âge corrigé":""}) —`);
+  [...c.growth].sort((a,b)=>a.date<b.date?1:-1).slice(0,4).forEach(g => { const am = effAge(c, parseD(g.date));
+    L.push(`${fmtD(g.date)} : ${["weight","height","ofc"].filter(k=>g[k]).map(k => { const z = zScore(k,c.sex,am,Number(g[k])); return `${MEAS[k].label} ${fmtNum(g[k],k==="weight"?2:1)} ${MEAS[k].unit}${z!=null?` (P${pctLabel(z)}, z ${z>=0?"+":""}${fmtNum(z,2)})`:""}`; }).join(" · ")}`); });
+  const vel = heightVelocity(c); if (vel) L.push(`Vitesse de croissance : ${fmtNum(vel.v,1)} cm/an`);
+  const mp = midParental(c); if (mp) L.push(`Taille cible parentale : ${fmtNum(mp.t,0)} cm (± 8,5)`);
+  growthAlerts(c).forEach(a => L.push(a.out ? `! ${MEAS[a.meas].label} hors 3e-97e percentile` : `! ${MEAS[a.meas].label} : ${a.n} lignes de percentiles franchies à la ${a.dir} depuis le ${fmtD(a.from.date)}`));
+  L.push(``, `— VACCINATION (PIQ) —`);
+  PIQ.forEach(g => vaxStatus(c,g).forEach(d => { if (d.st!=="na" && (d.st!=="avenir" || g.age <= m+6)) L.push(`${g.label} · ${d.name} : ${VSTAT[d.st][1]}${d.rec?` le ${fmtD(d.rec.date)}${d.rec.lot?`, lot ${d.rec.lot}`:""}${d.rec.reactions?`, réaction : ${d.rec.reactions}`:""}`:""}`); }));
+  if (em < 78 && mod(c,"milestones")){
+    L.push(``, `— DÉVELOPPEMENT —`);
+    const late = MS.filter(it => it.al && em > it.al && !c.milestones[it.k]);
+    L.push(late.length ? `Non acquis après l'âge d'alerte : ${late.map(i=>i.t).join(" ; ")}` : `Aucun jalon en retard selon le parent.`);
+    Object.entries(DOMAINS).forEach(([d,D]) => { const exp = MS.filter(it => it.d===d && it.b <= em); if (exp.length) L.push(`${D.short} : ${exp.filter(it=>c.milestones[it.k]).length}/${exp.length} jalons attendus acquis`); });
+  }
+  const g = guide(m), wk = Array.from({length:7},(_,i)=>dayTotals(c, addDays(today(), -i)));
+  const avg = k => wk.reduce((s,t)=>s+t[k],0)/7;
+  L.push(``, `— HABITUDES (moyenne 7 jours) —`, `Sommeil ${fmtNum(avg("sleep")/60,1)} h (cible ${g.sleep[0]}-${g.sleep[1]}) · activité ${fmtMin(avg("act"))} · écran ${fmtMin(avg("screen"))} · lecture ${fmtMin(avg("read"))}`);
+  const last7 = c.logs.filter(l => Date.now()-l.t < 7*DAY), temps = last7.filter(l=>l.type==="temp"), meds = last7.filter(l=>l.type==="med");
+  if (temps.length || meds.length){ L.push(``, `— FIÈVRE ET MÉDICAMENTS, 7 JOURS —`);
+    temps.forEach(l => L.push(`${fmtD(new Date(l.t),{day:"numeric",month:"short"})} ${fmtT(l.t)} · ${fmtNum(l.data.temp)} °C (${l.data.site})`));
+    meds.forEach(l => L.push(`${fmtD(new Date(l.t),{day:"numeric",month:"short"})} ${fmtT(l.t)} · ${l.data.name}${l.data.dose?` ${l.data.dose}`:""}`)); }
+  L.push(``, `Questions du parent :`, `………………………………………………`);
+  UI.reportTxt = L.join("\n");
+  sheet(`${sheetHead("Rapport pour la visite")}<p class="small muted">Copiez-le dans un courriel ou montrez l'écran au médecin.</p><div class="pre" id="reportTxt">${esc(UI.reportTxt)}</div><button class="btn kid" data-act="copy" data-v="__report">${icon("copy")}Copier le rapport</button>`);
+}
+function dataSheet(){
+  sheet(`${sheetHead("Mes données")}
+    <div class="banner info">${icon("info")}<div>Les données restent <b>dans ce navigateur, sur cet appareil</b>. Rien n'est envoyé ailleurs. Copiez une sauvegarde régulièrement.</div></div>
+    <button class="btn ghost" data-act="copy" data-v="__backup">${icon("copy")}Copier une sauvegarde (texte)</button>
+    ${fld("imp","Restaurer une sauvegarde",`<textarea class="inp" id="imp" placeholder="Collez la sauvegarde ici"></textarea>`)}
+    <div class="row"><button class="btn ghost" data-act="import">Restaurer</button><label class="btn line" style="cursor:pointer">Importer un fichier<input type="file" id="impFile" accept=".json,.txt,application/json" hidden></label></div>
+    <div class="sep"></div><button class="btn danger" data-act="askWipe">Tout effacer</button><div id="wipeConfirm"></div>`);
+}
+
+/* ---------- actions ---------- */
+let toastT;
+function toast(msg){ clearTimeout(toastT); let el = $("#toast"); if (!el){ el = document.createElement("div"); el.id="toast"; el.className="toast"; el.setAttribute("role","status"); document.body.appendChild(el); } el.textContent = msg; el.hidden = false; toastT = setTimeout(()=>el.hidden = true, 2200); }
+function commit(msg){ save(); render(); if (msg) toast(msg); }
+function copyText(t){
+  const fb = () => { const el = $("#reportTxt"); if (el){ const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Texte sélectionné, copiez-le"); } else toast("Copie impossible ici"); };
+  try { navigator.clipboard.writeText(t).then(()=>toast("Copié"), fb); } catch(e){ fb(); }
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const a = b.dataset.act, v = b.dataset.v, c = child();
+  if (a === "closeSheet"){ if (e.target === b || b.tagName === "BUTTON") { close(); if (UI.view) render(); } return; }
+  switch(a){
+    case "nav": UI.view = v; close(); try{ history.replaceState(null,"","#"+v); }catch(err){} render(); window.scrollTo({top:0}); break;
+    case "go": UI.view = v; UI.sub.sante = b.dataset.s; render(); window.scrollTo({top:0}); break;
+    case "kid": S.active = v; UI.range = null; commit(); break;
+    case "kidForm": kidForm(v); break;
+    case "modules": modulesSheet(); break;
+    case "resetModules": c.modules = {}; save(); modulesSheet(); toast("Choix selon l'âge rétablis"); break;
+    case "clearDemo": S = {children:[], active:null, demo:false, timer:null, theme:S.theme}; save(); render(); kidForm(); break;
+    case "log": logForm(v); break;
+    case "startTimer": { const side = (document.querySelector('input[name="mode"]:checked')||{}).value || "";
+      S.timer = {kid:c.id, type:v, start:Date.now(), side: side === "Biberon" ? "Sein gauche" : side}; close(); commit(v==="sleep"?"Bonne nuit":"Minuterie lancée"); break; }
+    case "stopTimer": { const t = S.timer; c.logs.push({id:uid(), type:t.type, t:t.start, end:Date.now(), data: t.type==="feed"?{mode:t.side}:{}}); S.timer = null; commit("Noté"); break; }
+    case "delLog": c.logs = c.logs.filter(l => l.id !== v); commit("Supprimé"); break;
+    case "allergen": c.allergensLog = c.allergensLog || {}; (c.allergensLog[v] = c.allergensLog[v] || []).push(iso(today())); commit(`${v} : exposition notée`); break;
+    case "growthForm": growthForm(); break;
+    case "delGrowth": c.growth = c.growth.filter(g => g.id !== v); commit("Mesure supprimée"); break;
+    case "meas": UI.sub.courbes = v; UI.range = null; render(); break;
+    case "range": UI.range = v; drawChart(c); break;
+    case "chrono": UI.chrono = v === "1"; render(); break;
+    case "sub": UI.sub.sante = v; render(); break;
+    case "msMode": UI.msMode = v; render(); break;
+    case "msAll": UI.msAll = !UI.msAll; render(); break;
+    case "ms": if (c.milestones[v]) delete c.milestones[v]; else c.milestones[v] = iso(today()); save(); render(); break;
+    case "tipCat": { c.hideTips = c.hideTips || []; c.hideTips = c.hideTips.includes(v) ? c.hideTips.filter(x=>x!==v) : [...c.hideTips, v]; commit(); break; }
+    case "vaxForm": vaxForm(v); break;
+    case "delVax": delete c.vaccines[v]; close(); commit("Retiré"); break;
+    case "tooth": { const base = v.slice(0,-1); if (c.teeth[base]){ c.teeth[base+"L"]=c.teeth[base]; c.teeth[base+"R"]=c.teeth[base]; delete c.teeth[base]; } if (c.teeth[v]) delete c.teeth[v]; else c.teeth[v] = iso(today()); commit(); break; }
+    case "eventForm": eventForm(v); break;
+    case "activityForm": activityForm(); break;
+    case "delActivity": c.activities = c.activities.filter(x => x.id !== v); commit("Retiré"); break;
+    case "delEvent": S.children.forEach(k => k.events = k.events.filter(x => x.id !== v)); commit("Supprimé"); break;
+    case "day": UI.calSel = v; render(); break;
+    case "calNav": { const base = UI.calMonth ? parseD(UI.calMonth) : new Date(today().getFullYear(), today().getMonth(), 1); UI.calMonth = iso(new Date(base.getFullYear(), base.getMonth()+Number(v), 1)); render(); break; }
+    case "firstForm": firstForm(); break;
+    case "delFirst": c.firsts = c.firsts.filter(f => f.id !== v); commit(); break;
+    case "urgence": urgence(); break;
+    case "report": report(); break;
+    case "data": dataSheet(); break;
+    case "theme": S.theme = S.theme == null ? "light" : S.theme === "light" ? "dark" : null; commit(S.theme==="dark"?"Thème sombre":S.theme==="light"?"Thème clair":"Thème automatique"); break;
+    case "rmPhoto": UI.photoDraft = null; $("#photoPrev").innerHTML = avatar({...c, photo:null}, 72); b.remove(); break;
+    case "copy": copyText(v === "__report" ? UI.reportTxt : v === "__backup" ? JSON.stringify(S) : v); break;
+    case "import": try { const d = JSON.parse($("#imp").value); if (!Array.isArray(d.children)) throw 0; S = d; S.children.forEach(k => { const bl = blankKid(); for (const x in bl) if (k[x] === undefined) k[x] = bl[x]; }); close(); commit("Sauvegarde restaurée"); } catch(err){ toast("Ce texte n'est pas une sauvegarde Care"); } break;
+    case "askWipe": $("#wipeConfirm").innerHTML = `<div class="banner alert" style="margin-top:8px"><div>Effacer tous les enfants et toutes les données de cet appareil ? <div class="row" style="margin-top:8px"><button class="btn sm danger" data-act="wipe">Oui, tout effacer</button></div></div></div>`; break;
+    case "wipe": S = {children:[], active:null, demo:false, timer:null, theme:S.theme}; close(); commit("Données effacées"); break;
+    case "askDelKid": $("#delConfirm").innerHTML = `<div class="banner alert"><div>Supprimer ce profil et toutes ses données ? <div class="row" style="margin-top:8px"><button type="button" class="btn sm danger" data-act="delKid" data-v="${v}">Oui, supprimer</button></div></div></div>`; break;
+    case "delKid": S.children = S.children.filter(k => k.id !== v); S.active = S.children[0]?.id || null; close(); commit("Profil supprimé"); break;
+  }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.id === "impFile" && t.files[0]){ const r = new FileReader(); r.onload = () => { $("#imp").value = r.result; }; r.readAsText(t.files[0]); }
+  if (t.dataset.mod){ const c = child(); c.modules[t.dataset.mod] = t.checked; save(); render(); }
+  if (t.id === "k-photo" && t.files[0]){
+    // Réduit la photo à 192 px (JPEG) pour garder le stockage léger
+    const r = new FileReader();
+    r.onload = () => { const img = new Image(); img.onload = () => {
+      const s = 192, cv = document.createElement("canvas"); cv.width = cv.height = s; const ctx = cv.getContext("2d");
+      const k = Math.max(s/img.width, s/img.height), w = img.width*k, h = img.height*k; ctx.drawImage(img, (s-w)/2, (s-h)/2, w, h);
+      UI.photoDraft = cv.toDataURL("image/jpeg", 0.82); $("#photoPrev").innerHTML = `<img class="avatar" src="${UI.photoDraft}" alt="" style="width:72px;height:72px">`;
+    }; img.src = r.result; }; r.readAsDataURL(t.files[0]);
+  }
+});
+const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+const radio = n => (document.querySelector(`input[name="${n}"]:checked`)||{}).value || "";
+const tsOf = id => { const v = val(id); return v ? new Date(v).getTime() : Date.now(); };
+document.addEventListener("submit", e => {
+  const f = e.target.closest("form[data-form]"); if (!f) return;
+  e.preventDefault();
+  const c = child(), kind = f.dataset.form;
+  if (kind === "log"){
+    const type = f.dataset.type, t = tsOf("f-t"); let data = {}, end;
+    const mins = Number(val("f-min"))||0;
+    if (type === "feed"){ data = {mode:radio("mode"), ml:val("f-ml")}; if (mins) end = t + mins*6e4; }
+    if (type === "sleep"){ end = tsOf("f-end"); if (end <= t){ toast("La fin doit être après le début"); return; } }
+    if (type === "diaper") data = {kind:radio("kind"), note:val("f-note")};
+    if (type === "solid"){ data = {food:val("f-food"), allergen:val("f-al"), reaction:val("f-re")}; if (data.allergen){ (c.allergensLog[data.allergen] = c.allergensLog[data.allergen]||[]).push(iso(new Date(t))); } }
+    if (type === "temp"){ const v = Number(val("f-temp").replace(",",".")); if (!(v >= 34 && v <= 43)){ toast("Entrez une température entre 34 et 43 °C"); return; } data = {temp:v, site:radio("site")}; }
+    if (type === "med"){ if (!val("f-name")){ toast("Indiquez le médicament"); return; } data = {name:val("f-name"), dose:val("f-dose")}; }
+    if (type === "mood") data = {mood:radio("mood"), note:val("f-note")};
+    if (["screen","tummy","read","activity"].includes(type) && !mins){ toast("Indiquez le nombre de minutes"); return; }
+    if (type === "screen" || type === "tummy") data = {min:mins};
+    if (type === "read") data = {min:mins, title:val("f-title")};
+    if (type === "activity") data = {what:val("f-what"), min:mins, intensity:radio("intensity")};
+    if (type === "note"){ if (!val("f-text")) { toast("Écrivez une note"); return; } data = {text:val("f-text")}; }
+    c.logs.push({id:uid(), type, t, end, data}); close(); commit("Noté");
+  }
+  if (kind === "growth"){
+    const w = Number(val("g-w").replace(",",".")), h = Number(val("g-h").replace(",",".")), oc = Number(val("g-c").replace(",","."));
+    if (!w && !h && !oc){ toast("Entrez au moins une mesure"); return; }
+    if (parseD(val("g-date")) < parseD(c.dob)){ toast("La date est avant la naissance"); return; }
+    c.growth.push({id:uid(), date:val("g-date"), weight:w||null, height:h||null, ofc:oc||null}); close(); commit("Mesure ajoutée");
+  }
+  if (kind === "kid"){
+    const id = f.dataset.id;
+    const looks = {"Selon l'âge":"auto","Bébé":"nour","Bambin":"bamb","Préscolaire":"pres","Scolaire":"scol","Ado":"ado"};
+    const d = {name:val("k-name"), nick:val("k-nick"), dob:val("k-dob"), sex: radio("sex")==="Garçon"?"M":"F", gaW:Number(val("k-gaw"))||40, gaD:Number(val("k-gad"))||0,
+      color:radio("color")||"mint", look:looks[radio("look")]||"auto", photo:UI.photoDraft||null, hFather:Number(val("k-hf"))||null, hMother:Number(val("k-hm"))||null,
+      allergies:val("k-al"), conditions:val("k-co"), meds:val("k-me"), doctor:val("k-dr"), pharmacy:val("k-ph")};
+    if (!d.name || !d.dob){ toast("Prénom et date de naissance requis"); return; }
+    if (id) Object.assign(S.children.find(k=>k.id===id), d);
+    else { const k = {...blankKid(), id:uid(), ...d}; S.children.push(k); S.active = k.id; }
+    close(); commit(id ? "Profil mis à jour" : `Bienvenue ${d.nick||d.name}`);
+  }
+  if (kind === "vax"){ c.vaccines[f.dataset.id] = {date:val("v-date"), lot:val("v-lot"), site:radio("site"), reactions:val("v-re")}; close(); commit("Vaccin noté"); }
+  if (kind === "event"){
+    const type = Object.entries(EVT).find(([,v]) => v[1] === radio("type"))?.[0] || "autre";
+    S.children.find(x => x.id === (val("e-kid") || S.active)).events.push({id:uid(), date:val("e-date"), time:val("e-time"), title:val("e-title"), type});
+    UI.calSel = val("e-date"); close(); commit("Ajouté à l'agenda");
+  }
+  if (kind === "activity"){
+    const days = [...document.querySelectorAll('input[name="days"]:checked')].map(i => Number(i.value));
+    if (!days.length){ toast("Choisissez au moins un jour"); return; }
+    c.activities.push({id:uid(), name:val("a-name"), days, time:val("a-time"), place:val("a-place")}); close(); commit("Activité ajoutée");
+  }
+  if (kind === "first"){ c.firsts.push({id:uid(), title:val("p-title"), date:val("p-date")||iso(today()), note:val("p-note")}); close(); commit("Souvenir ajouté"); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+setInterval(() => { const el = $("#timerVal"); if (el && S.timer) el.textContent = fmtDur(Date.now() - S.timer.start); }, 15000);
+render();
+</script>
+
+<script>
+if ("serviceWorker" in navigator && location.protocol === "https:" && !/localhost$/.test(location.hostname)) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>

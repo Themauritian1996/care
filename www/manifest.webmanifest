@@ -1,0 +1,16 @@
+{
+  "name": "Care",
+  "short_name": "Care",
+  "description": "Croissance, Activité, Rendez-vous, Éveil : le carnet de l'enfant de 0 à 18 ans",
+  "lang": "fr-CA",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F4FB",
+  "theme_color": "#FFEDE5",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
