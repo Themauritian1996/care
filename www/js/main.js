@@ -68,6 +68,7 @@ Object.assign(ACT, {
   theme: () => { S.settings.theme = S.settings.theme == null ? "dark" : S.settings.theme === "dark" ? "light" : null; commit(S.settings.theme==="dark"?T("Thème sombre"):S.settings.theme==="light"?T("Thème clair"):T("Thème automatique")); },
   setTheme: v => { S.settings.theme = v === "auto" ? null : v; commit(); },
   setLang: v => { S.settings.lang = v; commit(); },
+  setUnit: v => { const [k, u] = v.split(":"); S.settings.units = {...(S.settings.units||{}), [k]:u}; commit(); },
   setAppName: v => { S.settings.appName = v; S.settings.appNameLocal = true; commit(); },
   urgence: () => urgence(),
   clearDemo: () => { const keep = {theme:S.settings.theme, lang:S.settings.lang, bg:S.settings.bg}; S = blankState(); Object.assign(S.settings, keep); normalize(); save(); render(); memberForm(S.me); },
@@ -84,12 +85,13 @@ Object.assign(ACT, {
   pauseTimer: () => { const t = timerOf(child()); if (!t) return; if (t.pausedAt){ t.pausedMs += Date.now() - t.pausedAt; t.pausedAt = null; } else t.pausedAt = Date.now(); commit(); },
   stopTimer: () => { const c = child(), t = timerOf(c); if (!t) return; const end = t.pausedAt || Date.now(), paused = Math.round((t.pausedMs||0)/6e4);
     c.logs.push({id:uid(), type:t.type, t:t.start, end, data: t.type === "feed" ? {mode:t.side, pausedMin:paused} : {kind:t.kind, pausedMin:paused}}); delete S.timers[c.id]; commit(T("Noté")); },
-  delLog: v => { const c = child(); c.logs = c.logs.filter(l => l.id !== v); commit(T("Supprimé")); },
+  delLog: v => { const c = child(); c.logs = c.logs.filter(l => l.id !== v); closeSheet(); commit(T("Supprimé")); },
+  editLog: v => { const c = child(), L = c.logs.find(x => x.id === v); if (!L) return; if (L.type === "trk") logForm("trk:" + L.data.tid, v); else logForm(L.type, v); },
   trend: v => trendSheet(v), trendDays: v => { UI.trendDays = +v; trendSheet(UI.trendKey); },
   goalsForm: () => goalsForm(), ackBand: () => { const c = child(); c.goalBand = guide(ageMonths(c)).band; commit(); },
   resetGoals: () => { const c = child(); c.goals = {}; c.goalBand = guide(ageMonths(c)).band; closeSheet(); commit(T("Recommandations rétablies")); },
   trackerForm: v => trackerForm(v), delTracker: v => { const c = child(); c.trackers = c.trackers.filter(t => t.id !== v); closeSheet(); commit(); },
-  activityForm: () => activityForm(), delActivity: v => { const c = child(); c.activities = c.activities.filter(x => x.id !== v); commit(); },
+  activityForm: v => activityForm(v), delActivity: v => { const c = child(); c.activities = c.activities.filter(x => x.id !== v); closeSheet(); commit(); },
   allergen: v => { const c = child(); (c.allergensLog[v] = c.allergensLog[v] || []).push(iso(today())); commit(T("{a} : exposition notée",{a:T(v)})); },
   quickFood: v => { const c = child(), f = c.foodFav.find(x => x.name === v); c.logs.push({id:uid(), type:"solid", t:Date.now(), data:{items:[{name:f.name, group:f.group, qty:f.qty||""}]}}); commit(T("{a} noté",{a:v})); },
   addMealItem: () => { UI.meal.items.push({name:"", group:"legfruits", qty:""}); mealForm(UI.meal); },
@@ -187,15 +189,19 @@ Object.assign(ACT, {
 
   /* défis */
   tribuTab: v => { UI.sub.tribu = v; UI.groupOpen = null; if (UI.view !== "tribu") go("tribu"); else render(); },
-  taskForm: v => { if (!needParent()) taskForm(v); }, rewardForm: () => rewardForm(),
+  taskForm: v => { if (!needParent()) taskForm(v); }, rewardForm: v => rewardForm(v),
   taskTpl: v => { const t = TASK_TPL[+v]; $("#tk-title").value = T(t.t); $("#tk-pts").value = t.p; const r = document.querySelector(`input[name="tkicon"][value="${t.ic}"]`); if (r) r.checked = true; },
   rewardTpl: v => { const t = REWARD_TPL[+v]; $("#rw-title").value = T(t.t); $("#rw-cost").value = t.cost; },
   delTask: v => { S.tasks = S.tasks.filter(t => t.id !== v); closeSheet(); commit(); },
   notifTest: async () => { if (!(await Native.notifPermission())) return toast(T("Notifications refusées par l'appareil")); await Native.notifyAt(T("Test {app}",{app:appName()}), T("Les rappels fonctionnent !"), Date.now() + 5000, {go:"home"}); toast(T("Notification dans 5 secondes : vous pouvez fermer l'app")); },
+  driveTest: async () => { const out = $("#driveOut"); if (out) out.innerHTML = `<span class="spin"></span> ${T("Test en cours…")}`;
+    try { const r = await Cloud.driveUpload(`${T("Test")} ${new Date().toLocaleString(LOCALE())}.txt`, "text/plain", btoa(unescape(encodeURIComponent(T("Fichier de test de {app}. Vous pouvez le supprimer.",{app:appName()})))), "", [T("Test")]);
+      if (out) out.innerHTML = `<span style="color:var(--mint-ink)">✓ ${T("Ça marche : un fichier « Test » est dans votre Drive, dossier « {f} ».",{f:`${appName()} – ${T("Souvenirs")}`})}</span> ${r.webViewLink?`<a href="${esc(r.webViewLink)}" target="_blank" rel="noopener">${T("Ouvrir")}</a>`:""} ${S.settings.driveFolder?`<a href="https://drive.google.com/drive/folders/${esc(S.settings.driveFolder)}" target="_blank" rel="noopener">${T("Ouvrir le dossier")}</a>`:""}`; }
+    catch(e){ if (out) out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; } },
   famPhoto: async () => { const d = await Native.takePhoto({source:"prompt"}); if (!d) return; S.family.photo = await shrinkImage(d, 360, 0.8); save(); render(); familySheet(); toast(T("Photo de famille ajoutée")); },
   famPhotoDel: () => { S.family.photo = null; save(); render(); familySheet(); },
   groupPhoto: async v => { const d = await Native.takePhoto({source:"prompt"}); if (!d) return; const small = await shrinkImage(d, 360, 0.8); const g = S.groups.find(x => x.id === v); g.photo = small; render(); await Cloud.groupPhoto(v, small); toast(T("Photo du groupe ajoutée")); },
-  delReward: v => { const r = S.rewards.find(x => x.id === v); if (r?.team && !r.doneAt) S.redemptions = S.redemptions.filter(x => !(x.kind === "team" && x.rewardId === v)); S.rewards = S.rewards.filter(x => x.id !== v); commit(r?.team && !r.doneAt ? T("Objectif retiré : les points sont rendus") : undefined); },
+  delReward: v => { closeSheet(); const r = S.rewards.find(x => x.id === v); if (r?.team && !r.doneAt) S.redemptions = S.redemptions.filter(x => !(x.kind === "team" && x.rewardId === v)); S.rewards = S.rewards.filter(x => x.id !== v); commit(r?.team && !r.doneAt ? T("Objectif retiré : les points sont rendus") : undefined); },
   approve: v => { const x = S.completions.find(c => c.id === v); x.status = "ok"; commit(T("Validé")); confetti(); },
   refuse: v => { const x = S.completions.find(c => c.id === v); x.status = "refuse"; commit(); },
   redeemOk: v => { S.redemptions.find(x => x.id === v).status = "ok"; commit(); },
@@ -263,11 +269,11 @@ Object.assign(FORMS, {
   log: f => {
     const c = child(), type = f.dataset.type, t = tsOf("f-t"); let data = {}, end;
     const mins = numOf("f-min") || Number(pickVal("mins")) || 0;
-    if (type.startsWith("trk:")){ const tr = c.trackers.find(x => "trk:"+x.id === type); const v = tr.type === "yesno" ? 1 : tr.type === "scale" ? Number(pickVal("scale")) : numOf("f-v"); if (!v) return toast(T("Indiquez une valeur")); c.logs.push({id:uid(), type:"trk", t, data:{tid:tr.id, v, note:val("f-note")}}); closeSheet(); return commit(T("Noté")); }
-    if (type === "feed"){ data = {mode:pickVal("mode")||"Sein gauche", ml:val("f-ml")}; if (numOf("f-min")) end = t + numOf("f-min")*6e4; }
+    if (type.startsWith("trk:")){ const tr = c.trackers.find(x => "trk:"+x.id === type); const v = tr.type === "yesno" ? 1 : tr.type === "scale" ? Number(pickVal("scale")) : numOf("f-v"); if (!v) return toast(T("Indiquez une valeur")); if (f.dataset.id){ const L = c.logs.find(x => x.id === f.dataset.id); Object.assign(L, {t, data:{tid:tr.id, v, note:val("f-note")}}); } else c.logs.push({id:uid(), type:"trk", t, data:{tid:tr.id, v, note:val("f-note")}}); closeSheet(); return commit(T("Noté")); }
+    if (type === "feed"){ data = {mode:pickVal("mode")||"Sein gauche", ml:numOf("f-ml") ? volToMl(numOf("f-ml")) : ""}; if (numOf("f-min")) end = t + numOf("f-min")*6e4; }
     if (type === "sleep"){ end = tsOf("f-end"); if (end <= t) return toast(T("La fin doit être après le début")); data = {kind:pickVal("kind")||"Nuit", where:pickVal("where")}; }
     if (type === "diaper") data = {kind:pickVal("kind")||"Pipi", color:pickVal("color"), texture:pickVal("texture"), note:val("f-note")};
-    if (type === "temp"){ const v = numOf("f-temp"); if (!(v >= 34 && v <= 43)) return toast(T("Entrez une température entre 34 et 43 °C")); data = {temp:v, site:pickVal("site")||"Rectale"}; }
+    if (type === "temp"){ const v = tempToC(numOf("f-temp")); if (!(v >= 34 && v <= 43)) return toast(T("Entrez une température plausible (34 à 43 °C / 93 à 109 °F)")); data = {temp:v, site:pickVal("site")||"Rectale"}; }
     if (type === "med"){ const name = val("f-name") || T(pickVal("name")); if (!name) return toast(T("Indiquez le médicament")); data = {name, dose:val("f-dose")}; }
     if (type === "mood") data = {mood:pickVal("mood")||"Bien", note:val("f-note")};
     if (["screen","tummy","read","activity"].includes(type) && !mins) return toast(T("Indiquez le nombre de minutes"));
@@ -275,13 +281,15 @@ Object.assign(FORMS, {
     if (type === "read") data = {min:mins, title:val("f-title")};
     if (type === "activity") data = {what:val("f-what") || pickVal("what") || "Activité", min:mins, intensity:pickVal("intensity")||"Modérée"};
     if (type === "note"){ if (!val("f-text")) return toast(T("Écrivez une note")); data = {text:val("f-text")}; }
+    if (f.dataset.id){ const L = c.logs.find(x => x.id === f.dataset.id); if (L){ Object.assign(L, {t, end, data:{...L.data, ...data}}); if (!end) delete L.end; } closeSheet(); return commit(T("Modifié")); }
     c.logs.push({id:uid(), type, t, end, data}); closeSheet(); commit(T("Noté"));
   },
   meal: async f => {
     const c = child(), items = UI.meal.items.filter(i => i.name.trim()); if (!items.length) return toast(T("Ajoutez au moins un aliment"));
     const t = tsOf("f-t"), al = val("f-al");
     if (al) (c.allergensLog[al] = c.allergensLog[al] || []).push(iso(new Date(t)));
-    const log = {id:uid(), type:"solid", t, data:{items, allergen:al, reaction:val("f-re"), ai:!!UI.meal.ai, meal:pickVal("mealk")||mealKindAt(t)}}; c.logs.push(log);
+    const ex = UI.meal.editId ? c.logs.find(x => x.id === UI.meal.editId) : null;
+    const log = ex || {id:uid(), type:"solid"}; Object.assign(log, {t, data:{...(ex?.data||{}), items, allergen:al, reaction:val("f-re"), ai:!!UI.meal.ai, meal:pickVal("mealk")||mealKindAt(t)}}); if (!ex) c.logs.push(log);
     if (aiReady() && aiKey() && ageMonths(c) >= 12 && items.some(i => !i.nut)) nutEstimateJob(c, [log]);
     UI.meal = null; closeSheet(); commit(T("Repas noté"));
   },
@@ -290,8 +298,9 @@ Object.assign(FORMS, {
     c.goalBand = g.band; closeSheet(); commit(T("Objectifs enregistrés")); },
   tracker: f => { const c = child(), id = f.dataset.id; const d = {name:val("t-name"), type:radio("ttype")||"count", unit:val("t-unit"), goal:numOf("t-goal")||null, goalKind:radio("tkind")||"min", color:radio("tcolor")||"teal", icon:radio("ticon")||"target"};
     if (!d.name) return toast(T("Nom requis")); if (id) Object.assign(c.trackers.find(x => x.id === id), d); else c.trackers.push({id:uid(), ...d}); closeSheet(); commit(T("Suivi enregistré")); },
-  activity: () => { const days = checked("days").map(Number); if (!days.length) return toast(T("Choisissez au moins un jour")); child().activities.push({id:uid(), name:val("a-name"), days, time:val("a-time"), place:val("a-place")}); closeSheet(); commit(T("Activité ajoutée")); },
-  growth: () => { const c = child(), w = numOf("g-w"), h = numOf("g-h"), oc = numOf("g-c");
+  activity: f => { const days = checked("days").map(Number); if (!days.length) return toast(T("Choisissez au moins un jour")); const c = child(), d = {name:val("a-name"), days, time:val("a-time"), place:val("a-place")};
+    if (f.dataset.id) Object.assign(c.activities.find(x => x.id === f.dataset.id), d); else c.activities.push({id:uid(), ...d}); closeSheet(); commit(f.dataset.id ? T("Modifié") : T("Activité ajoutée")); },
+  growth: () => { const c = child(), w = Math.round(toMetric("weight", numOf("g-w"))*1000)/1000 || 0, h = Math.round(toMetric("height", numOf("g-h"))*10)/10 || 0, oc = Math.round(toMetric("ofc", numOf("g-c"))*10)/10 || 0;
     if (!w && !h && !oc) return toast(T("Entrez au moins une mesure")); if (parseD(val("g-date")) < parseD(c.dob)) return toast(T("La date est avant la naissance"));
     c.growth.push({id:uid(), date:val("g-date"), weight:w||null, height:h||null, ofc:oc||null}); closeSheet(); commit(T("Mesure ajoutée")); },
   vax: f => { child().vaccines[f.dataset.id] = {date:val("v-date"), lot:val("v-lot"), site:pickVal("site"), reactions:val("v-re")}; closeSheet(); commit(T("Vaccin noté")); },
@@ -318,7 +327,7 @@ Object.assign(FORMS, {
   },
   task: f => { const id = f.dataset.id; const d = {title:val("tk-title"), points:numOf("tk-pts")||5, assignees:checked("tkwho"), team:!!$("#tk-team")?.checked, times:[0,1,2,3].map(i => val("tk-h"+i)).filter(Boolean), perDay:Math.max(1, Math.min(8, +val("tk-per")||1)), recur:radio("tkrec")||"daily", days:checked("tkdays").map(Number), date:val("tk-date"), icon:radio("tkicon")||"star"};
     if (!d.assignees.length) return toast(T("Choisissez au moins une personne")); if (id) Object.assign(S.tasks.find(t => t.id === id), d); else S.tasks.push({id:uid(), ...d}); closeSheet(); commit(T("Défi enregistré")); },
-  reward: () => { S.rewards.push({id:uid(), title:val("rw-title"), cost:numOf("rw-cost")||50}); closeSheet(); commit(T("Récompense ajoutée")); },
+  reward: f => { const d = {title:val("rw-title"), cost:numOf("rw-cost")||50}; if (f.dataset.id) Object.assign(S.rewards.find(r => r.id === f.dataset.id), d); else S.rewards.push({id:uid(), ...d}); closeSheet(); commit(f.dataset.id ? T("Modifié") : T("Récompense ajoutée")); },
   chat: async f => { const t = $("#chat-in").value.trim(); if (!t) return; $("#chat-in").value = ""; await Cloud.send(f.dataset.ch, t); },
   groupNew: async () => { const id = await Cloud.groupCreate(val("gn")); closeSheet(); UI.groupOpen = id; toast(T("Groupe créé")); },
   joinGroup: async () => { await Cloud.groupJoin(val("jg-code")); toast(T("Vous avez rejoint le groupe")); },
@@ -342,3 +351,4 @@ Object.assign(FORMS, {
   setTimeout(maybeAutoReview, 3000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && renderPending && !$("#layer .scrim")){ renderPending = false; render(); } });
 })();
+Object.assign(ACT, { dayDetail: v => dayDetail(v), weekDetail: v => weekDetail(v) });

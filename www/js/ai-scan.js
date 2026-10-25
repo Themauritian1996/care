@@ -15,12 +15,12 @@ const aiBtn = (act, v, label, ic = "spark") => aiReady() ? `<button class="btn s
 const todayCtx = () => `Nous sommes le ${iso(today())} (${fmtD(today(),{weekday:"long"})}). Si une date n'a pas d'année, choisis la prochaine occurrence. Dates au format AAAA-MM-JJ, heures au format HH:MM (24 h). Écris le texte en ${LANG==="en"?"anglais":"français"}.`;
 
 /* ---------- lecture d'un document ---------- */
-async function aiScan(kind){
+async function aiScan(kind, retryImg){
   if (!aiKey()){ aiSheet(); return; }
   const c = child(), K = SCAN_KINDS[kind]; if (!K) return;
   if (kind !== "events" && !c) return toast(T("Ajoutez d'abord un enfant"));
-  const data = await Native.takePhoto({source:"prompt"}); if (!data) return;
-  const img = await shrinkImage(data, 1600, 0.85);
+  let img = retryImg; if (!img){ const data = await Native.takePhoto({source:"prompt"}); if (!data) return; img = await shrinkImage(data, 1600, 0.85); }
+  UI.scanImg = {kind, img};
   sheet(`${sheetHead(T(K.l))}<img src="${img}" alt="" style="border-radius:16px;max-height:240px;object-fit:contain;background:var(--surface2)"><p class="muted"><span class="spin"></span> ${T("Lecture du document…")}</p>`);
   const m = c && !isPrenatal(c) ? ageMonths(c) : null;
   const who = c ? `Enfant : ${esc(c.nick||c.name)}, ${m != null ? ageLabel(m) : "à naître"}. Allergies connues : ${c.allergies||"aucune"}.` : "";
@@ -50,7 +50,7 @@ Pour chaque mesure : date, weight en kg, height en cm, ofc (périmètre crânien
     const r = await gemini({tier:"quality", system:todayCtx(), json:P.schema, contents:[{role:"user", parts:[{inline_data:{mime_type:"image/jpeg", data:img.split(",")[1]}}, {text:P.prompt}]}]});
     UI.scan = {kind, out:parseJSON(r.text), kid:c?.id}; aiHist("scan", T(K.l), "```\n"+JSON.stringify(UI.scan.out, null, 1).slice(0, 3000)+"\n```", {kid:c?.id||null});
     scanResult();
-  } catch(e){ closeSheet(); toast(e.message); }
+  } catch(e){ sheet(`${sheetHead(T(K.l))}<img src="${img}" alt="" style="border-radius:16px;max-height:200px;object-fit:contain;background:var(--surface2)"><div class="banner alert">${icon("alert")}<div class="small">${esc(e.message)}<div class="tiny muted">${esc(AI_LAST_ERR)}</div></div></div><div class="row"><button class="btn kid" data-act="scanRetry">${icon("auto")}${T("Réessayer avec la même photo")}</button><button class="btn ghost" data-act="aiScan" data-v="${kind}">${icon("camera")}${T("Autre photo")}</button></div>`); }
 }
 const okDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d||"") ? d : "";
 const atTime = (date, hhmm) => { const d = parseD(date); const [h, m] = (hhmm||"").split(/[:h]/).map(Number); d.setHours(isNaN(h)?12:h, isNaN(m)?0:m, 0, 0); return d.getTime(); };
@@ -149,7 +149,7 @@ async function aiYearStory(kidId, year){
 }
 
 Object.assign(ACT, {
-  aiScan: v => aiScan(v), scanImport: () => scanImport(),
+  aiScan: v => aiScan(v), scanRetry: () => aiScan(UI.scanImg.kind, UI.scanImg.img), scanImport: () => scanImport(),
   scanMeal: () => { const o = UI.scan.out; mealForm({items:[{name:o.product||"", group:FOOD_GROUPS[o.group]?o.group:"autres", qty:o.portion||"", nut:o.nut||null}], comment:o.verdict, ai:true}); },
   scanFav: () => { const o = UI.scan.out, c = kidById(UI.scan.kid); if (!c.foodFav.some(f => f.name === o.product)) c.foodFav.push({name:o.product, group:FOOD_GROUPS[o.group]?o.group:"autres"}); commit(T("Ajouté aux favoris")); },
   aiOutShare: () => Native.share({title:appName(), text:UI.aiOut?.text||""}),

@@ -239,11 +239,12 @@ function taskForm(id){
     <div class="field"><label>${T("Icône")}</label><div class="radio-row">${ics.map(i=>`<label><input type="radio" name="tkicon" value="${i}" ${t.icon===i?"checked":""}><span style="display:grid;place-items:center;width:42px;height:38px;padding:0">${icon(i).replace("<svg",'<svg style="width:20px;height:20px"')}</span></label>`).join("")}</div></div>
     <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${id?`<button type="button" class="btn danger" data-act="delTask" data-v="${id}">${T("Supprimer")}</button>`:""}</div></form>`);
 }
-function rewardForm(){
-  sheet(`<form class="stack" data-form="reward" style="gap:14px">${sheetHead(T("Nouvelle récompense"))}
-    <div class="pick">${REWARD_TPL.map((x,i)=>`<button type="button" data-act="rewardTpl" data-v="${i}">${T(x.t)}</button>`).join("")}</div>
-    ${fld("rw-title",T("Récompense"),inp("rw-title","","required"))}${fld("rw-cost",T("Coût en points"),numIn("rw-cost","",5,50))}
-    <button class="btn kid" type="submit">${T("Ajouter")}</button></form>`);
+function rewardForm(id){
+  const r = S.rewards.find(x => x.id === id);
+  sheet(`<form class="stack" data-form="reward" data-id="${r?.id||""}" style="gap:14px">${sheetHead(r ? T("Modifier la récompense") : T("Nouvelle récompense"))}
+    ${r?"":`<div class="pick">${REWARD_TPL.map((x,i)=>`<button type="button" data-act="rewardTpl" data-v="${i}">${T(x.t)}</button>`).join("")}</div>`}
+    ${fld("rw-title",T("Récompense"),inp("rw-title",r?.title||"","required"))}${fld("rw-cost",r?.team?T("Points à rassembler"):T("Coût en points"),numIn("rw-cost","",5,r?.cost||50))}
+    <div class="row"><button class="btn kid grow" type="submit">${r?T("Enregistrer"):T("Ajouter")}</button>${r?`<button type="button" class="btn danger" data-act="delReward" data-v="${r.id}">${icon("trash")}</button>`:""}</div></form>`);
 }
 
 /* ======== DISCUSSIONS ======== */

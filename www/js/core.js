@@ -275,3 +275,19 @@ function series(c, key, days){
   const M = metricOf(c, key); if (!M) return [];
   return Array.from({length:days}, (_,i) => { const d = addDays(today(), i-days+1); return {d, v:M.get(dayTotals(c, d))}; });
 }
+
+/* ---------- unités d'affichage (les données restent en métrique) ---------- */
+const UN = () => ({w:"kg", l:"cm", v:"ml", t:"C", ...(S?.settings?.units||{})});
+const volU = () => UN().v === "oz" ? "oz" : "ml";
+const fmtVolIn = ml => UN().v === "oz" ? Math.round(ml/29.5735*10)/10 : ml;
+const volToMl = x => UN().v === "oz" ? Math.round(x*29.5735) : x;
+const fmtVol = ml => UN().v === "oz" ? `${fmtNum(ml/29.5735,1)} oz` : `${Math.round(ml)} ml`;
+const tempU = () => UN().t === "F" ? "°F" : "°C";
+const fmtTempIn = c => UN().t === "F" ? Math.round((c*9/5+32)*10)/10 : c;
+const tempToC = x => UN().t === "F" ? Math.round((x-32)*5/9*10)/10 : x;
+const fmtTemp = c => UN().t === "F" ? `${fmtNum(c*9/5+32,1)} °F` : `${fmtNum(c,1)} °C`;
+/* mesures de croissance : poids, taille, périmètre crânien */
+const cvM = (k, v) => v == null || isNaN(v) ? v : k === "weight" && UN().w === "lb" ? v*2.20462 : (k === "height" || k === "ofc") && UN().l === "in" ? v/2.54 : v;
+const toMetric = (k, v) => !v ? v : k === "weight" && UN().w === "lb" ? v/2.20462 : (k === "height" || k === "ofc") && UN().l === "in" ? v*2.54 : v;
+const muM = k => k === "weight" ? (UN().w === "lb" ? "lb" : "kg") : k === "bmi" ? "kg/m²" : (UN().l === "in" ? "po" : "cm");
+const dpM = (k, d) => (k === "weight" && UN().w === "lb") ? 1 : d;

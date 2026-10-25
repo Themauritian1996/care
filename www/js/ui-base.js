@@ -10,8 +10,17 @@ let toastT;
 function toast(msg){ clearTimeout(toastT); let el = $("#toast"); if (!el){ el = document.createElement("div"); el.id="toast"; el.className="toast"; el.setAttribute("role","status"); document.body.appendChild(el); } el.textContent = msg; el.hidden = false; toastT = setTimeout(()=>el.hidden = true, 2400); }
 function commit(msg){ save(); render(); if (msg) toast(msg); }
 function sheet(inner, cls=""){
-  $("#layer").innerHTML = `<div class="scrim" data-act="closeSheet"><div class="sheet ${cls}" role="dialog" aria-modal="true"><div class="sheet-grab"></div>${inner}</div></div>`;
+  const prev = $("#layer .sheet"), keep = prev && prev.dataset.key === (UI.sheetKey||"") ? prev.scrollTop : 0;
+  $("#layer").innerHTML = `<div class="scrim" data-act="closeSheet"><div class="sheet ${cls}" role="dialog" aria-modal="true" data-key="${UI.sheetKey||""}"><div class="sheet-grab"></div>${inner}</div></div>`;
+  centerPressed("#layer");
   if (!Native.isApp && window.matchMedia("(min-width:821px)").matches){ const f = $("#layer input:not([type=radio]):not([type=checkbox]):not([type=file]), #layer textarea"); if (f) setTimeout(()=>f.focus({preventScroll:true}), 60); }
+}
+/* barres défilantes : garde l'onglet choisi au centre (au lieu de revenir au début) */
+function centerPressed(root){
+  $$(`${root} .ai-tabs, ${root} .seg, ${root} .pick, ${root} .chips-scroll`).forEach(el => {
+    if (el.scrollWidth <= el.clientWidth + 2) return; const on = el.querySelector('[aria-pressed="true"]'); if (!on) return;
+    const a = el.getBoundingClientRect(), b = on.getBoundingClientRect(); el.scrollLeft += (b.left - a.left) - (a.width - b.width) / 2;
+  });
 }
 function closeSheet(){ $("#layer").innerHTML = ""; if (typeof FAM !== "undefined" && FAM.on){ clearInterval(FAM.t); FAM.on = false; } if (typeof PL !== "undefined" && PL.on) stopPlay(); }
 const fld = (id,l,inp) => `<div class="field"><label for="${id}">${l}</label>${inp}</div>`;
@@ -98,6 +107,7 @@ function topbar(){
   return `<div class="top">
     ${showKids ? `<div class="chips-scroll" role="group" aria-label="${T("Enfants")}">${S.children.map(c => `<button class="kid-pill" data-act="kid" data-v="${c.id}" aria-pressed="${c.id===S.active}">${avatarOf(c,30)}${esc(c.nick||c.name)}</button>`).join("")}${isKidUser()?"":`<button class="add-kid" data-act="kidForm">+ ${T("Enfant")}</button>`}</div>`
       : `<div class="grow row" style="gap:10px">${UI.view==="home"?"":`<h1 style="font-size:1.4rem">${esc({agenda:T("Agenda"), tribu:appName(), souvenirs:T("Souvenirs"), plus:T("Réglages")}[UI.view]||"")}</h1>`}</div>`}
+    <button class="icon-btn" data-act="search" title="${T("Rechercher")}" aria-label="${T("Rechercher")}">${icon("search")}</button>
     <button class="icon-btn" data-act="theme" title="${T("Thème")}" aria-label="${T("Changer le thème")}">${icon(themeIcon())}</button>
     <button class="icon-btn" data-act="urgence" title="${T("Urgence et ressources")}" aria-label="${T("Urgence et ressources")}" style="color:var(--danger)">${icon("phone")}</button>
   </div>${isKidUser() ? `<div class="kidmode">${icon("lock").replace("<svg",'<svg style="width:18px;height:18px"')}<span class="grow">${S.settings.parental.kidMode ? T("Mode enfant activé") : T("Compte enfant")}</span>${S.settings.parental.kidMode?`<button class="btn sm ghost" data-act="exitKidMode">${T("Quitter")}</button>`:""}</div>` : ""}`;
@@ -113,7 +123,7 @@ function render(){
   if (S.demo && !isKidUser()) html += `<div class="banner info">${icon("info")}<div>${T("Vous voyez des <b>données d'exemple</b>.")} <button class="btn sm ghost" data-act="clearDemo" style="margin-left:6px">${T("Commencer avec ma famille")}</button></div></div>`;
   html += ({home:homeView, kid:kidView, agenda:agendaView, tribu:tribuView, souvenirs:souvenirsView, plus:plusView, assistant:assistantView}[UI.view] || homeView)();
   $("#main").innerHTML = html;
-  afterRender();
+  afterRender(); centerPressed("#main");
   if (!S.settings.onboarded && !UI.obShown) setTimeout(() => { if (!UI.obShown && !$("#layer .scrim") && !(Cloud.ready && Cloud.mustLogin()) && (Cloud.ready || !window.TRIBE_FIREBASE)){ UI.obShown = true; maybeOnboard(); } }, 700);
 }
 const AFTER = [];
@@ -203,9 +213,11 @@ function plusView(){
       ${Cloud.user ? `<div class="row">${avatarOf(m,44)}<div class="grow"><b>${esc(m?.name||"")}</b><div class="small muted">${esc(Cloud.user.email||"")}</div></div><button class="btn sm ghost" data-act="logout">${icon("logout")}${T("Déconnexion")}</button></div>`
         : Cloud.configured ? `<p class="small muted">${T("Créez un compte pour partager avec la famille, discuter, et retrouver vos données sur tous vos appareils.")}</p><button class="btn kid" data-act="showLogin">${T("Se connecter ou créer un compte")}</button>`
         : `<div class="banner soft">${icon("info")}<div class="small">${T("Les comptes seront actifs dès que la configuration Firebase sera ajoutée à l'app. Pour l'instant, tout reste sur cet appareil.")}</div></div>`}
-      <div class="list">${row("memberForm","user",T("Mon profil"),T("Nom, avatar, couleur"),`data-v="${S.me}"`)}${row("familySheet","people",T("Ma famille"),T("Membres, invitation, rôles"))}</div></div>
+      <div class="list">${row("memberForm","user",T("Mon profil"),T("Nom, avatar, couleur"),`data-v="${S.me}"`)}${row("familySheet","people",T("Ma famille"),T("Membres, invitation, rôles"))}</div>
+      ${Cloud.user ? `<div class="sep"></div><h3>${icon("drive").replace("<svg",'<svg style="width:18px;height:18px;vertical-align:-3px"')} Google Drive</h3>${Cloud.canDrive?.() ? `<p class="small muted">${T("Les souvenirs et photos envoyés vont dans le dossier « {f} » de votre Drive, classés par catégorie puis par date.",{f:`${esc(appName())} – ${T("Souvenirs")}`})}</p><div class="row" style="flex-wrap:wrap"><button class="btn sm kid" data-act="driveTest">${icon("drive")}${T("Tester Google Drive")}</button>${S.settings.driveFolder?`<a class="btn sm ghost" href="https://drive.google.com/drive/folders/${esc(S.settings.driveFolder)}" target="_blank" rel="noopener">${T("Ouvrir le dossier")}</a>`:""}</div><div id="driveOut" class="small">${S.settings.driveErr?`<span style="color:var(--danger)">${esc(S.settings.driveErr)}</span>`:""}</div>` : `<p class="small muted">${T("Pour copier les souvenirs dans Google Drive, connectez-vous avec Google (pas seulement par courriel).")}</p>`}` : ""}</div>
     <div class="card c6"><div class="card-h"><h2>${T("Apparence")}</h2></div>
       <div class="field"><label>${T("Langue")}</label><div class="pick">${[["fr","Français"],["en","English"]].map(([k,l])=>`<button data-act="setLang" data-v="${k}" aria-pressed="${LANG===k}">${l}</button>`).join("")}</div></div>
+      <div class="field"><label>${T("Unités")}</label><div class="stack" style="gap:6px">${[["w",T("Poids"),[["kg","kg"],["lb","lb"]]],["l",T("Taille"),[["cm","cm"],["in",T("pouces")]]],["v",T("Volumes"),[["ml","ml"],["oz","oz"]]],["t",T("Température"),[["C","°C"],["F","°F"]]]].map(([k,l,opts]) => `<div class="row" style="gap:8px"><span class="small muted" style="width:96px">${l}</span><div class="seg" style="width:auto">${opts.map(([v,lb]) => `<button data-act="setUnit" data-v="${k}:${v}" aria-pressed="${UN()[k]===v}">${lb}</button>`).join("")}</div></div>`).join("")}<p class="tiny muted">${T("Les courbes OMS restent calculées en métrique ; seul l'affichage change.")}</p></div></div>
       <div class="field"><label>${T("Nom de l'app")}</label><div class="pick">${["Tribe","Tribu"].map(k=>`<button data-act="setAppName" data-v="${k}" aria-pressed="${appName()===k}">${k}</button>`).join("")}</div></div>
       <div class="field"><label>${T("Thème")}</label><div class="pick">${[["auto",T("Automatique")],["light",T("Clair")],["dark",T("Sombre")]].map(([k,l])=>`<button data-act="setTheme" data-v="${k}" aria-pressed="${(S.settings.theme||"auto")===k}">${l}</button>`).join("")}</div></div>
       <div class="field"><label>${T("Couleur de fond")}</label><div class="swatches">${BGS.map(b=>`<label title="${T(b.l)}"><input type="radio" name="bg" value="${b.id}" ${S.settings.bg===b.id?"checked":""} data-change="setBg"><span style="background:${isDark()?b.dark:b.light};border:1px solid var(--line)"></span></label>`).join("")}<label title="${T("Personnalisée")}"><input type="color" value="${S.settings.bg?.startsWith?.("#")?S.settings.bg:"#F6F4FB"}" data-change="setBgCustom" style="width:38px;height:38px;border:0;border-radius:50%;padding:0;background:none;cursor:pointer;position:static;opacity:1;pointer-events:auto"></label></div></div></div>

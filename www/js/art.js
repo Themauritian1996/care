@@ -2,6 +2,7 @@
    TRIBU — icônes, avatars, logo, décors selon l'âge (SVG maison)
    ========================================================================= */
 const I = {
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>',
   home:'<path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z"/>',
   kid:'<circle cx="12" cy="8" r="3.5"/><path d="M6 20c.5-4 3-6 6-6s5.5 2 6 6"/><path d="M10.5 4.8c.4-1.4 2.6-1.4 3 0"/>',
   sunrise:'<path d="M4 18h16M7 18a5 5 0 0 1 10 0M12 6v3M5.6 10.6l1.5 1.5M18.4 10.6l-1.5 1.5"/>',

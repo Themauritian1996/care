@@ -90,7 +90,7 @@ function quotidien(c){
   for (let i=0;i<7;i++){ const d = addDays(today(), -i); const L = dayLogs(c, d); if (L.length) days.push([d,L]); }
   h += `<div class="card"><div class="card-h"><h2>${T("Journal, 7 derniers jours")}</h2></div>`;
   if (!days.length) h += empty("sunrise", T("Aucune entrée cette semaine. Utilisez les boutons ci-dessus."));
-  days.forEach(([d,L]) => { h += `<div class="eyebrow" style="margin-top:6px">${dayName(d)}</div><div class="list">${L.map(l => logLine(c,l)).join("")}</div>`; });
+  days.forEach(([d,L]) => { h += `<button class="eyebrow linkish" data-act="dayDetail" data-v="${iso(d)}" style="margin-top:6px">${dayName(d)} ${icon("right").replace("<svg",'<svg style="width:12px;height:12px;vertical-align:-1px"')}</button><div class="list">${L.map(l => logLine(c,l)).join("")}</div>`; });
   return h + `</div>`;
 }
 const dayName = d => { const diff = Math.round((today()-d)/DAY); return diff===0?T("Aujourd'hui"):diff===1?T("Hier"):fmtD(d,{weekday:"long",day:"numeric",month:"long"}); };
@@ -105,14 +105,15 @@ function weeklyStats(c){
     const fmt = v => k === "sleep" ? fmtNum(v,1)+" h" : M.u === "min" ? fmtMin(v) : fmtNum(v, v%1?1:0)+(M.u?" "+M.u:"");
     return `<tr data-act="trend" data-v="${k}" style="cursor:pointer"><td style="font-weight:600">${T(M.l)}</td><td><b>${fmt(A)}</b></td><td class="small">${diff==null?"—":`<span style="color:var(--${good?"mint":"rose"}-ink)">${diff>=0?"▲":"▼"} ${Math.abs(Math.round(diff*100))} %</span>`}</td><td class="small">${hit==null?"—":`${hit}/7`}</td></tr>`;
   }).join("");
-  return `<div class="card"><div class="card-h"><h2>${T("Statistiques de la semaine")}</h2><span class="tiny muted">${T("moyenne par jour")}</span></div><div class="tbl"><table><thead><tr><th>${T("Mesure")}</th><th>${T("7 jours")}</th><th>${T("vs sem. préc.")}</th><th>${T("Objectif atteint")}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  const ins = insights(c, keys);
+  return `<div class="card"><div class="card-h"><h2>${T("Statistiques de la semaine")}</h2><span class="tiny muted">${T("moyenne par jour · touchez une ligne")}</span></div>${ins}<div class="tbl"><table><thead><tr><th>${T("Mesure")}</th><th>${T("7 jours")}</th><th>${T("vs sem. préc.")}</th><th>${T("Objectif atteint")}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 /* graphique en barres (tendance) */
 function bars(pts, goal, col, kind, unitH){
   const n = pts.length, max = Math.max(goal ? goal*1.25 : 0, ...pts.map(p=>p.v), 1), H = 74;
   const lbl = d => n <= 7 ? d.toLocaleDateString(LOCALE(),{weekday:"narrow"}) : n <= 31 ? (d.getDate()%5===1 ? d.getDate() : "") : (d.getDate()===1 ? d.toLocaleDateString(LOCALE(),{month:"short"}) : "");
   return `<div class="weekbars" style="--n:${n};gap:${n>40?1:n>14?2:5}px">${pts.map(p => { const bad = goal ? (kind === "max" ? p.v > goal : p.v < goal*0.8) : false;
-    return `<div class="wb" title="${fmtD(p.d,{weekday:"short",day:"numeric",month:"short"})} : ${unitH?fmtNum(p.v,1)+" h":fmtNum(p.v,p.v%1?1:0)}"><i style="height:${(p.v/max*H).toFixed(1)}px;background:var(--${bad&&kind==="max"?"danger":col});${bad&&kind!=="max"?"opacity:.5":""}"></i><span>${lbl(p.d)}</span></div>`; }).join("")}
+    return `<button type="button" class="wb" data-act="dayDetail" data-v="${iso(p.d)}" title="${fmtD(p.d,{weekday:"short",day:"numeric",month:"short"})} : ${unitH?fmtNum(p.v,1)+" h":fmtNum(p.v,p.v%1?1:0)}"><i style="height:${(p.v/max*H).toFixed(1)}px;background:var(--${bad&&kind==="max"?"danger":col});${bad&&kind!=="max"?"opacity:.5":""}"></i><span>${lbl(p.d)}</span></button>`; }).join("")}
     ${goal?`<div class="goal" style="bottom:${(18+goal/max*H).toFixed(1)}px" aria-hidden="true"></div>`:""}</div>`;
 }
 function trendSheet(key){
@@ -127,7 +128,36 @@ function trendSheet(key){
   sheet(`${sheetHead(T(M.l))}<div class="seg">${[7,30,90].map(n=>`<button data-act="trendDays" data-v="${n}" aria-pressed="${days===n}">${T("{n} jours",{n})}</button>`).join("")}</div>
     ${bars(pts, goal, M.col, M.kind, unitH)}
     <div class="stats"><div class="stat"><span class="muted tiny">${T("Moyenne / jour")}</span><div class="v">${fmt(avg)}</div></div><div class="stat"><span class="muted tiny">${T("Période précédente")}</span><div class="v">${fmt(pavg)}</div></div><div class="stat"><span class="muted tiny">${T("Min · max")}</span><div class="v" style="font-size:1.1rem">${fmt(Math.min(...vals))} · ${fmt(Math.max(...vals))}</div></div>${hit!=null?`<div class="stat"><span class="muted tiny">${T("Jours où l'objectif est atteint")}</span><div class="v">${hit}/${days}</div></div>`:""}${extra}</div>
-    ${goal?`<p class="tiny muted">${T("Ligne pointillée : objectif de {v}.",{v:fmt(goal)})}</p>`:""}`, "wide");
+    ${goal?`<p class="tiny muted">${T("Ligne pointillée : objectif de {v}. Touchez une barre pour voir la journée.",{v:fmt(goal)})}</p>`:`<p class="tiny muted">${T("Touchez une barre pour voir la journée.")}</p>`}
+    ${days <= 7 ? `<div class="list">${[...pts].reverse().map(p => `<button class="li rowbtn" data-act="dayDetail" data-v="${iso(p.d)}"><div class="grow"><div class="li-title cap">${fmtD(p.d,{weekday:"long",day:"numeric",month:"short"})}</div></div><b class="num" style="color:var(--${goal && (M.kind==="max" ? p.v > goal : p.v < goal) ? "rose" : "ink"}-ink, var(--ink))">${fmt(p.v)}</b>${icon("right")}</button>`).join("")}</div>`
+      : `<div class="list">${Array.from({length:Math.ceil(days/7)}, (_,w) => pts.slice(Math.max(0, days-7*(w+1)), days-7*w)).filter(a => a.length).map(a => `<button class="li rowbtn" data-act="weekDetail" data-v="${iso(a[0].d)}|${key}"><div class="grow"><div class="li-title">${T("Semaine du {d}",{d:fmtD(a[0].d,{day:"numeric",month:"short"})})}</div><div class="small muted">${a.length} ${T("jours")}</div></div><b class="num">${fmt(sum(a.map(p=>p.v))/a.length)}</b>${icon("right")}</button>`).join("")}</div>`}`, "wide");
+}
+/* analyse simple et concrète de la semaine, par mesure */
+function insights(c, keys){
+  const out = [];
+  keys.forEach(k => { const M = metricOf(c, k), goal = M?.goal(c); if (!M || !goal) return;
+    const a = series(c, k, 7), noted = a.filter(p => p.v > 0).length; if (!noted && M.kind !== "max") return;
+    const avg = sum(a.map(p => p.v)) / (M.kind === "max" ? 7 : Math.max(1, noted)), fmt = v => k === "sleep" ? fmtNum(v,1)+" h" : M.u === "min" ? fmtMin(v) : fmtNum(v,0)+(M.u?" "+M.u:"");
+    const ok = M.kind === "max" ? avg <= goal : avg >= goal * 0.9;
+    out.push(`<li class="${ok?"ok":"warn"}">${ok?"✓":"!"} <b>${T(M.l)}</b> : ${fmt(avg)} ${M.kind==="max"?T("par jour (max. {g})",{g:fmt(goal)}):T("par jour noté (objectif {g})",{g:fmt(goal)})}${noted < 4 && M.kind !== "max" ? ` · <span class="muted">${T("seulement {n} jour(s) noté(s)",{n:noted})}</span>` : ""}</li>`);
+  });
+  return out.length ? `<ul class="insights">${out.join("")}</ul>` : "";
+}
+function dayDetail(ds){
+  const c = child(), d = parseD(ds), L = dayLogs(c, d).sort((a,b) => a.t - b.t), Tt = dayTotals(c, d), G = goals(c);
+  const st = (l, v, g, max) => `<div class="stat"><span class="muted tiny">${l}</span><div class="v" style="font-size:1.15rem;color:${g ? ((max ? v > g : v < g) ? "var(--rose-ink)" : "var(--mint-ink)") : "inherit"}">${v}</div></div>`;
+  sheet(`${sheetHead(`<span class="cap">${fmtD(d,{weekday:"long",day:"numeric",month:"long"})}</span>`)}
+    <div class="row"><button class="icon-btn" data-act="dayDetail" data-v="${iso(addDays(d,-1))}" aria-label="${T("Jour précédent")}">${icon("left")}</button><span class="grow small muted center">${esc(c.nick||c.name)}</span><button class="icon-btn" data-act="dayDetail" data-v="${iso(addDays(d,1))}" aria-label="${T("Jour suivant")}" ${ds>=iso(today())?"disabled":""}>${icon("right")}</button></div>
+    <div class="stats">${st(T("Sommeil"), fmtNum(Tt.sleep/60,1)+" h", G.sleep && Tt.sleep ? null : null)}${Tt.nap?st(T("dont siestes"), fmtMin(Tt.nap)):""}${st(T("Activité"), fmtMin(Tt.act))}${mod(c,"screen")?st(T("Écran"), fmtMin(Tt.screen)):""}${mod(c,"reading")?st(T("Lecture"), fmtMin(Tt.read)):""}${Tt.feeds?st(T("Boires"), Tt.feeds + (Tt.ml?` · ${fmtVol(Tt.ml)}`:"")):""}${Tt.diapers?st(T("Couches"), Tt.diapers):""}${Tt.meals?st(T("Repas"), Tt.meals):""}</div>
+    ${L.length ? `<div class="list">${L.map(l => logLine(c, l)).join("")}</div>` : `<p class="muted small">${T("Rien de noté ce jour-là.")}</p>`}
+    ${isKidUser() ? "" : `<p class="tiny muted">${T("Touchez une ligne pour la modifier.")}</p>`}`, "wide");
+}
+function weekDetail(v){
+  const [ds, key] = v.split("|"), c = child(), d0 = parseD(ds), M = metricOf(c, key), unitH = key === "sleep";
+  const pts = Array.from({length:7}, (_,i) => { const d = addDays(d0, i); return {d, v:M.get(dayTotals(c, d))}; }).filter(p => p.d <= today());
+  const fmt = v => unitH ? fmtNum(v,1)+" h" : M.u === "min" ? fmtMin(v) : fmtNum(v, v%1?1:0)+(M.u?" "+M.u:"");
+  sheet(`${sheetHead(`${T(M.l)} · ${T("Semaine du {d}",{d:fmtD(d0,{day:"numeric",month:"short"})})}`)}${bars(pts, M.goal(c), M.col, M.kind, unitH)}
+    <div class="list">${pts.map(p => `<button class="li rowbtn" data-act="dayDetail" data-v="${iso(p.d)}"><div class="grow"><div class="li-title cap">${fmtD(p.d,{weekday:"long",day:"numeric"})}</div></div><b class="num">${fmt(p.v)}</b>${icon("right")}</button>`).join("")}</div>`, "wide");
 }
 function moodCard(c){
   const order = ["Difficile","Moyen","Bien","Super"], cols = ["rose","butter","mint","sky"];
@@ -142,7 +172,7 @@ function sportsCard(c){
   const sugg = m < 72 ? T("Jeu libre dehors, natation parent-enfant, vélo à pousser, danse, parc") : m < 144 ? T("Varier : natation, vélo, soccer, gymnastique, arts martiaux, ski, escalade") : T("Un sport d'équipe, une activité d'endurance et du renforcement 3 fois par semaine");
   const weekMin = sum(Array.from({length:7},(_,i)=>dayTotals(c, addDays(today(), -i)).act));
   return `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Sports et activités")}</span><h2>${T("Horaire de la semaine")}</h2></div>${isKidUser()?"":`<button class="btn sm kid" data-act="activityForm">${icon("plus")}${T("Activité")}</button>`}</div>
-    ${c.activities.length?`<div class="list">${c.activities.map(a=>`<div class="li"><div class="ic" style="background:var(--mint-bg);color:var(--mint-ink)">${icon("ball")}</div><div class="grow"><div class="li-title">${esc(a.name)}</div><div class="small muted">${a.days.map(d=>WD()[d]).join(", ")}${a.time?` · ${a.time}`:""}${a.place?` · ${esc(a.place)}`:""}</div></div>${isKidUser()?"":`<button class="icon-btn flat" data-act="delActivity" data-v="${a.id}" aria-label="${T("Supprimer")}">${icon("trash")}</button>`}</div>`).join("")}</div>`:`<p class="small muted">${T("Aucune activité régulière. Elles apparaîtront aussi dans l'agenda.")}</p>`}
+    ${c.activities.length?`<div class="list">${c.activities.map(a=>`<div class="li" ${isKidUser()?"":`data-act="activityForm" data-v="${a.id}" style="cursor:pointer"`}><div class="ic" style="background:var(--mint-bg);color:var(--mint-ink)">${icon("ball")}</div><div class="grow"><div class="li-title">${esc(a.name)}</div><div class="small muted">${a.days.map(d=>WD()[d]).join(", ")}${a.time?` · ${a.time}`:""}</div>${a.place?`<div class="small">${placeLink(a.place)}</div>`:""}</div>${isKidUser()?"":icon("edit").replace("<svg",'<svg style="width:18px;height:18px;color:var(--soft)"')}</div>`).join("")}</div>`:`<p class="small muted">${T("Aucune activité régulière. Elles apparaîtront aussi dans l'agenda.")}</p>`}
     <div class="banner ok">${icon("run")}<div><b class="num">${fmtMin(weekMin)}</b> ${T("d'activité notée sur 7 jours.")} ${T("Idées pour cet âge :")} ${sugg}.</div></div></div>`;
 }
 function logLine(c, l){
@@ -150,11 +180,11 @@ function logLine(c, l){
   if (l.type === "trk"){ tr = (c.trackers||[]).find(x => x.id === l.data.tid); T0 = {label:tr?.name||T("Suivi"), ic:tr?.icon||"target", c:tr?.color||"teal"}; }
   T0 = T0 || LOGT.note; const d = l.data || {};
   let txt = T(T0.label), sub = "";
-  if (l.type === "feed") { txt = T(d.mode || "Boire"); sub = [d.ml?`${d.ml} ml`:"", l.end?fmtDur(l.end-l.t-(d.pausedMin||0)*6e4):""].filter(Boolean).join(" · "); }
+  if (l.type === "feed") { txt = T(d.mode || "Boire"); sub = [d.ml?fmtVol(d.ml):"", l.end?fmtDur(l.end-l.t-(d.pausedMin||0)*6e4):""].filter(Boolean).join(" · "); }
   if (l.type === "sleep") { txt = T(d.kind || "Dodo"); sub = l.end ? `${fmtT(l.t)} → ${fmtT(l.end)} · ${fmtDur(l.end-l.t-(d.pausedMin||0)*6e4)}${d.where?` · ${T(d.where)}`:""}` : T("en cours"); }
   if (l.type === "diaper") { txt = `${T("Couche")} · ${T(d.kind)}`; sub = [d.color, d.texture].filter(Boolean).map(T).join(", "); }
   if (l.type === "solid") { txt = (d.items||[]).map(i => i.name).join(", ") || d.food || T("Repas"); const kc = sum((d.items||[]).map(i => Number(i.nut?.kcal)||0)), pr = sum((d.items||[]).map(i => Number(i.nut?.prot)||0)); sub = [d.meal?T(d.meal):"", kc?`${Math.round(kc)} kcal · ${Math.round(pr)} g ${T("prot.")}`:"", d.allergen?T("Allergène : {a}",{a:T(d.allergen)}):"", d.reaction?T("réaction : {r}",{r:d.reaction}):""].filter(Boolean).join(" · "); }
-  if (l.type === "temp") { txt = `${fmtNum(d.temp)} °C`; sub = T(d.site); }
+  if (l.type === "temp") { txt = fmtTemp(d.temp); sub = T(d.site); }
   if (l.type === "med") { txt = d.name || T("Médicament"); sub = d.dose || ""; }
   if (l.type === "mood") txt = `${T("Humeur")} · ${T(d.mood)}`;
   if (l.type === "screen") txt = `${T("Écran")} · ${fmtMin(d.min)}`;
@@ -165,37 +195,38 @@ function logLine(c, l){
   if (l.type === "note") txt = d.text;
   if (d.note && l.type!=="note") sub = [sub, d.note].filter(Boolean).join(" · ");
   const canDel = !isKidUser() || allow("delete");
-  return `<div class="li"><div class="ic" style="background:var(--${T0.c}-bg);color:var(--${T0.c}-ink)">${icon(T0.ic)}</div><div class="grow"><div class="li-title">${esc(txt)}</div>${sub?`<div class="small muted">${esc(sub)}</div>`:""}</div><span class="small muted num">${fmtT(l.t)}</span>${canDel?`<button class="icon-btn flat" data-act="delLog" data-v="${l.id}" aria-label="${T("Supprimer")}">${icon("trash")}</button>`:""}</div>`;
+  return `<div class="li" ${canDel?`data-act="editLog" data-v="${l.id}" style="cursor:pointer"`:""}><div class="ic" style="background:var(--${T0.c}-bg);color:var(--${T0.c}-ink)">${icon(T0.ic)}</div><div class="grow"><div class="li-title">${esc(txt)}</div>${sub?`<div class="small muted">${esc(sub)}</div>`:""}</div><span class="small muted num">${fmtT(l.t)}</span>${canDel?`<button class="icon-btn flat" data-act="delLog" data-v="${l.id}" aria-label="${T("Supprimer")}">${icon("trash")}</button>`:""}</div>`;
 }
 
 /* ---------- formulaires du journal (choix rapides + note facultative) ---------- */
 const pick = (name, opts, sel) => `<div class="pick" data-pick="${name}">${opts.map(o => `<button type="button" data-act="pickOpt" data-v="${esc(o)}" aria-pressed="${o===sel}">${esc(T(o))}</button>`).join("")}</div><input type="hidden" id="pk-${name}" value="${esc(sel||"")}">`;
 const pickVal = name => val("pk-"+name);
-function logForm(type){
+function logForm(type, editId){
   const c = child(), m = ageMonths(c); let body = "", title;
-  const time = fld("f-t",T("Heure"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(Date.now())}">`);
-  const note = fld("f-note",T("Note (facultatif)"),`<input class="inp" id="f-note">`);
+  const L = editId ? c.logs.find(x => x.id === editId) : null, d = L?.data || {}, ed = !!L, mn = d.min ? String(d.min) : "";
+  const time = fld("f-t",T("Heure"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(L?.t||Date.now())}">`);
+  const note = fld("f-note",T("Note (facultatif)"),`<input class="inp" id="f-note" value="${esc(d.note||"")}">`);
   if (type.startsWith("trk:")){
     const t = c.trackers.find(x => "trk:"+x.id === type); title = t.name;
     body = t.type === "yesno" ? `<p class="small muted">${T("Touchez Enregistrer pour noter « oui » maintenant.")}</p>${time}${note}`
-      : t.type === "scale" ? `${fld("f-v",T("Note de 1 à 5"),pick("scale",["1","2","3","4","5"],"3"))}${time}${note}`
-      : `${fld("f-v",`${T("Valeur")}${t.unit?` (${esc(t.unit)})`:""}`,numIn("f-v","",t.type==="count"?1:"any", t.type==="count"?1:""))}${time}${note}`;
+      : t.type === "scale" ? `${fld("f-v",T("Note de 1 à 5"),pick("scale",["1","2","3","4","5"],d.v?String(d.v):"3"))}${time}${note}`
+      : `${fld("f-v",`${T("Valeur")}${t.unit?` (${esc(t.unit)})`:""}`,numIn("f-v","",t.type==="count"?1:"any", d.v ?? (t.type==="count"?1:"")))}${time}${note}`;
   } else {
     title = T(LOGT[type].label);
-    if (type === "feed") body = `${pick("mode",QUICK.feedSide,"Sein gauche")}<div class="fgrid">${fld("f-ml",T("Quantité (ml)"),numIn("f-ml",T("biberon")))}${fld("f-min",T("Durée (min)"),numIn("f-min","",1))}</div>${time}<button type="button" class="btn ghost" data-act="startTimer" data-v="feed">${icon("bottle")}${T("Démarrer une minuterie de tétée")}</button>`;
-    if (type === "sleep") body = `${pick("kind",QUICK.sleepKind, new Date().getHours() >= 19 || new Date().getHours() < 6 ? "Nuit" : "Sieste")}<button type="button" class="btn kid" data-act="startTimer" data-v="sleep">${icon("moon")}${T("Démarrer maintenant (minuterie)")}</button><div class="sep"></div><p class="small muted">${T("Ou noter un sommeil terminé :")}</p><div class="fgrid">${fld("f-t",T("Début"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(Date.now()-(m>=36?9:1)*36e5)}">`)}${fld("f-end",T("Fin"),`<input class="inp" id="f-end" type="datetime-local" value="${localInput(Date.now())}">`)}</div>${fld("x",T("Où (facultatif)"),pick("where",QUICK.sleepWhere,""))}`;
-    if (type === "diaper") body = `${pick("kind",["Pipi","Selle","Pipi et selle"],"Pipi")}<div class="field"><label>${T("Couleur (facultatif)")}</label>${pick("color",QUICK.diaperColor,"")}</div><div class="field"><label>${T("Consistance (facultatif)")}</label>${pick("texture",QUICK.diaperTexture,"")}</div>${time}${note}`;
-    if (type === "solid"){ mealForm(); return; }
-    if (type === "temp") body = `${fld("f-temp",T("Température (°C)"),`<input class="inp" id="f-temp" type="number" inputmode="decimal" step="0.1" min="34" max="43" placeholder="38,2">`)}${pick("site",["Rectale","Buccale","Axillaire","Tympanique"],m<24?"Rectale":"Buccale")}${time}<p class="tiny muted">${T("Avant 2 ans, la mesure rectale est la plus fiable.")}</p>`;
-    if (type === "med") body = `${pick("name",QUICK.medCommon,"")}${fld("f-name",T("Ou un autre médicament"),`<input class="inp" id="f-name">`)}${fld("f-dose",T("Dose donnée (selon l'étiquette ou la prescription)"),`<input class="inp" id="f-dose" placeholder="${T("Ex. : 2,5 ml")}">`)}${time}<p class="tiny muted">${T("Pour la dose, suivez l'étiquette selon le poids de l'enfant, ou demandez au pharmacien.")}</p>`;
-    if (type === "mood") body = `${pick("mood",QUICK.mood,"Bien")}${note}${time}`;
-    if (type === "screen") body = `${pick("mins",["15","30","45","60","90","120"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","60"))}${time}`;
-    if (type === "tummy") body = `${pick("mins",["5","10","15","20","30"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","10"))}${time}`;
-    if (type === "read") body = `${pick("mins",["10","15","20","30","45"],"")}<div class="fgrid">${fld("f-min",T("Ou minutes exactes"),numIn("f-min","15"))}${fld("f-title",T("Livre (facultatif)"),`<input class="inp" id="f-title" list="books">`)}</div><datalist id="books">${[...new Set(c.logs.filter(l=>l.type==="read"&&l.data.title).map(l=>l.data.title))].map(t=>`<option value="${esc(t)}">`).join("")}</datalist>${time}`;
-    if (type === "activity") body = `${pick("what",[...new Set([...c.activities.map(a=>a.name), ...QUICK.activity])].slice(0,12),"")}${fld("f-what",T("Ou autre activité"),`<input class="inp" id="f-what">`)}${pick("mins",["15","30","45","60","90"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","30"))}${pick("intensity",["Légère","Modérée","Intense"],"Modérée")}${time}`;
-    if (type === "note") body = `${fld("f-text",T("Note"),`<textarea class="inp" id="f-text"></textarea>`)}${time}`;
+    if (type === "feed") body = `${pick("mode",QUICK.feedSide,d.mode||"Sein gauche")}<div class="fgrid">${fld("f-ml",`${T("Quantité")} (${volU()})`,numIn("f-ml",T("biberon"),1,d.ml?fmtVolIn(d.ml):""))}${fld("f-min",T("Durée (min)"),numIn("f-min","",1,L?.end?Math.round((L.end-L.t)/6e4):""))}</div>${time}${ed?"":`<button type="button" class="btn ghost" data-act="startTimer" data-v="feed">${icon("bottle")}${T("Démarrer une minuterie de tétée")}</button>`}`;
+    if (type === "sleep") body = `${pick("kind",QUICK.sleepKind, d.kind || (new Date().getHours() >= 19 || new Date().getHours() < 6 ? "Nuit" : "Sieste"))}${ed?"":`<button type="button" class="btn kid" data-act="startTimer" data-v="sleep">${icon("moon")}${T("Démarrer maintenant (minuterie)")}</button><div class="sep"></div><p class="small muted">${T("Ou noter un sommeil terminé :")}</p>`}<div class="fgrid">${fld("f-t",T("Début"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(L?.t||Date.now()-(m>=36?9:1)*36e5)}">`)}${fld("f-end",T("Fin"),`<input class="inp" id="f-end" type="datetime-local" value="${localInput(L?.end||Date.now())}">`)}</div>${fld("x",T("Où (facultatif)"),pick("where",QUICK.sleepWhere,d.where||""))}`;
+    if (type === "diaper") body = `${pick("kind",["Pipi","Selle","Pipi et selle"],d.kind||"Pipi")}<div class="field"><label>${T("Couleur (facultatif)")}</label>${pick("color",QUICK.diaperColor,d.color||"")}</div><div class="field"><label>${T("Consistance (facultatif)")}</label>${pick("texture",QUICK.diaperTexture,d.texture||"")}</div>${time}${note}`;
+    if (type === "solid"){ mealForm(L ? {items:JSON.parse(JSON.stringify(d.items||[])), editId:L.id, t:L.t, meal:d.meal, reaction:d.reaction, allergen:d.allergen} : null); return; }
+    if (type === "temp") body = `${fld("f-temp",`${T("Température")} (${tempU()})`,`<input class="inp" id="f-temp" type="number" inputmode="decimal" step="0.1" placeholder="${tempU()==="°F"?"100.8":"38,2"}" value="${d.temp?fmtTempIn(d.temp):""}">`)}${pick("site",["Rectale","Buccale","Axillaire","Tympanique"],d.site||(m<24?"Rectale":"Buccale"))}${time}<p class="tiny muted">${T("Avant 2 ans, la mesure rectale est la plus fiable.")}</p>`;
+    if (type === "med") body = `${pick("name",QUICK.medCommon,"")}${fld("f-name",T("Ou un autre médicament"),`<input class="inp" id="f-name" value="${esc(d.name||"")}">`)}${fld("f-dose",T("Dose donnée (selon l'étiquette ou la prescription)"),`<input class="inp" id="f-dose" placeholder="${T("Ex. : 2,5 ml")}" value="${esc(d.dose||"")}">`)}${time}<p class="tiny muted">${T("Pour la dose, suivez l'étiquette selon le poids de l'enfant, ou demandez au pharmacien.")}</p>`;
+    if (type === "mood") body = `${pick("mood",QUICK.mood,d.mood||"Bien")}${note}${time}`;
+    if (type === "screen") body = `${pick("mins",["15","30","45","60","90","120"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","60",5,mn))}${time}`;
+    if (type === "tummy") body = `${pick("mins",["5","10","15","20","30"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","10",5,mn))}${time}`;
+    if (type === "read") body = `${pick("mins",["10","15","20","30","45"],"")}<div class="fgrid">${fld("f-min",T("Ou minutes exactes"),numIn("f-min","15",5,mn))}${fld("f-title",T("Livre (facultatif)"),`<input class="inp" id="f-title" list="books" value="${esc(d.title||"")}">`)}</div><datalist id="books">${[...new Set(c.logs.filter(l=>l.type==="read"&&l.data.title).map(l=>l.data.title))].map(t=>`<option value="${esc(t)}">`).join("")}</datalist>${time}`;
+    if (type === "activity") body = `${pick("what",[...new Set([...c.activities.map(a=>a.name), ...QUICK.activity])].slice(0,12),"")}${fld("f-what",T("Ou autre activité"),`<input class="inp" id="f-what" value="${esc(d.what||"")}">`)}${pick("mins",["15","30","45","60","90"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","30",5,mn))}${pick("intensity",["Légère","Modérée","Intense"],d.intensity||"Modérée")}${time}`;
+    if (type === "note") body = `${fld("f-text",T("Note"),`<textarea class="inp" id="f-text">${esc(d.text||"")}</textarea>`)}${time}`;
   }
-  sheet(`<form class="stack" data-form="log" data-type="${type}" style="gap:14px">${sheetHead(esc(title))}${body}<button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`);
+  sheet(`<form class="stack" data-form="log" data-type="${type}" data-id="${ed?L.id:""}" style="gap:14px">${sheetHead(ed ? T("Modifier · {t}",{t:esc(title)}) : esc(title))}${body}<div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${ed?`<button type="button" class="btn danger" data-act="delLog" data-v="${L.id}">${icon("trash")}</button>`:""}</div></form>`);
 }
 function goalsForm(){
   const c = child(), G = goals(c), g = G.rec;
@@ -217,12 +248,13 @@ function trackerForm(id){
     <div class="field"><label>${T("Icône")}</label><div class="radio-row">${ics.map(i=>`<label><input type="radio" name="ticon" value="${i}" ${t.icon===i?"checked":""}><span style="display:grid;place-items:center;width:42px;height:38px;padding:0">${icon(i).replace("<svg",'<svg style="width:20px;height:20px"')}</span></label>`).join("")}</div></div>
     <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${id?`<button type="button" class="btn danger" data-act="delTracker" data-v="${id}">${T("Supprimer")}</button>`:""}</div></form>`);
 }
-function activityForm(){
-  sheet(`<form class="stack" data-form="activity" style="gap:14px">${sheetHead(T("Activité régulière"))}
-    ${fld("a-name",T("Activité"),`<input class="inp" id="a-name" required list="actlist"><datalist id="actlist">${QUICK.activity.map(a=>`<option value="${esc(T(a))}">`).join("")}</datalist>`)}
-    <div class="field"><label>${T("Jours")}</label>${checks("days",[1,2,3,4,5,6,0].map(d=>[String(d),WD()[d]]))}</div>
-    <div class="fgrid">${fld("a-time",T("Heure"),`<input class="inp" id="a-time" type="time">`)}${fld("a-place",T("Lieu"),`<input class="inp" id="a-place">`)}</div>
-    <button class="btn kid" type="submit">${T("Ajouter")}</button></form>`);
+function activityForm(id){
+  const a = id ? child().activities.find(x => x.id === id) : null;
+  sheet(`<form class="stack" data-form="activity" data-id="${a?.id||""}" style="gap:14px">${sheetHead(a ? T("Modifier l'activité") : T("Activité régulière"))}
+    ${fld("a-name",T("Activité"),`<input class="inp" id="a-name" required list="actlist" value="${esc(a?.name||"")}"><datalist id="actlist">${QUICK.activity.map(x=>`<option value="${esc(T(x))}">`).join("")}</datalist>`)}
+    <div class="field"><label>${T("Jours")}</label>${checks("days",[1,2,3,4,5,6,0].map(d=>[String(d),WD()[d]]),(a?.days||[]).map(String))}</div>
+    <div class="fgrid">${fld("a-time",T("Heure"),`<input class="inp" id="a-time" type="time" value="${a?.time||""}">`)}${fld("a-place",T("Lieu (ouvre la carte)"),`<input class="inp" id="a-place" value="${esc(a?.place||"")}">`)}</div>
+    <div class="row"><button class="btn kid grow" type="submit">${a?T("Enregistrer"):T("Ajouter")}</button>${a?`<button type="button" class="btn danger" data-act="delActivity" data-v="${a.id}">${icon("trash")}</button>`:""}</div></form>`);
 }
 
 /* ======== REPAS ET BOIRES ======== */
@@ -250,7 +282,7 @@ function repas(c){
   h += nutritionCard(c);
   if (m < 36) h += allergenCard(c);
   const meals = c.logs.filter(l => l.type === "solid").sort((a,b)=>b.t-a.t).slice(0,12);
-  h += `<div class="card"><div class="card-h"><h2>${T("Derniers repas")}</h2></div>${meals.length?`<div class="list">${meals.map(l=>logLine(c,l)).join("")}</div>`:empty("spoon",T("Aucun repas noté."))}</div>`;
+  h += mealJournalCard(c) + mealTrendsCard(c);
   return h;
 }
 function mealForm(prefill){
@@ -258,16 +290,17 @@ function mealForm(prefill){
   const favNames = (c.foodFav||[]).map(f => f.name);
   const rows = UI.meal.items.map((it,i) => `<div class="stack" style="gap:6px;padding:10px;border-radius:14px;background:var(--surface2)"><div class="row"><input class="inp grow" data-meal="${i}" data-k="name" value="${esc(it.name)}" placeholder="${T("Aliment")}" list="foodlist"><input class="inp" style="width:110px" data-meal="${i}" data-k="qty" value="${esc(it.qty)}" placeholder="${T("Quantité")}"><button type="button" class="icon-btn flat" data-act="favFood" data-v="${i}" aria-label="${T("Favori")}" style="color:var(--butter-ink)">${icon("star").replace('fill="none"', favNames.includes(it.name)?'fill="currentColor"':'fill="none"')}</button>${UI.meal.items.length>1?`<button type="button" class="icon-btn flat" data-act="rmMealItem" data-v="${i}" aria-label="${T("Retirer")}">${icon("x")}</button>`:""}</div>
     <div class="pick">${Object.entries(FOOD_GROUPS).map(([k,g]) => `<button type="button" data-act="mealGroup" data-v="${i}:${k}" aria-pressed="${it.group===k}" style="font-size:.78rem;padding:5px 9px">${T(g.label)}</button>`).join("")}</div></div>`).join("");
-  sheet(`<form class="stack" data-form="meal" style="gap:12px">${sheetHead(T("Repas"))}
+  const M0 = UI.meal; sheet(`<form class="stack" data-form="meal" style="gap:12px">${sheetHead(M0.editId ? T("Modifier le repas") : T("Repas"))}
     ${UI.meal.photo?`<img src="${UI.meal.photo}" alt="" style="border-radius:16px;max-height:200px;object-fit:cover">`:""}
     ${UI.meal.comment?`<div class="banner soft">${icon("spark")}<div class="small">${esc(UI.meal.comment)}</div></div>`:""}
     <div id="mealItems" class="stack" style="gap:8px">${rows}</div><datalist id="foodlist">${[...new Set([...favNames, ...Object.values(FOOD_SUGG).flat().map(T)])].map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
     <button type="button" class="btn ghost" data-act="addMealItem">${icon("plus")}${T("Ajouter un aliment")}</button>
-    ${ageMonths(c) < 36 ? fld("f-al",T("Contient un allergène ?"),`<select class="inp" id="f-al"><option value="">${T("Non")}</option>${ALLERGENS.map(a=>`<option value="${a}">${T(a)}</option>`).join("")}</select>`) : ""}
-    <div class="field"><label>${T("Moment")}</label>${pick("mealk",["Déjeuner","Dîner","Souper","Collation"],mealKindAt(Date.now()))}</div>
-    ${fld("f-re",T("Réaction ou commentaire (facultatif)"),`<input class="inp" id="f-re">`)}
-    ${fld("f-t",T("Heure"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(Date.now())}">`)}
-    <button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`);
+    ${ageMonths(c) < 36 ? fld("f-al",T("Contient un allergène ?"),`<select class="inp" id="f-al"><option value="">${T("Non")}</option>${ALLERGENS.map(a=>`<option value="${a}" ${M0.allergen===a?"selected":""}>${T(a)}</option>`).join("")}</select>`) : ""}
+    <div class="field"><label>${T("Moment")}</label>${pick("mealk",["Déjeuner","Dîner","Souper","Collation"],M0.meal||mealKindAt(M0.t||Date.now()))}</div>
+    ${fld("f-re",T("Réaction ou commentaire (facultatif)"),`<input class="inp" id="f-re" value="${esc(M0.reaction||"")}">`)}
+    ${fld("f-t",T("Heure"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(M0.t||Date.now())}">`)}
+    ${M0.items.some(i => i.nut) ? `<p class="tiny muted">${icon("spark").replace("<svg",'<svg style="width:12px;height:12px"')} ${T("Nutriments estimés : {k} kcal · {p} g protéines",{k:Math.round(sum(M0.items.map(i => Number(i.nut?.kcal)||0))), p:Math.round(sum(M0.items.map(i => Number(i.nut?.prot)||0)))})}</p>` : ""}
+    <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${M0.editId?`<button type="button" class="btn danger" data-act="delLog" data-v="${M0.editId}">${icon("trash")}</button>`:""}</div></form>`);
 }
 function allergenCard(c){
   const log = c.allergensLog || {};
@@ -304,7 +337,7 @@ function croissance(c){
   if (!c.growth.length) h += empty("chart", T("Ajoutez une première mesure."));
   else h += `<div class="tbl"><table><thead><tr><th>${T("Date")}</th><th>${T("Âge")}</th><th>${T("Poids")}</th><th>${T("Taille")}</th>${mod(c,"ofc")?`<th>${T("PC")}</th>`:""}<th>${T("IMC")}</th><th></th></tr></thead><tbody>${[...c.growth].sort((a,b)=>a.date<b.date?1:-1).map(g => {
     const am = effAge(c, parseD(g.date));
-    const cell = (key, v, dp) => { if (!v) return `<td class="muted">—</td>`; const z = zScore(key, c.sex, am, v); return `<td><b>${fmtNum(v,dp)}</b>${z!=null?`<div class="tiny muted">P${pctLabel(z)} · z ${z>=0?"+":""}${fmtNum(z,2)}</div>`:""}</td>`; };
+    const cell = (key, v, dp) => { if (!v) return `<td class="muted">—</td>`; const z = zScore(key, c.sex, am, v); return `<td><b>${fmtNum(cvM(key,v),dpM(key,dp))}</b>${z!=null?`<div class="tiny muted">P${pctLabel(z)} · z ${z>=0?"+":""}${fmtNum(z,2)}</div>`:""}</td>`; };
     const bmi = g.weight && g.height ? g.weight/Math.pow(g.height/100,2) : null;
     return `<tr><td>${fmtD(g.date)}</td><td class="small">${ageLabel(ageMonths(c, parseD(g.date)))}</td>${cell("weight",Number(g.weight),2)}${cell("height",Number(g.height),1)}${mod(c,"ofc")?cell("ofc",Number(g.ofc),1):""}${cell("bmi",bmi,1)}<td>${isKidUser()?"":`<button class="icon-btn flat" data-act="delGrowth" data-v="${g.id}" aria-label="${T("Supprimer")}">${icon("trash")}</button>`}</td></tr>`; }).join("")}</tbody></table></div>`;
   return h + `<p class="tiny muted">${T("Normes OMS de croissance (0-5 ans) et référence OMS 2007 (5-19 ans), recommandées au Canada.")}</p></div>`;
@@ -336,7 +369,7 @@ function drawChart(c, sel, big=false){
   const ys = niceStep((hi-lo)*1.12/6); lo = Math.max(0, Math.floor((lo-(hi-lo)*.06)/ys)*ys); hi = Math.ceil((hi+(hi-lo)*.06)/ys)*ys;
   const X = m => P.l + (m-R.a)/span*(W-P.l-P.r), Y = v => H-P.b - (v-lo)/(hi-lo)*(H-P.t-P.b);
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${T(MEAS[k].label)}" style="font-family:var(--body)">`;
-  for (let v=lo; v<=hi+1e-9; v+=ys) s += `<line x1="${P.l}" x2="${W-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P.l-8}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmtNum(v, ys<1?1:0)}</text>`;
+  for (let v=lo; v<=hi+1e-9; v+=ys) s += `<line x1="${P.l}" x2="${W-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P.l-8}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmtNum(cvM(k, v), (ys<1 || cvM(k,1)!==1)?1:0)}</text>`;
   const xs = span <= 6 ? 1 : span <= 24 ? 3 : span <= 36 ? 6 : 12;
   for (let m=Math.ceil(R.a/xs)*xs; m<=R.b; m+=xs) s += `<line x1="${X(m)}" x2="${X(m)}" y1="${P.t}" y2="${H-P.b}" stroke="var(--line)" stroke-dasharray="2 4"/><text x="${X(m)}" y="${H-P.b+18}" text-anchor="middle" font-size="11" fill="var(--muted)">${R.b<=30?m+" "+T("m"):fmtNum(m/12, m%12?1:0)+" "+T("a")}</text>`;
   const c15 = curves[1].arr, c85 = curves[3].arr;
@@ -347,10 +380,10 @@ function drawChart(c, sel, big=false){
   if (pts.length){
     s += `<path d="M${pts.map(p=>`${X(p.m).toFixed(1)},${Y(p.x).toFixed(1)}`).join("L")}" fill="none" stroke="var(--kid-ink)" stroke-width="2.5" stroke-linejoin="round"/>`;
     pts.forEach((p,i) => { const last = i === pts.length-1;
-      s += `<circle cx="${X(p.m)}" cy="${Y(p.x)}" r="${last?7:5}" fill="var(--kid)" stroke="var(--surface)" stroke-width="2.5"><title>${fmtD(p.date)} · ${fmtNum(p.x, MEAS[k].dp)} ${MEAS[k].unit}${p.z!=null?` · P${pctLabel(p.z)}`:""}</title></circle>`;
-      if (last || big) s += `<text x="${Math.min(X(p.m)+10, W-P.r-70)}" y="${Y(p.x)-12}" font-size="${big?11:12}" font-weight="700" fill="var(--kid-ink)">${fmtNum(p.x, MEAS[k].dp)}${p.z!=null?` · P${pctLabel(p.z)}`:""}</text>`; });
+      s += `<circle cx="${X(p.m)}" cy="${Y(p.x)}" r="${last?7:5}" fill="var(--kid)" stroke="var(--surface)" stroke-width="2.5"><title>${fmtD(p.date)} · ${fmtNum(cvM(k,p.x), dpM(k,MEAS[k].dp))} ${muM(k)}${p.z!=null?` · P${pctLabel(p.z)}`:""}</title></circle>`;
+      if (last || big) s += `<text x="${Math.min(X(p.m)+10, W-P.r-70)}" y="${Y(p.x)-12}" font-size="${big?11:12}" font-weight="700" fill="var(--kid-ink)">${fmtNum(cvM(k,p.x), dpM(k,MEAS[k].dp))}${p.z!=null?` · P${pctLabel(p.z)}`:""}</text>`; });
   } else s += `<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="var(--muted)">${T("Aucune mesure dans cette période")}</text>`;
-  el.innerHTML = s + `<text x="${P.l}" y="${P.t-6}" font-size="11" fill="var(--muted)">${MEAS[k].unit}</text></svg>`;
+  el.innerHTML = s + `<text x="${P.l}" y="${P.t-6}" font-size="11" fill="var(--muted)">${muM(k)}</text></svg>`;
 }
 /* glisser pour déplacer, pincer (ou molette) pour zoomer */
 function bindChartPan(sel, c){
@@ -396,7 +429,7 @@ function growthForm(){
   const c = child();
   sheet(`<form class="stack" data-form="growth" style="gap:14px">${sheetHead(T("Nouvelle mesure"))}
     ${fld("g-date",T("Date"),`<input class="inp" id="g-date" type="date" value="${iso(today())}" required>`)}
-    <div class="fgrid">${fld("g-w",T("Poids (kg)"),`<input class="inp" id="g-w" type="number" inputmode="decimal" step="0.005" min="0.3" max="200">`)}${fld("g-h",T("Taille (cm)"),`<input class="inp" id="g-h" type="number" inputmode="decimal" step="0.1" min="25" max="230">`)}${mod(c,"ofc")?fld("g-c",T("Périmètre crânien (cm)"),`<input class="inp" id="g-c" type="number" inputmode="decimal" step="0.1" min="20" max="65">`):""}</div>
+    <div class="fgrid">${fld("g-w",`${T("Poids")} (${muM("weight")})`,`<input class="inp" id="g-w" type="number" inputmode="decimal" step="0.005" min="0.3" max="440">`)}${fld("g-h",`${T("Taille")} (${muM("height")})`,`<input class="inp" id="g-h" type="number" inputmode="decimal" step="0.1" min="9" max="230">`)}${mod(c,"ofc")?fld("g-c",`${T("Périmètre crânien")} (${muM("ofc")})`,`<input class="inp" id="g-c" type="number" inputmode="decimal" step="0.1" min="7" max="65">`):""}</div>
     <button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`);
 }
 

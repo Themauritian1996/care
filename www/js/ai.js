@@ -24,16 +24,20 @@ const AI_BADMODEL = /not found|is not supported|404|unknown model|does not exist
 function aiFriendly(e){
   const m = String(e?.message || e || "");
   if (/api key|API_KEY|permission|401|403/i.test(m)) return T("Clé Gemini refusée : vérifiez-la dans l'Assistant (onglet Réglages).");
+  if (/quota|exhausted|429|rate/i.test(m)) return T("Limite de votre clé Gemini atteinte pour le moment (quota gratuit). Réessayez plus tard ou activez la facturation dans AI Studio.");
+  if (/timeout/i.test(m)) return T("Gemini a mis trop de temps à répondre ; réessayez (le réseau est peut-être lent).");
   if (AI_RETRY.test(m)) return T("Gemini est très sollicité en ce moment. Réessayez dans une minute (l'app a déjà essayé d'autres modèles).");
   return m || T("Erreur Gemini");
 }
-async function geminiCall(model, {contents, system, json, search, onText, temperature, timeout}){
+const thinkFor = (model, tier) => /^gemini-3\.(8|6)/.test(model) ? {thinkingLevel: /3\.6/.test(model) ? "minimal" : "low"} : /^gemini-3/.test(model) && !/lite/.test(model) ? {thinkingLevel:"low"} : null;
+async function geminiCall(model, {contents, system, json, search, onText, temperature, timeout, think = true}){
   const key = aiKey();
   const body = { contents, generationConfig:{temperature} };
+  const th = think && thinkFor(model); if (th) body.generationConfig.thinkingConfig = th;
   if (system) body.systemInstruction = {parts:[{text:system}]};
   if (json){ body.generationConfig.responseMimeType = "application/json"; body.generationConfig.responseSchema = json; }
   if (search && !json) body.tools = [{google_search:{}}];
-  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), timeout);
+  const ctl = new AbortController(); let to = setTimeout(() => ctl.abort(), timeout);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:${onText ? "streamGenerateContent?alt=sse" : "generateContent"}`;
   try {
     const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json", "x-goog-api-key":key}, body:JSON.stringify(body), signal:ctl.signal});
@@ -41,39 +45,48 @@ async function geminiCall(model, {contents, system, json, search, onText, temper
     const srcs = [], addSrc = cand => (cand?.groundingMetadata?.groundingChunks||[]).map(g => g.web).filter(Boolean).forEach(w => { if (!srcs.some(s => s.uri === w.uri)) srcs.push({title:w.title, uri:w.uri}); });
     if (!onText){
       const d = await r.json(), cand = d.candidates?.[0];
-      const text = (cand?.content?.parts||[]).map(p => p.text||"").join("");
-      if (!text && cand?.finishReason && cand.finishReason !== "STOP") throw new Error(`Gemini : ${cand.finishReason}`);
+      const text = (cand?.content?.parts||[]).filter(p => !p.thought).map(p => p.text||"").join("");
+      if (!text) throw new Error(`Gemini : ${cand?.finishReason || d.promptFeedback?.blockReason || "réponse vide"}`);
       addSrc(cand); return {text, sources:srcs, model};
     }
     const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "", text = "";
     for (;;){
       const {done, value} = await rd.read(); if (done) break;
+      clearTimeout(to); to = setTimeout(() => ctl.abort(), timeout); // le délai repart à chaque morceau reçu
       buf += dec.decode(value, {stream:true});
       let i; while ((i = buf.indexOf("\n")) >= 0){
         const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
         if (!line.startsWith("data:")) continue;
-        try { const d = JSON.parse(line.slice(5)), cand = d.candidates?.[0]; const t = (cand?.content?.parts||[]).map(p => p.text||"").join(""); if (t){ text += t; onText(text); } addSrc(cand); } catch(e){}
+        try { const d = JSON.parse(line.slice(5)), cand = d.candidates?.[0]; const t = (cand?.content?.parts||[]).filter(p => !p.thought).map(p => p.text||"").join(""); if (t){ text += t; onText(text); } addSrc(cand); } catch(e){}
       }
     }
     if (!text) throw new Error("Gemini : réponse vide");
     return {text, sources:srcs, model};
-  } finally { clearTimeout(to); }
+  } catch(e){ if (e.name === "AbortError") { const t = new Error("timeout"); t.timeout = true; throw t; } throw e; }
+  finally { clearTimeout(to); }
 }
-/* appel avec repli automatique sur d'autres modèles */
-async function gemini({contents, system, json = null, search = false, tier, onText, temperature = 0.5, timeout = 70000}){
+/* appel fiable : essaie le dernier modèle qui a marché, puis les autres ; sans recherche Web ni réflexion si ça bloque ; 3 passes */
+let AI_LAST_ERR = "";
+async function gemini({contents, system, json = null, search = false, tier, onText, temperature = 0.5, timeout}){
   if (!aiKey()) throw new Error(T("Ajoutez d'abord votre clé Gemini dans l'Assistant."));
-  const chain = modelChain(tier); let lastErr;
-  for (let pass = 0; pass < 2; pass++){
+  const ok = S.settings.ai.okModel, base = modelChain(tier), chain = ok && base.includes(ok) ? [ok, ...base.filter(m => m !== ok)] : base;
+  const tmo = timeout || (json ? 45000 : onText ? 25000 : 40000);
+  let lastErr, useSearch = search, think = true;
+  for (let pass = 0; pass < 3; pass++){
     for (const model of chain){
-      try { return await geminiCall(model, {contents, system, json, search, onText, temperature, timeout}); }
-      catch(e){
-        lastErr = e; const m = String(e.message||"");
-        if (/api key|API_KEY_INVALID|PERMISSION_DENIED/i.test(m) || e.status === 401 || e.status === 403) throw new Error(aiFriendly(e));
-        if (search && /tool|search|grounding/i.test(m)){ try { return await geminiCall(model, {contents, system, json, search:false, onText, temperature, timeout}); } catch(e2){ lastErr = e2; } }
-        if (!AI_RETRY.test(m) && !AI_BADMODEL.test(m) && e.status !== 400) throw new Error(aiFriendly(e));
+      try {
+        const r = await geminiCall(model, {contents, system, json, search:useSearch, onText, temperature, timeout:tmo, think});
+        if (S.settings.ai.okModel !== model){ S.settings.ai.okModel = model; save(); }
+        return r;
+      } catch(e){
+        lastErr = e; const m = String(e.message||""); AI_LAST_ERR = `${model} : ${m}`.slice(0, 300);
+        if (/API_KEY_INVALID|api key not valid|PERMISSION_DENIED/i.test(m) || e.status === 401 || e.status === 403) throw new Error(aiFriendly(e));
+        if (/thinking/i.test(m)) think = false;
+        if (useSearch){ useSearch = false; try { const r = await geminiCall(model, {contents, system, json, search:false, onText, temperature, timeout:tmo, think}); S.settings.ai.okModel = model; save(); return r; } catch(e2){ lastErr = e2; AI_LAST_ERR = `${model} : ${e2.message}`.slice(0, 300); } }
+        if (S.settings.ai.okModel === model){ S.settings.ai.okModel = null; }
       }
     }
-    await sleep(1500);
+    await sleep(pass === 0 ? 1500 : 4000);
   }
   throw new Error(aiFriendly(lastErr));
 }
@@ -102,16 +115,20 @@ function aiHist(cat, title, text, extra = {}){
   S.aiHist.unshift(e); if (S.aiHist.length > 150) S.aiHist.length = 150; save(); return e;
 }
 function aiJob(kind, title, fn, opts = {}){
-  const j = {id:uid(), kind, title, st:"run", at:Date.now(), kid:opts.kid ?? UI.aiKid};
+  const j = {id:uid(), kind, title, st:"run", at:Date.now(), kid:opts.kid ?? UI.aiKid, fn, opts};
   AIJ.unshift(j); if (AIJ.length > 30) AIJ.length = 30; aiBadge(); aiRefreshJobs();
-  toast(T("Lancé : {t} (onglet En cours)",{t:title}));
-  Promise.resolve().then(() => fn(j)).then(res => {
+  if (!opts.quiet) toast(T("Lancé : {t} (onglet En cours)",{t:title}));
+  runJob(j); return j;
+}
+function runJob(j){
+  j.st = "run"; j.at = Date.now(); j.err = null; aiBadge(); aiRefreshJobs();
+  const tick = setInterval(aiRefreshJobs, 1000);
+  return Promise.resolve().then(() => j.fn(j)).then(res => {
     j.st = "ok"; j.res = res; j.done = Date.now();
-    readyChip(T("Prêt : {t}",{t:title}), () => opts.open ? opts.open(res, j) : aiOpenJob(j.id));
-    if (document.hidden || !document.hasFocus?.()) Native.notifyNow(T("Prêt : {t}",{t:title}), T("Touchez pour ouvrir l'assistant"), {go:"assistant", tab:"jobs"});
-  }).catch(e => { j.st = "err"; j.err = aiFriendly(e); toast(j.err); })
-    .finally(() => { aiBadge(); aiRefreshJobs(); });
-  return j;
+    if (!j.opts.quiet) readyChip(T("Prêt : {t}",{t:j.title}), () => j.opts.open ? j.opts.open(res, j) : aiOpenJob(j.id));
+    if (document.hidden) Native.notifyNow(T("Prêt : {t}",{t:j.title}), T("Touchez pour ouvrir l'assistant"), {go:"assistant", tab:"jobs"});
+  }).catch(e => { j.st = "err"; j.err = e.message || aiFriendly(e); j.detail = AI_LAST_ERR; if (!j.opts.quiet) toast(j.err); j.opts.onErr?.(e); })
+    .finally(() => { clearInterval(tick); aiBadge(); aiRefreshJobs(); });
 }
 function aiBadge(){ const f = $("#fab"); if (!f) return; const n = AIJ.filter(j => j.st === "run").length; f.dataset.count = n || ""; f.classList.toggle("busy", n > 0); }
 function aiRefreshJobs(){ const box = $("#aiJobs"); if (box) box.innerHTML = jobsList(); const t = $("#aiTabJobs"); if (t) t.textContent = AIJ.filter(j => j.st === "run").length || ""; }
@@ -121,7 +138,7 @@ function readyChip(msg, fn){
   el.innerHTML = `${icon("check")} ${esc(msg)} · <u>${T("Ouvrir")}</u>`; el.hidden = false; el.onclick = () => { el.hidden = true; fn(); };
   clearTimeout(readyT); readyT = setTimeout(() => el.hidden = true, 9000);
 }
-const jobsList = () => AIJ.length ? `<div class="list">${AIJ.map(j => `<button class="li" data-act="aiOpenJob" data-v="${j.id}" ${j.st==="run"?"disabled":""}><div class="ic" style="background:var(--${j.st==="err"?"rose":j.st==="ok"?"mint":"lilac"}-bg);color:var(--${j.st==="err"?"rose":j.st==="ok"?"mint":"lilac"}-ink)">${j.st==="run"?`<span class="spin"></span>`:icon(j.st==="ok"?"check":"alert")}</div><div class="grow"><div class="li-title">${esc(j.title)}</div><div class="small muted">${j.st==="run"?T("En cours… {s} s",{s:Math.round((Date.now()-j.at)/1000)}):j.st==="ok"?T("Prêt · touchez pour ouvrir"):esc(j.err||"")}</div></div></button>`).join("")}</div>` : empty("spark", T("Rien en cours. Lancez plusieurs créations à la fois : elles apparaissent ici."));
+const jobsList = () => AIJ.length ? `<div class="list">${AIJ.map(j => `<div class="li"><button class="grow row" data-act="aiOpenJob" data-v="${j.id}" style="border:0;background:none;padding:0;text-align:left;color:inherit;font:inherit;cursor:pointer;gap:12px" ${j.st!=="ok"?"disabled":""}><div class="ic" style="background:var(--${j.st==="err"?"rose":j.st==="ok"?"mint":"lilac"}-bg);color:var(--${j.st==="err"?"rose":j.st==="ok"?"mint":"lilac"}-ink)">${j.st==="run"?`<span class="spin"></span>`:icon(j.st==="ok"?"check":"alert")}</div><div class="grow"><div class="li-title">${esc(j.title)}</div><div class="small muted">${j.st==="run"?T("En cours… {s} s",{s:Math.round((Date.now()-j.at)/1000)}):j.st==="ok"?T("Prêt · touchez pour ouvrir"):esc(j.err||"")}</div>${j.st==="err"&&j.detail?`<div class="tiny muted">${T("Détail")} : ${esc(j.detail)}</div>`:""}</div></button>${j.st==="err"?`<button class="btn sm kid" data-act="aiRetry" data-v="${j.id}">${icon("auto")}${T("Réessayer")}</button>`:""}</div>`).join("")}</div>` : empty("spark", T("Rien en cours. Lancez plusieurs créations à la fois : elles apparaissent ici."));
 function aiOpenJob(id){ const j = AIJ.find(x => x.id === id); if (!j || j.st !== "ok") return; if (j.res?.histId) return aiHistOpen(j.res.histId); if (j.res?.open) return j.res.open(); }
 
 /* ---------- page Assistant ---------- */
@@ -132,7 +149,7 @@ function assistantView(){
   const kids = S.children; if (!kids.some(k => k.id === UI.aiKid)) UI.aiKid = (UI.view === "kid" ? child()?.id : null) || kids[0]?.id || null;
   const run = AIJ.filter(j => j.st === "run").length;
   let h = `<div class="top"><div class="grow row" style="gap:10px;min-width:0"><span class="ai-mark">${icon("spark")}</span><h1 style="font-size:1.4rem">${T("Assistant")}</h1></div>
-    <button class="icon-btn" data-act="go" data-v="home" aria-label="${T("Fermer")}">${icon("x")}</button></div>`;
+    <button class="icon-btn" data-act="search" aria-label="${T("Rechercher")}">${icon("search")}</button><button class="icon-btn" data-act="go" data-v="home" aria-label="${T("Fermer")}">${icon("x")}</button></div>`;
   if (!aiKey()) return h + `<div class="card"><div class="banner info">${icon("key")}<div class="small">${T("L'assistant utilise Gemini avec votre propre clé (gratuite pour un usage personnel). Créez-la sur aistudio.google.com/apikey puis collez-la ci-dessous. Elle reste sur cet appareil.")}</div></div>${aiKeyForm()}</div>`;
   h += `<div class="ai-tabs" role="tablist">${AI_TABS().map(([k,l,ic]) => `<button role="tab" data-act="aiTab" data-v="${k}" aria-pressed="${UI.aiTab===k}">${icon(ic)}<span>${l}</span>${k==="jobs"?`<b class="badge" id="aiTabJobs">${run||""}</b>`:""}</button>`).join("")}</div>`;
   if (kids.length > 1 && !["hist","jobs","set","recipes"].includes(UI.aiTab)) h += `<div class="pick">${kids.map(k => `<button data-act="aiKid" data-v="${k.id}" aria-pressed="${k.id===UI.aiKid}">${avatarOf(k,20)} ${esc(k.nick||k.name)}</button>`).join("")}</div>`;
@@ -147,16 +164,19 @@ function askPane(){
 }
 const srcList = s => s?.length ? `<div class="tiny" style="margin-top:6px"><b>${T("Sources")}</b> : ${s.slice(0,6).map(x => `<a href="${esc(x.uri)}" target="_blank" rel="noopener">${esc(x.title||"lien")}</a>`).join(" · ")}</div>` : "";
 const qa = x => `<div class="msg mine">${esc(x.q)}</div><div class="msg ai">${md(x.a)}${srcList(x.sources)}</div>`;
-async function aiAsk(q){
-  const c = kidById(UI.aiKid), th = $("#aiThread");
-  if (th){ if (!(S.aiChat||[]).some(x => x.kid === (c?.id||null))) th.innerHTML = ""; th.insertAdjacentHTML("beforeend", `<div class="msg mine">${esc(q)}</div><div class="msg ai" id="aiWait"><span class="spin"></span> ${T("Je cherche dans la littérature…")}</div>`); $("#aiWait")?.scrollIntoView({block:"nearest"}); }
-  try {
+function aiAsk(q){
+  const c = kidById(UI.aiKid), wid = "aw" + uid();
+  const th = $("#aiThread");
+  if (th){ if (!(S.aiChat||[]).some(x => x.kid === (c?.id||null))) th.innerHTML = ""; th.insertAdjacentHTML("beforeend", `<div class="msg mine">${esc(q)}</div><div class="msg ai" id="${wid}"><span class="spin"></span> ${T("Je cherche dans la littérature…")}</div>`); $("#"+wid)?.scrollIntoView({block:"nearest"}); }
+  aiJob("question", q.slice(0, 60), async j => {
+    const w0 = $("#"+wid); if (w0) w0.innerHTML = `<span class="spin"></span> ${T("Je cherche dans la littérature…")}`;
     const prev = (S.aiChat||[]).filter(x => x.kid === (c?.id||null)).slice(-4).flatMap(x => [{role:"user", parts:[{text:x.q}]}, {role:"model", parts:[{text:x.a}]}]);
-    const r = await gemini({system: AI_SYSTEM() + " Réponds en 120 à 250 mots.\n" + kidContext(c), contents:[...prev, {role:"user", parts:[{text:q}]}], search:S.settings.ai.search !== false, onText: t => { const w = $("#aiWait"); if (w) w.innerHTML = md(t); }});
+    const r = await gemini({system: AI_SYSTEM() + " Réponds en 120 à 250 mots.\n" + kidContext(c), contents:[...prev, {role:"user", parts:[{text:q}]}], search:S.settings.ai.search !== false, onText: t => { const w = $("#"+wid); if (w) w.innerHTML = md(t); }});
     S.aiChat = S.aiChat || []; S.aiChat.push({kid:c?.id||null, q, a:r.text, sources:r.sources, at:Date.now()}); if (S.aiChat.length > 80) S.aiChat.splice(0, S.aiChat.length-80);
-    aiHist("question", q, r.text, {sources:r.sources, kid:c?.id||null});
-    const w = $("#aiWait"); if (w){ w.removeAttribute("id"); w.innerHTML = md(r.text) + srcList(r.sources); }
-  } catch(e){ const w = $("#aiWait"); if (w){ w.removeAttribute("id"); w.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; } }
+    const e = aiHist("question", q, r.text, {sources:r.sources, kid:c?.id||null});
+    const w = $("#"+wid); if (w) w.innerHTML = md(r.text) + srcList(r.sources);
+    return {histId:e.id};
+  }, {kid:c?.id||null, quiet:true, onErr: e => { const w = $("#"+wid); if (w) w.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span> <button class="btn sm ghost" data-act="aiRetryLast">${T("Réessayer")}</button><div class="tiny muted">${esc(AI_LAST_ERR)}</div>`; }});
 }
 function scanPane(){
   const c = kidById(UI.aiKid), m = c && !isPrenatal(c) ? ageMonths(c) : 0;
@@ -204,7 +224,8 @@ function setPane(){
     <div class="field"><label>${T("Vitesse")}</label>${radios("aispeed",[["rapide",T("Rapide (Flash-Lite, recommandé)")],["qualite",T("Plus détaillé (Flash)")]],A.speed||"rapide")}</div>
     <label class="switch"><input type="checkbox" id="ai-search" ${A.search!==false?"checked":""} data-change="aiSearch"><span class="tg"></span><span class="grow">${T("Chercher des sources sur le Web pour les questions")}</span></label>
     ${fld("ai-model",T("Modèle personnalisé (facultatif)"),`<input class="inp" id="ai-model" value="${esc(Object.values(AI_MODELS).flat().includes(A.model)?"":A.model||"")}" placeholder="gemini-3.8-flash" data-change="aiModel">`)}
-    <p class="tiny muted">${T("Si un modèle est surchargé, l'app essaie automatiquement : {m}.",{m:modelChain().join(", ")})}</p></div>`;
+    <p class="tiny muted">${T("Si un modèle est surchargé, l'app essaie automatiquement : {m}.",{m:modelChain().join(", ")})}${S.settings.ai.okModel?` ${T("Dernier modèle qui a fonctionné : {m}.",{m:S.settings.ai.okModel})}`:""}</p>
+    <button class="btn ghost" data-act="aiPing">${icon("spark")}${T("Tester la connexion à Gemini")}</button><div id="aiPing" class="small"></div></div>`;
 }
 const aiKeyForm = () => `<form class="stack" data-form="aiKey">${fld("ai-key",T("Clé API Gemini"),`<input class="inp" id="ai-key" type="password" autocomplete="off" placeholder="AIza…">`)}<button class="btn kid" type="submit">${T("Enregistrer la clé")}</button></form>`;
 function aiSettings(){
@@ -216,23 +237,37 @@ function aiSettings(){
 /* ---------- repas en photo (avec nutriments estimés) ---------- */
 const NUT_SCHEMA = {type:"OBJECT", properties:{kcal:{type:"NUMBER"}, prot:{type:"NUMBER"}, carb:{type:"NUMBER"}, fat:{type:"NUMBER"}, fiber:{type:"NUMBER"}, sugar:{type:"NUMBER"}, sodium:{type:"NUMBER"}, calcium:{type:"NUMBER"}, iron:{type:"NUMBER"}}};
 const NUT_HELP = "nut = nutriments estimés pour la quantité indiquée : kcal, prot (g), carb (g), fat (g), fiber (g), sugar (g de sucres), sodium (mg), calcium (mg), iron (mg).";
-async function aiMealPhoto(){
+async function aiMealPhoto(retryImg){
   if (!aiKey()){ aiSheet("set"); return; }
-  const c = child(); if (!c) return toast(T("Ajoutez d'abord un enfant"));
-  const data = await Native.takePhoto({source:"prompt"}); if (!data) return;
-  const small = await shrinkImage(data, 1024, 0.8);
+  const c = (UI.view === "assistant" ? kidById(UI.aiKid) : null) || child(); if (!c) return toast(T("Ajoutez d'abord un enfant"));
+  let small = retryImg; if (!small){ const data = await Native.takePhoto({source:"prompt"}); if (!data) return; small = await shrinkImage(data, 1024, 0.8); }
+  UI.mealImg = small;
   sheet(`${sheetHead(T("Analyse du repas"))}<img src="${small}" alt="" style="border-radius:16px;max-height:240px;object-fit:cover"><p class="muted"><span class="spin"></span> ${T("Analyse en cours…")}</p>`);
   const m = ageMonths(c);
   try {
-    const schema = {type:"OBJECT", properties:{items:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, group:{type:"STRING", enum:Object.keys(FOOD_GROUPS)}, qty:{type:"STRING"}, nut:NUT_SCHEMA}, required:["name","group","qty"]}}, comment:{type:"STRING"}}, required:["items","comment"]};
-    const r = await gemini({tier:"quality", json:schema, system:`Tu analyses une photo de repas pour un enfant de ${ageLabel(m)}. Liste chaque aliment visible en ${LANG==="en"?"anglais":"français"}, son groupe (legfruits = légumes et fruits, proteines, grains, laitiers, autres = gâteries, boissons sucrées) et une quantité estimée (c. à soupe, tasse, morceaux, g). ${NUT_HELP} Dans comment, une ou deux phrases utiles sur l'équilibre selon le Guide alimentaire canadien et, avant 4 ans, signale tout aliment à risque d'étouffement (raisins entiers, noix, maïs soufflé, saucisses en rondelles).`,
+    const schema = {type:"OBJECT", properties:{items:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, group:{type:"STRING", enum:Object.keys(FOOD_GROUPS)}, qty:{type:"STRING"}, nut:NUT_SCHEMA}, required:["name","group","qty","nut"]}}, comment:{type:"STRING"}}, required:["items","comment"]};
+    const r = await gemini({tier:"fast", json:schema, temperature:0.2, system:`Tu analyses une photo de repas pour un enfant de ${ageLabel(m)}. Liste chaque aliment visible en ${LANG==="en"?"anglais":"français"}, son groupe (legfruits = légumes et fruits, proteines, grains, laitiers, autres = gâteries, boissons sucrées) et une quantité estimée (c. à soupe, tasse, morceaux, g) pour la portion visible. ${NUT_HELP} Dans comment, une ou deux phrases utiles sur l'équilibre selon le Guide alimentaire canadien et, avant 4 ans, signale tout aliment à risque d'étouffement (raisins entiers, noix, maïs soufflé, saucisses en rondelles).`,
       contents:[{role:"user", parts:[{inline_data:{mime_type:"image/jpeg", data:small.split(",")[1]}}, {text:"Analyse ce repas."}]}]});
-    const out = parseJSON(r.text), thumb = await shrinkImage(small, 480, 0.75);
-    aiHist("scan", T("Repas : {i}",{i:(out.items||[]).map(i => i.name).join(", ")}), `${(out.items||[]).map(i => `- ${i.name} (${i.qty})`).join("\n")}\n\n${out.comment||""}`, {kid:c.id});
-    mealForm({items:(out.items||[]).map(i => ({name:i.name, group:FOOD_GROUPS[i.group]?i.group:"autres", qty:i.qty, nut:i.nut||null})), comment:out.comment, photo:thumb, ai:true});
-  } catch(e){ toast(e.message); closeSheet(); }
+    const out = parseJSON(r.text), t = Date.now();
+    const items = (out.items||[]).map(i => ({name:i.name, group:FOOD_GROUPS[i.group]?i.group:"autres", qty:i.qty, nut:i.nut||null}));
+    if (!items.length) throw new Error(T("Aucun aliment reconnu : reprenez la photo de plus près."));
+    const log = {id:uid(), type:"solid", t, data:{items, meal:mealKindAt(t), ai:true, comment:out.comment||""}};
+    c.logs.push(log); UI.mealLog = {kid:c.id, id:log.id}; save();
+    aiHist("scan", T("Repas : {i}",{i:items.map(i => i.name).join(", ")}), `${items.map(i => `- ${i.name} (${i.qty})${i.nut?.kcal?` · ${Math.round(i.nut.kcal)} kcal`:""}`).join("\n")}\n\n${out.comment||""}`, {kid:c.id});
+    mealDone();
+  } catch(e){ sheet(`${sheetHead(T("Analyse du repas"))}<img src="${small}" alt="" style="border-radius:16px;max-height:200px;object-fit:cover"><div class="banner alert">${icon("alert")}<div class="small">${esc(e.message)}<div class="tiny muted">${esc(AI_LAST_ERR)}</div></div></div><div class="row"><button class="btn kid" data-act="mealRetry">${icon("auto")}${T("Réessayer avec la même photo")}</button><button class="btn ghost" data-act="aiMealPhoto">${icon("camera")}${T("Autre photo")}</button></div>`); }
 }
-
+function mealDone(){
+  const ref = UI.mealLog, c = kidById(ref.kid), L = c?.logs.find(x => x.id === ref.id); if (!L) return closeSheet();
+  const it = L.data.items, tot = k => Math.round(sum(it.map(i => Number(i.nut?.[k])||0)));
+  sheet(`${sheetHead(T("Repas noté pour {n}",{n:esc(c.nick||c.name)}))}${UI.mealImg?`<img src="${UI.mealImg}" alt="" style="border-radius:16px;max-height:180px;object-fit:cover">`:""}
+    ${S.children.length > 1 ? `<div class="pick">${S.children.filter(k => !isPrenatal(k)).map(k => `<button data-act="mealMove" data-v="${k.id}" aria-pressed="${k.id===c.id}">${avatarOf(k,20)} ${esc(k.nick||k.name)}</button>`).join("")}</div>` : ""}
+    <div class="list">${it.map(i => `<div class="li"><div class="ic" style="background:var(--${FOOD_GROUPS[i.group]?.color||"surface2"}-bg)">${icon("spoon")}</div><div class="grow"><div class="li-title">${esc(i.name)}</div><div class="small muted">${esc(i.qty||"")} · ${T(FOOD_GROUPS[i.group]?.label||"Autres")}</div></div>${i.nut?.kcal?`<span class="small num">${Math.round(i.nut.kcal)} kcal</span>`:""}</div>`).join("")}</div>
+    <div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip peach">${tot("kcal")} kcal</span><span class="chip coral">${tot("prot")} g ${T("prot.")}</span><span class="chip butter">${tot("carb")} g ${T("glucides")}</span><span class="chip lilac">${tot("fat")} g ${T("lipides")}</span><span class="chip mint">${tot("fiber")} g ${T("fibres")}</span></div>
+    ${L.data.comment?`<div class="banner soft">${icon("spark")}<div class="small">${esc(L.data.comment)}</div></div>`:""}
+    <p class="tiny muted">${T("Déjà ajouté au journal et au calendrier des repas ({m}). Valeurs estimées.",{m:T(L.data.meal)})}</p>
+    <div class="row"><button class="btn kid grow" data-act="closeSheet">${icon("check")}${T("Parfait")}</button><button class="btn ghost" data-act="mealEditAi">${icon("edit")}${T("Modifier")}</button><button class="btn danger" data-act="mealUndo">${icon("trash")}</button></div>`);
+}
 /* ---------- revues ---------- */
 async function aiReview(kidId, silent){
   const c = kidById(kidId) || child(); if (!c || !aiKey()) return;
@@ -253,6 +288,11 @@ async function aiReview(kidId, silent){
 }
 /* revue automatique : si l'heure prévue est passée depuis la dernière revue */
 function maybeAutoReview(){
+  if (aiKey() && feat("ai")) S.children.filter(c => c.nutAuto && c.nutAuto !== "jamais" && !isPrenatal(c) && ageMonths(c) >= 12).forEach((c, i) => {
+    const per = c.nutAuto === "mois" ? 30 : 7, last = (S.aiHist||[]).find(e => e.cat === "nutrition" && e.kid === c.id && e.text);
+    if (!c.nutAutoAt){ c.nutAutoAt = Date.now(); save(); return; }
+    if (Date.now() - Math.max(c.nutAutoAt, last?.at || 0) >= per*DAY){ c.nutAutoAt = Date.now(); save(); setTimeout(() => nutAdvice(c, per, true).then?.(() => {}), 5000 + i*2000); }
+  });
   const A = S.settings.ai; if (!aiKey() || A.freq === "jamais" || !feat("ai")) return;
   if (!A.lastReview){ A.lastReview = iso(today()); save(); return; } // première fois : on attend le prochain rendez-vous prévu
   const slot = lastReviewSlot(), last = parseD(A.lastReview);
@@ -262,12 +302,20 @@ function maybeAutoReview(){
 
 Object.assign(ACT, {
   ai: () => aiSheet(), aiTab: v => { UI.aiTab = v; if (UI.view !== "assistant") go("assistant"); else render(); },
-  aiKid: v => { UI.aiKid = v; render(); }, aiAskQuick: v => aiAsk(v), aiMealPhoto: () => aiMealPhoto(),
+  aiKid: v => { UI.aiKid = v; render(); },
+  mealRetry: () => aiMealPhoto(UI.mealImg),
+  mealMove: v => { const ref = UI.mealLog, from = kidById(ref.kid), L = from.logs.find(x => x.id === ref.id), to = kidById(v); if (!L || !to || from === to) return; from.logs = from.logs.filter(x => x !== L); to.logs.push(L); ref.kid = v; save(); mealDone(); },
+  mealUndo: () => { const ref = UI.mealLog, c = kidById(ref.kid); c.logs = c.logs.filter(x => x.id !== ref.id); closeSheet(); commit(T("Repas retiré")); },
+  mealEditAi: () => { const ref = UI.mealLog; S.active = ref.kid; ACT.editLog(ref.id); }, aiAskQuick: v => aiAsk(v), aiMealPhoto: () => aiMealPhoto(),
   aiReview: () => { S.settings.ai.topics = checked("aitopics"); S.settings.ai.freq = radio("aifreq") || S.settings.ai.freq; save(); return aiReview(UI.aiKid); },
   aiReviewSave: () => { const A = S.settings.ai; A.topics = checked("aitopics"); A.freq = radio("aifreq") || A.freq; A.reviewDay = +val("ai-rday"); A.reviewTime = val("ai-rtime") || "19:00";
     if (A.freq !== "jamais" && !S.settings.notif.enabled){ S.settings.notif.enabled = true; Native.notifPermission(); } S.settings.notif.review = true;
     commit(T("Revue prévue le {d}",{d:fmtD(nextReviewAt(),{weekday:"long",hour:"2-digit",minute:"2-digit"})})); },
-  aiOpenJob: v => aiOpenJob(v), aiHistOpen: v => aiHistOpen(v),
+  aiOpenJob: v => aiOpenJob(v), aiRetry: v => { const j = AIJ.find(x => x.id === v); if (j) runJob(j); },
+  aiRetryLast: () => { const j = AIJ.find(x => x.kind === "question" && x.st === "err"); if (j) runJob(j); },
+  aiPing: async () => { const out = $("#aiPing"); out.innerHTML = `<span class="spin"></span>`; const res = [];
+    for (const m of [...new Set([...AI_MODELS.fast, ...AI_MODELS.quality])]){ const t0 = Date.now(); try { await geminiCall(m, {contents:[{role:"user", parts:[{text:"Réponds seulement : OK"}]}], temperature:0, timeout:20000}); res.push(`✅ ${m} · ${((Date.now()-t0)/1000).toFixed(1)} s`); if (!S.settings.ai.okModel) S.settings.ai.okModel = m; } catch(e){ res.push(`❌ ${m} · ${String(e.message).slice(0,90)}`); } out.innerHTML = res.map(esc).join("<br>"); }
+    save(); }, aiHistOpen: v => aiHistOpen(v),
   histCat: v => { UI.histCat = v; render(); }, histFav: () => { UI.histFav = !UI.histFav; render(); },
   histFavT: v => { const e = S.aiHist.find(x => x.id === v); e.fav = !e.fav; save(); aiHistOpen(v); },
   histShare: v => { const e = S.aiHist.find(x => x.id === v); Native.share({title:e.title, text:`${e.title}\n\n${e.text}`}); },

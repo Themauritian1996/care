@@ -29,7 +29,7 @@ if (cfg && cfg.apiKey){
     try {
       if (Native.isApp && !NativeAuth){ toast(T("Connexion Google pas encore activée dans l'APK : utilisez votre courriel pour l'instant")); return; }
       if (NativeAuth){
-        const r = await NativeAuth.signInWithGoogle({scopes:[DRIVE_SCOPE]});
+        const r = await NativeAuth.signInWithGoogle({scopes:[DRIVE_SCOPE], useCredentialManager:false});
         const cred = A.GoogleAuthProvider.credential(r.credential?.idToken, r.credential?.accessToken);
         C.googleToken = r.credential?.accessToken || null; C.tokenAt = Date.now();
         await A.signInWithCredential(auth, cred);
@@ -239,7 +239,9 @@ if (cfg && cfg.apiKey){
   /* ---------- Google Drive (souvenirs) ---------- */
   async function driveToken(){
     if (C.googleToken && Date.now() - C.tokenAt < 50*60e3) return C.googleToken;
-    if (NativeAuth){ const r = await NativeAuth.signInWithGoogle({scopes:[DRIVE_SCOPE]}); C.googleToken = r.credential?.accessToken; C.tokenAt = Date.now(); return C.googleToken; }
+    if (NativeAuth){ const r = await NativeAuth.signInWithGoogle({scopes:[DRIVE_SCOPE], useCredentialManager:false}); C.googleToken = r.credential?.accessToken; C.tokenAt = Date.now();
+      if (!C.googleToken) throw new Error(T("Google n'a pas donné l'accès à Drive. Réessayez et acceptez l'autorisation « Google Drive »."));
+      return C.googleToken; }
     const p = new A.GoogleAuthProvider(); p.addScope(DRIVE_SCOPE);
     const r = await A.reauthenticateWithPopup(auth.currentUser, p).catch(() => A.linkWithPopup(auth.currentUser, p));
     C.googleToken = A.GoogleAuthProvider.credentialFromResult(r)?.accessToken; C.tokenAt = Date.now(); return C.googleToken;
@@ -269,7 +271,10 @@ if (cfg && cfg.apiKey){
     const meta = {name, parents:[folder], description};
     const body = `--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${bnd}\r\nContent-Type: ${mime}\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64}\r\n--${bnd}--`;
     const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {method:"POST", headers:{Authorization:"Bearer "+tok, "Content-Type":`multipart/related; boundary=${bnd}`}, body});
-    const d = await r.json(); if (!r.ok) { if (r.status === 401) C.googleToken = null; throw new Error(d.error?.message || "Drive"); }
+    const d = await r.json();
+    if (!r.ok){ if (r.status === 401) C.googleToken = null; if (r.status === 404 && !path.retried){ S.settings.driveFolder = null; S.settings.driveDirs = {}; save(); path.retried = true; return C.driveUpload(name, mime, base64, description, path); }
+      const msg = d.error?.message || `Drive ${r.status}`; S.settings.driveErr = /has not been used|disabled|accessNotConfigured/i.test(msg) ? T("L'API Google Drive n'est pas activée dans le projet Firebase. Ouvrez console.cloud.google.com/apis/library/drive.googleapis.com?project=tribe-26d85 et touchez « Activer ».") : msg; save(); throw new Error(S.settings.driveErr); }
+    if (S.settings.driveErr){ S.settings.driveErr = null; save(); }
     return d;
   };
   render();
