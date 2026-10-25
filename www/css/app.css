@@ -354,3 +354,5 @@ blockquote.quote.big{margin:0;font-size:1.25rem;cursor:default}
 .card-h .row{flex-wrap:wrap;justify-content:flex-end}
 .pick button svg{width:16px;height:16px;vertical-align:-3px}
 .seg button{flex:1 0 auto;padding:7px 10px}
+.legend{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:0;margin-right:3px}
+.li[disabled]{cursor:not-allowed}

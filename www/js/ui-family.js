@@ -182,13 +182,6 @@ function taskDueOn(t, d){
   return t.date === iso(d);
 }
 const completionOf = (taskId, memberId, date) => S.completions.find(x => x.taskId === taskId && x.memberId === memberId && x.date === date);
-function pointsOf(mid){
-  const earned = sum(S.completions.filter(x => x.memberId === mid && x.status === "ok").map(x => x.points));
-  const spent = sum(S.redemptions.filter(x => x.memberId === mid && x.status !== "refuse").map(x => x.cost));
-  const weekStart = iso(addDays(today(), -((today().getDay()+6)%7)));
-  const week = sum(S.completions.filter(x => x.memberId === mid && x.status === "ok" && x.date >= weekStart).map(x => x.points));
-  return {earned, balance: earned - spent, week};
-}
 const levelOf = pts => { let i = LEVELS.findIndex(l => pts < l); if (i < 0) i = LEVELS.length; return {lvl:i, from:LEVELS[i-1]||0, to:LEVELS[i]||LEVELS[LEVELS.length-1]*1.5}; };
 const leaderboard = () => S.family.members.filter(m => S.tasks.some(t => (t.assignees||[]).includes(m.id))).map(m => ({m, ...pointsOf(m.id)})).sort((a,b)=>b.week-a.week);
 function unreadCount(){ if (!Cloud.user) return 0; const lr = (S.lastRead||{}).family || 0; return S.messages.filter(x => x.at > lr && x.uid !== Cloud.user.uid).length + sum((S.groups||[]).map(g => (g.messages||[]).filter(x => x.at > ((S.lastRead||{})[g.id]||0) && x.uid !== Cloud.user.uid).length)); }
@@ -200,24 +193,6 @@ function tribuView(){
   if (UI.sub.tribu === "chat") return h + chatView("family");
   return h + groupsView();
 }
-function defisView(){
-  const d = today(), ds = iso(d), viewer = me(), parent = !isKidUser();
-  const people = parent ? S.family.members : [viewer];
-  let h = `<div class="grid">${people.filter(p => S.tasks.some(t => (t.assignees||[]).includes(p.id)) || p.id === viewer.id).map(p => { const P = pointsOf(p.id), L = levelOf(P.earned);
-    return `<div class="card c4" style="background:linear-gradient(160deg,var(--${p.color||"peach"}-bg),var(--surface))"><div class="row">${avatarOf(p,44)}<div class="grow"><b>${esc(p.name)}</b><div class="tiny muted">${T("Niveau {n}",{n:L.lvl})} · ${T("{n} pts cette semaine",{n:P.week})}</div></div><div class="points" style="color:var(--${p.color||"peach"}-ink)">${P.balance}</div></div><div class="levelbar"><i style="width:${clamp((P.earned-L.from)/(L.to-L.from)*100,2,100).toFixed(0)}%"></i></div><span class="tiny muted">${T("{n} points avant le niveau suivant",{n:Math.max(0,Math.round(L.to-P.earned))})}</span></div>`; }).join("")}</div>`;
-  const pending = S.completions.filter(x => x.status === "pending");
-  if (parent && pending.length) h += `<div class="card"><div class="card-h"><h2>${T("À valider")}</h2><span class="chip butter">${pending.length}</span></div>${pending.map(x => { const t = S.tasks.find(y => y.id === x.taskId), m = member(x.memberId);
-    return `<div class="taskrow">${avatarOf(m,32)}<div class="grow"><b>${esc(t?.title||"")}</b><div class="tiny muted">${esc(m?.name||"")} · ${fmtD(x.date,{day:"numeric",month:"short"})} · +${x.points}</div></div><button class="btn sm kid" data-act="approve" data-v="${x.id}">${icon("check")}</button><button class="btn sm ghost" data-act="refuse" data-v="${x.id}">${icon("x")}</button></div>`; }).join("")}</div>`;
-  const today_ = S.tasks.filter(t => taskDueOn(t, d));
-  h += `<div class="card"><div class="card-h"><h2>${T("Défis d'aujourd'hui")}</h2>${parent?`<button class="btn sm kid" data-act="taskForm">${icon("plus")}${T("Défi")}</button>`:""}</div>
-    ${today_.length ? today_.map(t => (t.assignees||[]).filter(a => parent || a === viewer.id).map(a => { const m = member(a); if (!m) return ""; const cp = completionOf(t.id, a, ds);
-      return `<div class="taskrow"><div class="ic" style="background:var(--${m.color||"peach"}-bg);color:var(--${m.color||"peach"}-ink)">${icon(t.icon||"star")}</div><div class="grow"><b>${esc(t.title)}</b><div class="tiny muted">${esc(m.name)} · +${t.points} ${T("pts")}</div></div>${cp ? `<span class="chip ${cp.status==="ok"?"mint":cp.status==="pending"?"butter":"rose"}">${cp.status==="ok"?T("Fait !"):cp.status==="pending"?T("À valider"):T("Refusé")}</span>` : `<button class="btn sm kid" data-act="taskDone" data-v="${t.id}|${a}">${icon("check")}${T("Fait")}</button>`}</div>`; }).join("")).join("") : empty("star", parent ? T("Créez des défis : lit fait, lecture, devoirs, ménage… Les parents peuvent aussi s'en donner !") : T("Aucun défi aujourd'hui."))}</div>`;
-  h += `<div class="card"><div class="card-h"><h2>${T("Récompenses")}</h2>${parent?`<button class="btn sm ghost" data-act="rewardForm">${icon("plus")}${T("Récompense")}</button>`:""}</div>
-    ${S.rewards.length ? `<div class="grid">${S.rewards.map(r => { const can = pointsOf(viewer.id).balance >= r.cost; return `<div class="reward c4">${icon("gift").replace("<svg",'<svg style="width:28px;height:28px;color:var(--peach-ink)"')}<b>${esc(r.title)}</b><span class="chip butter">${r.cost} ${T("pts")}</span><button class="btn sm ${can?"kid":"ghost"}" data-act="redeem" data-v="${r.id}" ${can?"":"disabled"}>${can?T("Échanger"):T("Pas encore assez de points")}</button>${parent?`<button class="btn sm line" data-act="delReward" data-v="${r.id}">${T("Retirer")}</button>`:""}</div>`; }).join("")}</div>` : `<p class="small muted">${T("Ajoutez des récompenses à échanger contre des points.")}</p>`}
-    ${S.redemptions.filter(x => x.status === "pending").length && parent ? `<div class="sep"></div><b>${T("Échanges à confirmer")}</b>${S.redemptions.filter(x=>x.status==="pending").map(x => `<div class="taskrow">${avatarOf(member(x.memberId),30)}<div class="grow">${esc(S.rewards.find(r=>r.id===x.rewardId)?.title||"")} · ${esc(member(x.memberId)?.name||"")}</div><button class="btn sm kid" data-act="redeemOk" data-v="${x.id}">${icon("check")}</button><button class="btn sm ghost" data-act="redeemNo" data-v="${x.id}">${icon("x")}</button></div>`).join("")}` : ""}</div>`;
-  if (parent && S.tasks.length) h += `<div class="card"><div class="card-h"><h2>${T("Tous les défis")}</h2></div><div class="list">${S.tasks.map(t => `<button class="li" data-act="taskForm" data-v="${t.id}"><div class="ic" style="background:var(--surface2)">${icon(t.icon||"star")}</div><div class="grow"><div class="li-title">${esc(t.title)}</div><div class="small muted">+${t.points} · ${t.recur==="daily"?T("chaque jour"):t.recur==="weekly"?(t.days||[]).map(d=>WD()[d]).join(", "):fmtD(t.date)} · ${esc((t.assignees||[]).map(a=>member(a)?.name).filter(Boolean).join(", "))}</div></div></button>`).join("")}</div></div>`;
-  return h;
-}
 function taskForm(id){
   const t = S.tasks.find(x => x.id === id) || {title:"", points:10, assignees:[], recur:"daily", days:[1,2,3,4,5], icon:"star"};
   const ics = ["star","bed","broom","book","pencil","spoon","dish","tooth","trash","note","run","screen","heart"];
@@ -226,6 +201,7 @@ function taskForm(id){
     ${fld("tk-title",T("Défi"),inp("tk-title",t.title,"required"))}
     ${fld("tk-pts",T("Points"),numIn("tk-pts","",5,t.points))}
     <div class="field"><label>${T("Pour qui ?")}</label>${checks("tkwho",S.family.members.map(m=>[m.id,m.name]),t.assignees)}</div>
+    <label class="switch"><input type="checkbox" id="tk-team" ${t.team?"checked":""}><span class="tg"></span><span class="grow"><b>${T("Défi d'équipe")}</b><br><span class="small muted">${T("Fait ensemble : chaque personne cochée reçoit les points en un seul geste.")}</span></span></label>
     <div class="field"><label>${T("Quand ?")}</label>${radios("tkrec",[["daily",T("Chaque jour")],["weekly",T("Certains jours")],["once",T("Une fois")]],t.recur)}</div>
     <div class="field"><label>${T("Jours (si certains jours)")}</label>${checks("tkdays",[1,2,3,4,5,6,0].map(d=>[String(d),WD()[d]]),(t.days||[]).map(String))}</div>
     ${fld("tk-date",T("Date (si une fois)"),inp("tk-date",t.date||iso(today()),'type="date"'))}

@@ -185,12 +185,9 @@ Object.assign(ACT, {
   taskTpl: v => { const t = TASK_TPL[+v]; $("#tk-title").value = T(t.t); $("#tk-pts").value = t.p; const r = document.querySelector(`input[name="tkicon"][value="${t.ic}"]`); if (r) r.checked = true; },
   rewardTpl: v => { const t = REWARD_TPL[+v]; $("#rw-title").value = T(t.t); $("#rw-cost").value = t.cost; },
   delTask: v => { S.tasks = S.tasks.filter(t => t.id !== v); closeSheet(); commit(); },
-  delReward: v => { S.rewards = S.rewards.filter(r => r.id !== v); commit(); },
-  taskDone: v => { const [tid, mid] = v.split("|"), t = S.tasks.find(x => x.id === tid); const auto = !isKidUser() || S.settings.parental.allow.selfApprove;
-    S.completions.push({id:uid(), taskId:tid, memberId:mid, date:iso(today()), points:t.points, status: auto ? "ok" : "pending", at:Date.now()}); commit(auto ? T("+{n} points !",{n:t.points}) : T("Envoyé au parent pour validation")); if (auto) confetti(); },
+  delReward: v => { const r = S.rewards.find(x => x.id === v); if (r?.team && !r.doneAt) S.redemptions = S.redemptions.filter(x => !(x.kind === "team" && x.rewardId === v)); S.rewards = S.rewards.filter(x => x.id !== v); commit(r?.team && !r.doneAt ? T("Objectif retiré : les points sont rendus") : undefined); },
   approve: v => { const x = S.completions.find(c => c.id === v); x.status = "ok"; commit(T("Validé")); confetti(); },
   refuse: v => { const x = S.completions.find(c => c.id === v); x.status = "refuse"; commit(); },
-  redeem: v => { const r = S.rewards.find(x => x.id === v); S.redemptions.push({id:uid(), rewardId:v, memberId:S.me, cost:r.cost, date:iso(today()), status: isKidUser() ? "pending" : "ok"}); commit(isKidUser() ? T("Demande envoyée au parent") : T("Récompense échangée !")); confetti(); },
   redeemOk: v => { S.redemptions.find(x => x.id === v).status = "ok"; commit(); },
   redeemNo: v => { S.redemptions.find(x => x.id === v).status = "refuse"; commit(); },
 
@@ -302,7 +299,7 @@ Object.assign(FORMS, {
     closeSheet(); commit(T("Souvenir enregistré"));
     if ($("#m-drive")?.checked !== false && Cloud.canDrive?.()) memoryToDrive(S.memories.find(m => m.id === id));
   },
-  task: f => { const id = f.dataset.id; const d = {title:val("tk-title"), points:numOf("tk-pts")||5, assignees:checked("tkwho"), recur:radio("tkrec")||"daily", days:checked("tkdays").map(Number), date:val("tk-date"), icon:radio("tkicon")||"star"};
+  task: f => { const id = f.dataset.id; const d = {title:val("tk-title"), points:numOf("tk-pts")||5, assignees:checked("tkwho"), team:!!$("#tk-team")?.checked, recur:radio("tkrec")||"daily", days:checked("tkdays").map(Number), date:val("tk-date"), icon:radio("tkicon")||"star"};
     if (!d.assignees.length) return toast(T("Choisissez au moins une personne")); if (id) Object.assign(S.tasks.find(t => t.id === id), d); else S.tasks.push({id:uid(), ...d}); closeSheet(); commit(T("Défi enregistré")); },
   reward: () => { S.rewards.push({id:uid(), title:val("rw-title"), cost:numOf("rw-cost")||50}); closeSheet(); commit(T("Récompense ajoutée")); },
   chat: async f => { const t = $("#chat-in").value.trim(); if (!t) return; $("#chat-in").value = ""; await Cloud.send(f.dataset.ch, t); },
