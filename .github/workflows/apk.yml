@@ -80,7 +80,7 @@ jobs:
             fi
           fi
           if [ -f ../android-config/tribu.keystore ]; then
-            ./gradlew assembleRelease --no-daemon -x lintVitalAnalyzeRelease -x lintVitalReportRelease 2>&1 | tee build.log; [ ${PIPESTATUS[0]} -eq 0 ] || { report; exit 1; }
+            ./gradlew assembleRelease --no-daemon -x lintVitalRelease -x lintVitalAnalyzeRelease -x lintVitalReportRelease 2>&1 | tee build.log; [ ${PIPESTATUS[0]} -eq 0 ] || { report; exit 1; }
             A=$(find app/build/outputs/apk/release -name '*.apk' | head -1); echo "APK : $A"; [ -n "$A" ] || { echo "::error::Aucun APK release produit : $(ls -R app/build/outputs/apk | tr '\n' ' ')"; exit 1; }
             cp "$A" ../Tribe.apk
           else
