@@ -48,7 +48,7 @@ Pour chaque mesure : date, weight en kg, height en cm, ofc (périmètre crânien
   }[kind];
   try {
     const r = await gemini({tier:"quality", system:todayCtx(), json:P.schema, contents:[{role:"user", parts:[{inline_data:{mime_type:"image/jpeg", data:img.split(",")[1]}}, {text:P.prompt}]}]});
-    UI.scan = {kind, out:parseJSON(r.text), kid:c?.id}; aiHist("scan", T(K.l), "```\n"+JSON.stringify(UI.scan.out, null, 1).slice(0, 3000)+"\n```", {kid:c?.id||null});
+    UI.scanWho = null; UI.scan = {kind, out:parseJSON(r.text), kid:c?.id}; aiHist("scan", T(K.l), "```\n"+JSON.stringify(UI.scan.out, null, 1).slice(0, 3000)+"\n```", {kid:c?.id||null});
     scanResult();
   } catch(e){ sheet(`${sheetHead(T(K.l))}<img src="${img}" alt="" style="border-radius:16px;max-height:200px;object-fit:contain;background:var(--surface2)"><div class="banner alert">${icon("alert")}<div class="small">${esc(e.message)}<div class="tiny muted">${esc(AI_LAST_ERR)}</div></div></div><div class="row"><button class="btn kid" data-act="scanRetry">${icon("auto")}${T("Réessayer avec la même photo")}</button><button class="btn ghost" data-act="aiScan" data-v="${kind}">${icon("camera")}${T("Autre photo")}</button></div>`); }
 }
@@ -56,6 +56,7 @@ const okDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d||"") ? d : "";
 const atTime = (date, hhmm) => { const d = parseD(date); const [h, m] = (hhmm||"").split(/[:h]/).map(Number); d.setHours(isNaN(h)?12:h, isNaN(m)?0:m, 0, 0); return d.getTime(); };
 const scanRow = (i, title, sub, on = true) => `<label class="li" style="cursor:pointer"><input type="checkbox" name="scan" value="${i}" ${on?"checked":""} style="width:20px;height:20px;accent-color:var(--kid)"><div class="grow"><div class="li-title">${title}</div>${sub?`<div class="small muted">${sub}</div>`:""}</div></label>`;
 
+const scanItem = o => { const n = o.nut || (o.calories ? {kcal:o.calories} : null); return {name:o.product || T("Produit"), group:FOOD_GROUPS[o.group]?o.group:"autres", qty:o.portion||"", nut:n, b:n, f:1}; };
 function scanResult(){
   const {kind, out} = UI.scan, c = kidById(UI.scan.kid);
   let body = "", rows = [], actions = "";
@@ -68,7 +69,8 @@ function scanResult(){
       ${(out.nutrients||[]).length?`<div class="tbl"><table><tbody>${out.nutrients.map(n => `<tr><td>${esc(n.name)}</td><td class="num">${esc(n.amount||"")}</td><td class="num muted">${esc(n.dv||"")}</td></tr>`).join("")}</tbody></table></div>`:""}
       ${(out.allergens||[]).length?`<div class="field"><label>${T("Allergènes")}</label><div class="pick">${out.allergens.map(a => `<span class="chip ${hit.includes(a)?"danger":"butter"}">${esc(a)}</span>`).join("")}</div></div>`:""}
       ${out.ingredients?`<details><summary class="small">${T("Ingrédients")}</summary><p class="small">${esc(out.ingredients)}</p></details>`:""}`;
-    actions = c && !isPrenatal(c) ? `<button class="btn kid" data-act="scanMeal">${icon("spoon")}${T("Noter comme repas")}</button><button class="btn ghost" data-act="scanFav">${icon("star")}${T("Ajouter aux favoris")}</button>` : "";
+    const profs = S.children.filter(k => !isPrenatal(k) && ageMonths(k) >= 6); UI.scanWho = UI.scanWho?.length ? UI.scanWho : [c && profs.includes(c) ? c.id : profs[0]?.id].filter(Boolean);
+    actions = profs.length ? `<div class="field" style="width:100%"><label>${T("Pour qui ?")}</label><div class="pick" id="scanWho">${profs.map(k => `<button data-act="scanWho" data-v="${k.id}" aria-pressed="${UI.scanWho.includes(k.id)}">${avatarOf(k,20)} ${esc(k.nick||k.name)}</button>`).join("")}</div></div><button class="btn kid" data-act="scanMeal">${icon("spoon")}${T("Noter comme collation / repas")}</button><button class="btn ghost" data-act="scanFav">${icon("star")}${T("Garder dans la banque de collations")}</button>` : `<p class="small muted">${T("Ajoutez un profil pour noter ce produit.")}</p>`;
   } else if (kind === "daycare"){
     const date = okDate(out.date) || iso(today());
     (out.meals||[]).forEach(m => rows.push({t:"meal", d:m, title:`${icon("spoon")} ${m.time||""} ${(m.items||[]).map(i=>esc(i.name)).join(", ")}`, sub:esc(m.note||"")}));
@@ -91,7 +93,7 @@ function scanResult(){
     body += rows.length ? `<p class="small muted">${T("Vérifiez et décochez ce qui est faux, puis importez.")}</p><div class="list">${rows.map((r,i) => scanRow(i, r.title, r.sub, r.on !== false)).join("")}</div>` : `<p class="muted">${T("Rien de lisible trouvé. Essayez une photo plus nette, bien à plat et éclairée.")}</p>`;
     if (rows.length) actions = `<button class="btn kid" data-act="scanImport">${icon("check")}${T("Importer la sélection")}</button>`;
   }
-  sheet(`${sheetHead(T(SCAN_KINDS[kind].l))}${c?`<span class="small muted">${esc(c.nick||c.name)}</span>`:""}${body}<div class="row">${actions}<button class="btn ghost" data-act="aiScan" data-v="${kind}">${icon("camera")}${T("Reprendre")}</button></div><p class="tiny muted">${T("Lu par Gemini : relisez avant d'enregistrer.")}</p>`, "wide");
+  sheet(`${sheetHead(T(SCAN_KINDS[kind].l))}${c?`<span class="small muted">${esc(c.nick||c.name)}</span>`:""}${body}<div class="row" style="flex-wrap:wrap">${actions}<button class="btn ghost" data-act="aiScan" data-v="${kind}">${icon("camera")}${T("Reprendre")}</button></div><p class="tiny muted">${T("Lu par Gemini : relisez avant d'enregistrer.")}</p>`, "wide");
 }
 function scanImport(){
   const {kind, rows} = UI.scan, c = kidById(UI.scan.kid), sel = checked("scan").map(Number).map(i => rows[i]);
@@ -150,11 +152,16 @@ async function aiYearStory(kidId, year){
 
 Object.assign(ACT, {
   aiScan: v => aiScan(v), scanRetry: () => aiScan(UI.scanImg.kind, UI.scanImg.img), scanImport: () => scanImport(),
-  scanMeal: () => { const o = UI.scan.out; mealForm({items:[{name:o.product||"", group:FOOD_GROUPS[o.group]?o.group:"autres", qty:o.portion||"", nut:o.nut||null}], comment:o.verdict, ai:true}); },
-  scanFav: () => { const o = UI.scan.out, c = kidById(UI.scan.kid); if (!c.foodFav.some(f => f.name === o.product)) c.foodFav.push({name:o.product, group:FOOD_GROUPS[o.group]?o.group:"autres"}); commit(T("Ajouté aux favoris")); },
+  scanWho: v => { const w = UI.scanWho || [], i = w.indexOf(v); i >= 0 ? (w.length > 1 && w.splice(i, 1)) : w.push(v); UI.scanWho = w; $$("#scanWho button").forEach(b => b.setAttribute("aria-pressed", w.includes(b.dataset.v))); },
+  scanMeal: () => { const o = UI.scan.out, it = scanItem(o), t = Date.now();
+    (UI.scanWho||[]).map(kidById).filter(Boolean).forEach(k => k.logs.push({id:uid(), type:"solid", t, data:{items:[{...it}], meal:mealKindAt(t) === "Collation" || it.group === "autres" ? "Collation" : mealKindAt(t), ai:true}}));
+    commit(T("Noté pour {n}",{n:(UI.scanWho||[]).map(kidById).filter(Boolean).map(k => k.nick||k.name).join(", ")})); },
+  scanFav: () => { const it = scanItem(UI.scan.out);
+    (UI.scanWho||[]).map(kidById).filter(Boolean).forEach(k => { k.foodFav = k.foodFav || []; const ex = k.foodFav.find(f => norm(f.name) === norm(it.name)); ex ? Object.assign(ex, it) : k.foodFav.push({...it, snack:true}); });
+    commit(T("Gardé dans la banque de collations : touchez-le dans Repas pour le noter en un geste")); },
   aiOutShare: () => Native.share({title:appName(), text:UI.aiOut?.text||""}),
   aiOutKeep: () => { const o = UI.aiOut; if (!o) return; const title = (o.text.match(/^#+\s*(.+)$/m)||[])[1] || (o.kind === "year" ? T("Notre année {y}",{y:o.year}) : T("Histoire du soir"));
-    S.memories.push({id:uid(), kind:o.kind === "year" ? "yearbook" : "story", date:o.kind === "year" ? `${o.year}-12-31` > iso(today()) ? iso(today()) : `${o.year}-12-31` : iso(today()), title, text:o.text, kidIds:o.kid?[o.kid]:[]}); commit(T("Souvenir enregistré")); },
+    S.memories.push({id:uid(), kind:o.kind === "year" ? "yearbook" : "story", date:o.kind === "year" ? `${o.year}-12-31` > iso(today()) ? iso(today()) : `${o.year}-12-31` : iso(today()), title, text:o.text, kidIds:o.kid?[o.kid]:[]}); commit(T("Souvenir enregistré")); driveQ("mem", S.memories.at(-1).id); },
   aiMemText: v => { const [a, b] = (v||"m-text|m-title").split("|"); aiMemoryText(a, b); },
   aiYear: v => { const [kid, y] = v.split("|"); aiYearStory(kid, y); },
 });

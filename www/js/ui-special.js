@@ -102,8 +102,8 @@ async function saveSpecial(f){
   if (kind === "art" && !UI.photoDraft.mem2 && !d.photoId) return toast(T("Ajoutez la photo de la création"));
   if (UI.photoDraft.mem2){ d.photoId = d.photoId || uid(); await PhotoDB.put(d.photoId, UI.photoDraft.mem2); }
   if (ex) Object.assign(ex, d); else S.memories.push(d);
-  closeSheet(); commit(kind === "letter" ? T("Lettre scellée") : T("Souvenir enregistré")); if (kind === "first" && !ex) confetti();
-  if ($("#m-drive")?.checked && Cloud.canDrive?.()) memoryToDrive(S.memories.find(m => m.id === id));
+  const toDrive = !!$("#m-drive")?.checked; closeSheet(); commit(kind === "letter" ? T("Lettre scellée") : T("Souvenir enregistré")); if (kind === "first" && !ex) confetti();
+  if (toDrive) driveQ("mem", id);
 }
 /* affichage détaillé selon le type (appelé par openMemory) */
 function specialDetail(m){

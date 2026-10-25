@@ -17,6 +17,10 @@ const NUTS = [
 /* Cibles par jour. Énergie : équations EER (IOM 2005, activité « peu active ») si poids et taille connus, sinon valeurs typiques. */
 function nutTargets(c){
   const m = ageMonths(c), y = m / 12, F = c.sex === "F";
+  if (c.adult || y >= 19){ const g0 = [...(c.growth||[])].sort((a,b) => a.date < b.date ? 1 : -1), w0 = Number(g0.find(x => x.weight)?.weight) || null, h0 = Number(g0.find(x => x.height)?.height) || null;
+    const kcal = Math.round((w0 && h0 ? (10*w0 + 6.25*h0 - 5*y + (F ? -161 : 5)) * 1.45 : (F ? 2000 : 2500)) / 10) * 10;
+    return {kcal, prot: w0 ? Math.round(0.8*w0) : (F ? 46 : 56), carb:[Math.round(kcal*0.45/4), Math.round(kcal*0.65/4)], fat:[Math.round(kcal*0.20/9), Math.round(kcal*0.35/9)], fiber: F ? 25 : 38, sugar: Math.round(kcal*0.10/4), calcium: 1000, iron: F && y < 51 ? 18 : 8, sodium: 2300,
+      basis: w0 ? T("adulte · selon {w} kg{h}",{w:fmtNum(w0,1), h:h0?` · ${Math.round(h0)} cm`:""}) : T("valeurs adultes typiques (ajoutez poids et taille dans le profil)")}; }
   const g = [...(c.growth||[])].sort((a,b) => a.date < b.date ? 1 : -1), wt = Number(g.find(x => x.weight)?.weight) || null, ht = Number(g.find(x => x.height)?.height) / 100 || null;
   let kcal;
   if (wt && ht && y >= 3){ const PA = F ? 1.16 : 1.13; kcal = F ? 135.3 - 30.8*y + PA*(10*wt + 934*ht) + (y < 9 ? 20 : 25) : 88.5 - 61.9*y + PA*(26.7*wt + 903*ht) + (y < 9 ? 20 : 25); }

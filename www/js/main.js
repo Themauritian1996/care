@@ -93,15 +93,15 @@ Object.assign(ACT, {
   trackerForm: v => trackerForm(v), delTracker: v => { const c = child(); c.trackers = c.trackers.filter(t => t.id !== v); closeSheet(); commit(); },
   activityForm: v => activityForm(v), delActivity: v => { const c = child(); c.activities = c.activities.filter(x => x.id !== v); closeSheet(); commit(); },
   allergen: v => { const c = child(); (c.allergensLog[v] = c.allergensLog[v] || []).push(iso(today())); commit(T("{a} : exposition notée",{a:T(v)})); },
-  quickFood: v => { const c = child(), f = c.foodFav.find(x => x.name === v); c.logs.push({id:uid(), type:"solid", t:Date.now(), data:{items:[{name:f.name, group:f.group, qty:f.qty||""}]}}); commit(T("{a} noté",{a:v})); },
+  quickFood: v => { const c = child(), f = c.foodFav.find(x => x.name === v); c.logs.push({id:uid(), type:"solid", t:Date.now(), data:{items:[{name:f.name, group:f.group, qty:f.qty||"", nut:f.nut||null}], meal:f.snack ? "Collation" : mealKindAt(Date.now())}}); commit(T("{a} noté",{a:v})); },
   addMealItem: () => { UI.meal.items.push({name:"", group:"legfruits", qty:""}); mealForm(UI.meal); },
   rmMealItem: v => { UI.meal.items.splice(+v, 1); mealForm(UI.meal); },
   mealGroup: v => { const [i, g] = v.split(":"); UI.meal.items[+i].group = g; mealForm(UI.meal); },
   favFood: v => { const c = child(), it = UI.meal.items[+v]; if (!it.name) return toast(T("Écrivez d'abord le nom de l'aliment")); const i = c.foodFav.findIndex(f => f.name === it.name); if (i >= 0) c.foodFav.splice(i,1); else c.foodFav.push({name:it.name, group:it.group, qty:it.qty}); save(); mealForm(UI.meal); },
 
   /* croissance */
-  growthForm: () => growthForm(),
-  delGrowth: v => { const c = child(); c.growth = c.growth.filter(g => g.id !== v); commit(T("Mesure supprimée")); },
+  growthForm: v => growthForm(v),
+  delGrowth: v => { const c = child(); c.growth = c.growth.filter(g => g.id !== v); closeSheet(); commit(T("Mesure supprimée")); },
   meas: v => { UI.sub.courbes = v; UI.range = null; UI.zoom = null; render(); },
   range: v => { UI.range = v; UI.zoom = null; drawChart(child(), "#chart"); },
   chrono: v => { UI.chrono = v === "1"; render(); },
@@ -178,13 +178,13 @@ Object.assign(ACT, {
   photoDay: v => photoDay(v), openPhoto: v => openPhoto(v), openMemory: v => openMemory(v),
   memoryForm: v => memoryForm(v), memoryEdit: v => { const m = S.memories.find(x => x.id === v); if (m?.kind && SPECIAL.some(k => k.k === m.kind)){ UI.specKid = (m.kidIds||[])[0]; specialForm(m.kind + "|" + (m.key||""), v); } else memoryForm(null, v); },
   memPhoto: async () => { const d = await Native.takePhoto({source:"prompt"}); if (!d) return; UI.photoDraft.mem2 = await shrinkImage(d, 1280, 0.82); $("#memPhotoPrev").innerHTML = `<img src="${UI.photoDraft.mem2}" alt="" style="border-radius:14px;max-height:180px;object-fit:cover">`; },
-  delMemory: v => { S.memories = S.memories.filter(m => m.id !== v); closeSheet(); commit(T("Supprimé")); },
+  delMemory: v => { driveQDel(S.memories.find(m => m.id === v)?.driveIds); S.memories = S.memories.filter(m => m.id !== v); closeSheet(); commit(T("Supprimé")); },
   photoEdit: v => photoDay(null, v),
   photoReplace: async () => { const data = await Native.takePhoto({source:"prompt"}); if (!data) return; UI.photoDraft.day = await shrinkImage(data, 1280, 0.82); const img = $("#layer form img"); if (img) img.src = UI.photoDraft.day; },
-  delPhoto: async v => { S.photos = S.photos.filter(p => p.id !== v); await PhotoDB.del(v); closeSheet(); commit(T("Photo supprimée")); },
+  delPhoto: async v => { driveQDel(S.photos.find(p => p.id === v)?.driveIds); S.photos = S.photos.filter(p => p.id !== v); await PhotoDB.del(v); closeSheet(); commit(T("Photo supprimée")); },
   sharePhoto: async v => { const p = S.photos.find(x => x.id === v), d = await PhotoDB.get(v); Native.share({title:p.caption || T("Photo du jour"), text:`${p.caption||""} · ${fmtD(p.date,{day:"numeric",month:"long",year:"numeric"})}`, dataUrl:d, filename:`photo-${p.date}.jpg`}); },
   shareMemory: async v => { const m = S.memories.find(x => x.id === v); if (lockedMem(m)) return; const d = m.photoId ? await PhotoDB.get(m.photoId) : null; Native.share({title:m.title, text:`${m.title} · ${fmtD(m.date,{day:"numeric",month:"long",year:"numeric"})}${m.text?"\n\n"+m.text:""}`, dataUrl:d, filename:`souvenir-${m.date}.jpg`}); },
-  photoDrive: async v => { const p = S.photos.find(x => x.id === v), d = await PhotoDB.get(v); toast(T("Envoi vers Google Drive…")); try { const path = [T("Photos du jour"), p.date]; await Cloud.driveUpload(`${p.date} ${p.caption||T("Photo du jour")}.jpg`.slice(0,90), "image/jpeg", d.split(",")[1], `${T(PHOTO_CATS.find(c=>c.id===p.cat)?.l||"")} · ${p.date}`, path); p.drive = true; save(); toast(T("Enregistré dans Google Drive : {p}",{p:path.join(" / ")})); } catch(e){ toast(T("Google Drive : {e}",{e:e.message})); } },
+  photoDrive: v => { S.driveQueue = (S.driveQueue||[]).filter(x => x.id !== v); S.driveQueue.push({op:"up", kind:"photo", id:v}); save(); toast(T("Envoi vers Google Drive…")); driveFlush(true); },
   memoryDrive: v => memoryToDrive(S.memories.find(x => x.id === v), true),
 
   /* défis */
@@ -196,7 +196,7 @@ Object.assign(ACT, {
   notifTest: async () => { if (!(await Native.notifPermission())) return toast(T("Notifications refusées par l'appareil")); await Native.notifyAt(T("Test {app}",{app:appName()}), T("Les rappels fonctionnent !"), Date.now() + 5000, {go:"home"}); toast(T("Notification dans 5 secondes : vous pouvez fermer l'app")); },
   driveTest: async () => { const out = $("#driveOut"); if (out) out.innerHTML = `<span class="spin"></span> ${T("Test en cours…")}`;
     try { const r = await Cloud.driveUpload(`${T("Test")} ${new Date().toLocaleString(LOCALE())}.txt`, "text/plain", btoa(unescape(encodeURIComponent(T("Fichier de test de {app}. Vous pouvez le supprimer.",{app:appName()})))), "", [T("Test")]);
-      if (out) out.innerHTML = `<span style="color:var(--mint-ink)">✓ ${T("Ça marche : un fichier « Test » est dans votre Drive, dossier « {f} ».",{f:`${appName()} – ${T("Souvenirs")}`})}</span> ${r.webViewLink?`<a href="${esc(r.webViewLink)}" target="_blank" rel="noopener">${T("Ouvrir")}</a>`:""} ${S.settings.driveFolder?`<a href="https://drive.google.com/drive/folders/${esc(S.settings.driveFolder)}" target="_blank" rel="noopener">${T("Ouvrir le dossier")}</a>`:""}`; }
+      if (out) out.innerHTML = `<span style="color:var(--mint-ink)">✓ ${T("Ça marche : un fichier « Test » est dans votre Drive, dossier « {f} ».",{f:DRIVE_ROOT})}</span> ${r.webViewLink?`<a href="${esc(r.webViewLink)}" target="_blank" rel="noopener">${T("Ouvrir")}</a>`:""} ${S.settings.driveFolder?`<a href="https://drive.google.com/drive/folders/${esc(S.settings.driveFolder)}" target="_blank" rel="noopener">${T("Ouvrir le dossier")}</a>`:""}`; }
     catch(e){ if (out) out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; } },
   famPhoto: async () => { const d = await Native.takePhoto({source:"prompt"}); if (!d) return; S.family.photo = await shrinkImage(d, 360, 0.8); save(); render(); familySheet(); toast(T("Photo de famille ajoutée")); },
   famPhotoDel: () => { S.family.photo = null; save(); render(); familySheet(); },
@@ -212,22 +212,13 @@ Object.assign(ACT, {
   groupOpen: v => { UI.groupOpen = v; render(); }, groupClose: () => { UI.groupOpen = null; render(); },
   groupChat: v => { UI.groupOpen = null; $("#main").innerHTML = topbar() + chatView(v); afterRender(); },
   groupInvite: async v => { const code = await Cloud.groupInvite(v); $("#groupInviteOut").innerHTML = `<div class="banner ok">${icon("key")}<div><div class="phone">${code}</div><button class="btn sm ghost" data-act="shareText" data-v="${esc(T("Rejoins le groupe dans {app} avec le code {c}",{app:appName(), c:code}))}">${icon("share")}${T("Envoyer")}</button></div></div>`; },
-  groupEvent: v => sheet(`<form class="stack" data-form="groupEvent" data-g="${v}" style="gap:14px">${sheetHead(T("Proposer une activité"))}${fld("ge-t",T("Activité"),`<input class="inp" id="ge-t" required placeholder="${T("Glissade au parc")}">`)}<div class="fgrid">${fld("ge-d",T("Date"),`<input class="inp" id="ge-d" type="date" value="${iso(addDays(today(),7))}" required>`)}${fld("ge-h",T("Heure"),`<input class="inp" id="ge-h" type="time">`)}</div>${fld("ge-p",T("Lieu"),`<input class="inp" id="ge-p">`)}<button class="btn kid" type="submit">${T("Proposer")}</button></form>`),
+  groupEvent: v => sheet(`<form class="stack" data-form="groupEvent" data-g="${v}" style="gap:14px">${sheetHead(T("Proposer une activité"))}${fld("ge-t",T("Activité"),`<input class="inp" id="ge-t" required placeholder="${T("Glissade au parc")}">`)}<div class="fgrid">${fld("ge-d",T("Date"),`<input class="inp" id="ge-d" type="date" value="${iso(addDays(today(),7))}" required>`)}${fld("ge-h",T("Heure"),`<input class="inp" id="ge-h" type="time">`)}</div>${fld("ge-p",T("Lieu"),addrInput("ge-p",""))}<button class="btn kid" type="submit">${T("Proposer")}</button></form>`),
   groupRsvp: async v => { const [g, e] = v.split("|"), ev = S.groups.find(x => x.id === g)?.events?.find(x => x.id === e); await Cloud.groupRsvp(g, e, !ev?.rsvp?.[Cloud.user.uid]?.ok); },
 });
-async function memoryToDrive(m, verbose){
-  if (!m || !Cloud.canDrive?.()) return;
-  try {
-    if (verbose) toast(T("Envoi vers Google Drive…"));
-    const sp = SPECIAL.find(x => x.k === m.kind), dir = `${m.date} ${m.title}`.slice(0, 80);
-    const path = sp ? [T("Souvenirs spéciaux"), T(sp.l), dir] : ["story","yearbook"].includes(m.kind) ? [T("Histoires et récits"), dir] : [T("Moments précieux"), dir];
-    const kids = (m.kidIds||[]).map(id=>kidById(id)?.name).filter(Boolean).join(", ");
-    const body = lockedMem(m) ? T("Lettre scellée jusqu'au {d}.",{d:m.unlock}) : `${m.text||""}${m.answers?Object.entries(m.answers).map(([q,a])=>`\n${T(q)} ${a}`).join(""):""}`;
-    const txt = `${m.title}\n${fmtD(m.date,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}\n${kids}\n\n${body}`;
-    await Cloud.driveUpload(`${T("Souvenir")}.txt`, "text/plain", btoa(unescape(encodeURIComponent(txt))), m.title, path);
-    if (m.photoId){ const d = await PhotoDB.get(m.photoId); if (d) await Cloud.driveUpload(`${T("Photo")}.jpg`, "image/jpeg", d.split(",")[1], m.title, path); }
-    m.drive = true; save(); if (verbose) toast(T("Enregistré dans Google Drive : {p}",{p:path.join(" / ")}));
-  } catch(e){ toast(T("Google Drive : {e}",{e:e.message})); }
+function memoryToDrive(m, verbose){
+  if (!m || !Cloud.canDrive?.() || lockedMem(m)) return;
+  S.driveQueue = (S.driveQueue||[]).filter(x => x.id !== m.id); S.driveQueue.push({op:"up", kind:"mem", id:m.id}); save();
+  if (verbose) toast(T("Envoi vers Google Drive…")); driveFlush(!!verbose);
 }
 
 /* ======== CHANGEMENTS ======== */
@@ -248,12 +239,13 @@ Object.assign(CHANGE, {
 Object.assign(FORMS, {
   emailAuth: (f, e) => Cloud.emailAuth(val("a-email"), val("a-pass"), e.submitter?.value || "login"),
   kid: f => {
-    const id = f.dataset.id, born = radio("born") !== "non";
+    const id = f.dataset.id, born = radio("born") !== "non", adult = radio("born") === "adulte";
     const d = {name:val("k-name"), nick:val("k-nick"), sex:radio("sex"), color:radio("color")||"mint", look:radio("look")||"auto", avatar:readAvatar("kid"), photo:UI.photoDraft.kid || null,
       hFather:numOf("k-hf")||null, hMother:numOf("k-hm")||null, allergies:val("k-al"), conditions:val("k-co"), meds:val("k-me"), doctor:val("k-dr"), doctorEmail:val("k-de"), pharmacy:val("k-ph")};
     if (born){ d.dob = val("k-dob"); d.gaW = Number(val("k-gaw"))||40; d.gaD = Number(val("k-gad"))||0; if (!d.dob) return toast(T("Date de naissance requise")); }
     else { d.dob = null; d.dueDate = val("k-due"); if (!d.dueDate) return toast(T("Date prévue requise")); }
     if (!d.name) return toast(T("Prénom requis"));
+    d.adult = adult; if (adult && ageMonths({dob:d.dob}) < 216) return toast(T("Un profil adulte doit avoir 18 ans ou plus"));
     if (id) Object.assign(kidById(id), d); else { const k = {...blankKid(), id:uid(), ...d}; S.children.push(k); S.active = k.id; }
     normalize(); closeSheet(); UI.kidTab = null; commit(id ? T("Profil mis à jour") : T("Bienvenue {n}",{n:d.nick||d.name})); if (!id) go("kid");
   },
@@ -298,11 +290,14 @@ Object.assign(FORMS, {
     c.goalBand = g.band; closeSheet(); commit(T("Objectifs enregistrés")); },
   tracker: f => { const c = child(), id = f.dataset.id; const d = {name:val("t-name"), type:radio("ttype")||"count", unit:val("t-unit"), goal:numOf("t-goal")||null, goalKind:radio("tkind")||"min", color:radio("tcolor")||"teal", icon:radio("ticon")||"target"};
     if (!d.name) return toast(T("Nom requis")); if (id) Object.assign(c.trackers.find(x => x.id === id), d); else c.trackers.push({id:uid(), ...d}); closeSheet(); commit(T("Suivi enregistré")); },
-  activity: f => { const days = checked("days").map(Number); if (!days.length) return toast(T("Choisissez au moins un jour")); const c = child(), d = {name:val("a-name"), days, time:val("a-time"), place:val("a-place")};
-    if (f.dataset.id) Object.assign(c.activities.find(x => x.id === f.dataset.id), d); else c.activities.push({id:uid(), ...d}); closeSheet(); commit(f.dataset.id ? T("Modifié") : T("Activité ajoutée")); },
-  growth: () => { const c = child(), w = Math.round(toMetric("weight", numOf("g-w"))*1000)/1000 || 0, h = Math.round(toMetric("height", numOf("g-h"))*10)/10 || 0, oc = Math.round(toMetric("ofc", numOf("g-c"))*10)/10 || 0;
+  activity: f => { const days = checked("days").map(Number); if (!days.length) return toast(T("Choisissez au moins un jour")); const c = child(), d = {name:val("a-name"), days, time:val("a-time"), place:val("a-place"), dur:numOf("a-dur")||0, auto:$("#a-auto").checked};
+    if (f.dataset.id) Object.assign(c.activities.find(x => x.id === f.dataset.id), d); else c.activities.push({id:uid(), since:iso(today()), ...d}); closeSheet(); commit(f.dataset.id ? T("Modifié") : T("Activité ajoutée")); },
+  sportToggle: v => { const [cid, aid, ds] = v.split("|"), c = kidById(cid); c.sportSkip = c.sportSkip || {}; const k = aid+"|"+ds; if (c.sportSkip[k]) delete c.sportSkip[k]; else c.sportSkip[k] = true; save(); if ($("#layer .sheet")) dayDetail(ds); else render(); },
+  growth: f => { const c = child(), w = Math.round(toMetric("weight", numOf("g-w"))*1000)/1000 || 0, h = Math.round(toMetric("height", numOf("g-h"))*10)/10 || 0, oc = Math.round(toMetric("ofc", numOf("g-c"))*10)/10 || 0;
     if (!w && !h && !oc) return toast(T("Entrez au moins une mesure")); if (parseD(val("g-date")) < parseD(c.dob)) return toast(T("La date est avant la naissance"));
-    c.growth.push({id:uid(), date:val("g-date"), weight:w||null, height:h||null, ofc:oc||null}); closeSheet(); commit(T("Mesure ajoutée")); },
+    const d = {date:val("g-date"), weight:w||null, height:h||null, ofc:oc||null};
+    if (f?.dataset?.id){ Object.assign(c.growth.find(x => x.id === f.dataset.id), d); closeSheet(); return commit(T("Modifié")); }
+    c.growth.push({id:uid(), ...d}); closeSheet(); commit(T("Mesure ajoutée")); },
   vax: f => { child().vaccines[f.dataset.id] = {date:val("v-date"), lot:val("v-lot"), site:pickVal("site"), reactions:val("v-re")}; closeSheet(); commit(T("Vaccin noté")); },
   msDate: f => { child().milestones[f.dataset.k] = val("ms-date") || iso(today()); closeSheet(); commit(T("Bravo !")); },
   babyName: () => { const n = val("bn"); if (!n) return; child().prenatal.names.push(n); commit(); },
@@ -316,14 +311,14 @@ Object.assign(FORMS, {
     UI.calSel = d.date; closeSheet(); commit(T("Ajouté à l'agenda")); },
   photo: async () => { const d = {date:val("p-date")||iso(today()), cat:radio("pcat")||"autre", caption:val("p-cap"), kidIds:checked("pkids")};
     if (UI.photoDraft.edit){ const p = S.photos.find(x => x.id === UI.photoDraft.edit); Object.assign(p, d);
-      if (UI.photoDraft.day){ await PhotoDB.put(p.id, UI.photoDraft.day); p.v = Date.now(); } closeSheet(); return commit(T("Photo modifiée")); }
-    const id = uid(); await PhotoDB.put(id, UI.photoDraft.day); S.photos.push({id, ...d, by:S.me}); closeSheet(); commit(T("Photo enregistrée")); },
+      if (UI.photoDraft.day){ await PhotoDB.put(p.id, UI.photoDraft.day); p.v = Date.now(); } closeSheet(); commit(T("Photo modifiée")); return driveQ("photo", p.id); }
+    const id = uid(); await PhotoDB.put(id, UI.photoDraft.day); S.photos.push({id, ...d, by:S.me}); closeSheet(); commit(T("Photo enregistrée")); driveQ("photo", id); },
   memory: async f => { const id = f.dataset.id || uid(), ex = S.memories.find(m => m.id === id);
     const d = {id, title:val("m-title"), date:val("m-date"), text:val("m-text"), kidIds:checked("mkids"), drive:ex?.drive||false, photoId:ex?.photoId||null};
     if (UI.photoDraft.mem2){ d.photoId = d.photoId || uid(); await PhotoDB.put(d.photoId, UI.photoDraft.mem2); }
     if (ex) Object.assign(ex, d); else S.memories.push(d);
-    closeSheet(); commit(T("Souvenir enregistré"));
-    if ($("#m-drive")?.checked !== false && Cloud.canDrive?.()) memoryToDrive(S.memories.find(m => m.id === id));
+    const toDrive = $("#m-drive")?.checked !== false; closeSheet(); commit(T("Souvenir enregistré"));
+    if (toDrive) driveQ("mem", id);
   },
   task: f => { const id = f.dataset.id; const d = {title:val("tk-title"), points:numOf("tk-pts")||5, assignees:checked("tkwho"), team:!!$("#tk-team")?.checked, times:[0,1,2,3].map(i => val("tk-h"+i)).filter(Boolean), perDay:Math.max(1, Math.min(8, +val("tk-per")||1)), recur:radio("tkrec")||"daily", days:checked("tkdays").map(Number), date:val("tk-date"), icon:radio("tkicon")||"star"};
     if (!d.assignees.length) return toast(T("Choisissez au moins une personne")); if (id) Object.assign(S.tasks.find(t => t.id === id), d); else S.tasks.push({id:uid(), ...d}); closeSheet(); commit(T("Défi enregistré")); },
@@ -352,3 +347,4 @@ Object.assign(FORMS, {
   document.addEventListener("visibilitychange", () => { if (!document.hidden && renderPending && !$("#layer .scrim")){ renderPending = false; render(); } });
 })();
 Object.assign(ACT, { dayDetail: v => dayDetail(v), weekDetail: v => weekDetail(v) });
+Object.assign(ACT, { kcNav: v => { const b = UI.kcMonth ? parseD(UI.kcMonth) : new Date(today().getFullYear(), today().getMonth(), 1); UI.kcMonth = iso(addMonths(b, +v)); render(); } });

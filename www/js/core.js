@@ -44,7 +44,7 @@ const kidAge = c => isPrenatal(c) ? (()=>{ const p = pregWeek(c); return T("{n} 
 const mLabel = m => m < 24 ? T("{n} mois",{n:Math.round(m)}) : T("{n} ans",{n: m % 12 === 0 ? m/12 : fmtNum(m/12, 1)});
 const stageOf = m => STAGES.find(s => m < s.max);
 const stageKid = c => isPrenatal(c) ? STAGES[0] : stageOf(ageMonths(c));
-const lookOf = c => (c && c.look && c.look !== "auto") ? STAGES.find(s => s.id === c.look) : c ? stageKid(c) : STAGES[1];
+const lookOf = c => { const s = (c && c.look && c.look !== "auto") ? STAGES.find(s => s.id === c.look) : c ? stageKid(c) : STAGES[1]; return s?.id === "adulte" ? STAGES.find(x => x.id === "ado") : s; };
 
 /* ---------- moteur OMS (LMS) ---------- */
 const MEAS = { weight:{label:"Poids", unit:"kg", dp:2}, height:{label:"Taille", unit:"cm", dp:1}, ofc:{label:"Périmètre crânien", unit:"cm", dp:1}, bmi:{label:"IMC", unit:"kg/m²", dp:1} };
@@ -187,7 +187,7 @@ function normalize(){
   S.children.forEach(c => { const b = blankKid(); for (const k in b) if (c[k] === undefined) c[k] = b[k]; });
   if (!S.family.members.length) S.family.members = [{id:"m_"+uid(), name:T("Moi"), role:"parent", color:"lilac", avatar:{kind:"symbole", id:"coeur"}}];
   if (!S.me || !S.family.members.some(m => m.id === S.me)) S.me = S.family.members[0].id;
-  S.children.forEach(c => { if (!S.family.members.some(m => m.kidId === c.id) && ageMonths(c) >= 36) S.family.members.push({id:"m_"+c.id, name:c.nick||c.name, role:"enfant", kidId:c.id, color:c.color}); });
+  S.children.forEach(c => { if (!c.adult && !S.family.members.some(m => m.kidId === c.id) && ageMonths(c) >= 36) S.family.members.push({id:"m_"+c.id, name:c.nick||c.name, role:"enfant", kidId:c.id, color:c.color}); });
 }
 function loadLocal(){
   try { const r = localStorage.getItem(KEY); if (r) return JSON.parse(r); } catch(e){}
@@ -204,7 +204,8 @@ const kidById = id => S.children.find(c => c.id === id);
 const member = id => S.family.members.find(m => m.id === id);
 const me = () => member(S.me) || S.family.members[0];
 const feat = k => S.settings.features[k] !== false;
-const mod = (c, k) => { const o = c.modules?.[k]; if (o === true || o === false) return o; const M = MODULES.find(x => x.k === k); return M ? M.def(isPrenatal(c) ? -1 : ageMonths(c)) : true; };
+const ADULT_MODS = ["solids","sports","reading","screen","mood"];
+const mod = (c, k) => { const o = c.modules?.[k]; if (o === true || o === false) return o; if (c.adult) return ADULT_MODS.includes(k); const M = MODULES.find(x => x.k === k); return M ? M.def(isPrenatal(c) ? -1 : ageMonths(c)) : true; };
 
 /* ---------- contrôle parental ---------- */
 const isKidUser = () => S.settings.parental.kidMode || me()?.role === "enfant";
@@ -250,6 +251,9 @@ function dayTotals(c, d){
     if (l.type === "solid"){ T.meals++; (l.data.items||[]).forEach(it => T.groups[it.group||"autres"] = (T.groups[it.group||"autres"]||0) + 1); }
     if (l.type === "trk"){ const id = l.data.tid; T.trk[id] = (T.trk[id]||0) + (Number(l.data.v)||1); }
   });
+  // sports à l'horaire : comptés automatiquement (sauf si marqués « pas fait »)
+  const ds = iso(d); T.sport = 0;
+  if (d <= today()) (c.activities||[]).forEach(a => { if (!a.dur || a.auto === false || !a.days.map(Number).includes(d.getDay()) || (a.since && ds < a.since) || (c.sportSkip||{})[a.id+"|"+ds]) return; T.act += a.dur; T.sport += a.dur; });
   return T;
 }
 /* objectifs : valeur personnalisée ou recommandation de l'âge */

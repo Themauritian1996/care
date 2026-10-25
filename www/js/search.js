@@ -30,7 +30,7 @@ function searchIndex(){
   return out;
 }
 function searchSheet(){
-  UI.sq = UI.sq || ""; UI.scat = UI.scat || "all";
+  UI.sq = ""; UI.scat = "all";
   sheet(`${sheetHead(T("Rechercher"))}<input class="inp" id="sq" type="search" placeholder="${T("Un mot : brocoli, vaccin, fête, histoire, sieste…")}" value="${esc(UI.sq)}" autocomplete="off" enterkeyhint="search">
     <div class="pick" id="scats">${SEARCH_CATS.map(([k,l]) => `<button data-act="searchCat" data-v="${k}" aria-pressed="${UI.scat===k}">${T(l)}</button>`).join("")}</div><div id="sres"></div>`, "wide");
   UI.sidx = searchIndex(); searchRun(); setTimeout(() => $("#sq")?.focus(), 80);

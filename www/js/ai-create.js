@@ -37,7 +37,7 @@ function createPane(){
       <button class="btn kid" type="submit">${icon("spark")}${T("Créer la recette")}</button>`;
   if (k === "plan") f = `${fld("pl-a",T("Contraintes (facultatif)"),inp("pl-a","",`placeholder="${T("Végé, budget serré, soupers en 20 min…")}"`))}<button class="btn kid" type="submit">${icon("spark")}${T("Créer le menu")}</button>`;
   if (k === "ideas") f = `<div class="field"><label>${T("Où ?")}</label>${radios("id-where",[["dedans",T("À l'intérieur")],["dehors",T("Dehors")],["sortie",T("Sortie près de chez nous")]],"dedans")}</div>
-      ${fld("id-city",T("Ville ou quartier (pour les sorties)"),inp("id-city",S.settings.city||"Montréal",""))}
+      ${fld("id-city",T("Ville, code postal ou adresse (pour les sorties)"),addrInput("id-city", S.settings.city||"Montréal"))}
       <div class="field"><label>${T("Temps disponible")}</label>${radios("id-time",[["15",T("15 min")],["60",T("1 h")],["jour",T("Une journée")]],"60")}</div><button class="btn kid" type="submit">${icon("spark")}${T("Trouver des idées")}</button>`;
   if (k === "talk") f = `${fld("tk-a",T("Sujet"),inp("tk-a","",`placeholder="${T("Ex. : parler de la mort de grand-papa")}" required`))}<button class="btn kid" type="submit">${icon("spark")}${T("Préparer")}</button>`;
   return `<div class="create-grid">${Object.entries(CREATE_KINDS).map(([id,x]) => `<button class="create-tile" data-act="createKind" data-v="${id}" aria-pressed="${id===k}">${icon(x.ic)}<b>${T(x.l)}</b></button>`).join("")}</div>
@@ -70,8 +70,8 @@ function storyPick(i){
   $("#storyPlan").innerHTML = `<div class="stack" style="gap:10px;margin-top:10px">${fld("st-plan",T("Plan de l'histoire (modifiez librement)"),`<textarea class="inp" id="st-plan" rows="4">${esc(`${x.title}\n${x.pitch}\n${T("Personnages")} : ${x.characters}`)}</textarea>`)}<button type="button" class="btn kid" data-act="storyWrite">${icon("spark")}${T("Écrire le chapitre 1")}</button></div>`;
   $("#st-plan").scrollIntoView({block:"center", behavior:"smooth"});
 }
-function storyGen(story, plan, direction){
-  const c = kidById(story?.kid) || aiKidNow(), o = story?.opts || UI.storyOpts || storyOpts(), n = (story?.chapters.length || 0) + 1;
+function storyGen(story, plan, direction, over = {}){
+  const c = kidById(story?.kid) || aiKidNow(), o = {...(story?.opts || UI.storyOpts || storyOpts()), ...over}, n = (story?.chapters.length || 0) + 1;
   const words = Math.round((o.len||3) * 120);
   const title = story ? T("{t} · chapitre {n}",{t:story.title, n}) : T("Nouvelle histoire");
   return aiJob("story", title, async () => {
@@ -99,7 +99,7 @@ function storiesPane(){
   const mode = UI.stMode || "stories", fav = !!UI.stFav, list = (S.stories||[]).filter(s => !fav || s.fav);
   let h = `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><div class="seg" style="width:auto"><button data-act="stMode" data-v="stories" aria-pressed="${mode==="stories"}">${T("Par histoire")}</button><button data-act="stMode" data-v="chars" aria-pressed="${mode==="chars"}">${T("Personnages")}</button></div><div class="row"><button class="btn sm ghost" data-act="stFav" aria-pressed="${fav}">${icon("star")}${T("Favoris")}</button><button class="btn sm kid" data-act="createKind" data-v="story">${icon("plus")}${T("Nouvelle")}</button></div></div></div>`;
   if (!list.length) return h + `<div class="card">${empty("moon", T("Vos histoires apparaîtront ici, avec leurs chapitres et leurs personnages."))}</div>`;
-  if (mode === "stories") return h + list.map(s => `<button class="card story-card" data-act="storyOpen" data-v="${s.id}"><div class="row between"><div class="grow" style="min-width:0"><span class="eyebrow">${s.kid&&kidById(s.kid)?esc(kidById(s.kid).nick||kidById(s.kid).name)+" · ":""}${T("{n} chapitre(s)",{n:s.chapters.length})}</span><h3>${esc(s.title)}</h3></div>${s.fav?icon("star").replace('fill="none"','fill="currentColor"').replace("<svg",'<svg style="width:20px;height:20px;color:var(--butter-ink)"'):""}</div><p class="small muted clamp2">${esc(s.chapters.at(-1)?.summary||"")}</p><div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.filter(x => x.id !== "narr").map(x => `<span class="chip ${chColor(s, x.id)}">${esc(x.name)}</span>`).join("")}</div></button>`).join("");
+  if (mode === "stories") return h + list.map(s => `<div class="story-row"><button class="card story-card" data-act="storyOpen" data-v="${s.id}"><div class="row between"><div class="grow" style="min-width:0"><span class="eyebrow">${s.kid&&kidById(s.kid)?esc(kidById(s.kid).nick||kidById(s.kid).name)+" · ":""}${T("{n} chapitre(s)",{n:s.chapters.length})}</span><h3>${esc(s.title)}</h3></div>${s.fav?icon("star").replace('fill="none"','fill="currentColor"').replace("<svg",'<svg style="width:20px;height:20px;color:var(--butter-ink)"'):""}</div><p class="small muted clamp2">${esc(s.chapters.at(-1)?.summary||"")}</p><div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.filter(x => x.id !== "narr").map(x => `<span class="chip ${chColor(s, x.id)}">${esc(x.name)}</span>`).join("")}</div></button><button class="story-next" data-act="storyNextSheet" data-v="${s.id}" aria-label="${T("Chapitre suivant")}">${icon("spark")}<span>${T("Chapitre {n}",{n:s.chapters.length+1})}</span></button></div>`).join("");
   return h + list.map(s => `<div class="card"><div class="card-h"><h3>${esc(s.title)}</h3><button class="btn sm ghost" data-act="storyOpen" data-v="${s.id}">${T("Ouvrir")}</button></div><div class="list">${s.characters.map(x => `<button class="li" data-act="charForm" data-v="${s.id}|${x.id}"><div class="ic" style="background:var(--${chColor(s,x.id)}-bg, var(--surface2));color:var(--${chColor(s,x.id)}-ink, var(--ink))">${icon(x.id==="narr"?"book":"user")}</div><div class="grow"><div class="li-title">${esc(x.name)}${x.fav?" ★":""}</div><div class="small muted">${esc(x.desc||T("Narrateur"))} · ${T("voix")} ${esc((s.engine==="gemini"?x.voice?.gv:voiceLabel(x.voice?.dv))||T("auto"))}</div></div>${icon("sliders")}</button>`).join("")}</div></div>`).join("");
 }
 function storyOpen(id){
@@ -111,10 +111,75 @@ function storyOpen(id){
     <p class="tiny muted">${s.engine==="gemini" ? T("Voix naturelles générées par Gemini (quelques secondes par réplique, utilise votre clé).") : T("Voix intégrées au téléphone : instantanées et gratuites. Réglez la voix de chaque personnage ci-dessous.")}</p>
     <div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.map(x => `<button class="chip ${chColor(s,x.id)}" data-act="charForm" data-v="${id}|${x.id}">${icon("sliders").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${esc(x.name)}</button>`).join("")}</div>
     ${s.chapters.map((ch, ci) => `<div class="chapter"><div class="row between"><h3>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h3><button class="btn sm kid" data-act="storyPlay" data-v="${id}|${ci}">${icon(playing && PL.ch === ci ? "pause" : "play")}${playing && PL.ch === ci ? T("Arrêter") : T("Écouter")}</button></div>
+      ${ch.img ? `<img class="story-img" data-stimg="${ch.img}" alt="${esc(ch.title)}">` : ""}<div class="row" style="gap:6px"><button class="btn sm ghost" data-act="storyImg" data-v="${id}|${ci}">${icon("camera")}${ch.img?T("Nouvelle image"):T("Illustrer ce chapitre")}</button></div>
       ${ch.segs.map((sg, si) => `<p class="seg-line ${sg.c==="narr"?"narr":""}" id="sg-${ci}-${si}">${sg.c!=="narr"?`<b class="who" style="color:var(--${chColor(s,sg.c)}-ink)">${esc(s.characters.find(x=>x.id===sg.c)?.name||"")}</b> `:""}${esc(sg.t)}</p>`).join("")}</div>`).join("")}
     <div class="card tint"><h3>${T("Chapitre suivant")}</h3><div class="stack" style="gap:10px">${fld("st-dir",T("Où va l'histoire ? (facultatif)"),inp("st-dir","",`placeholder="${T("Ex. : ils trouvent une carte au trésor")}"`))}
       <div class="row" style="flex-wrap:wrap"><button class="btn ghost" data-act="storyNextIdeas" data-v="${id}">${icon("bulb")}${T("Proposer des suites")}</button><button class="btn kid" data-act="storyNext" data-v="${id}">${icon("spark")}${T("Écrire le chapitre {n}",{n:s.chapters.length+1})}</button></div><div id="nextIdeas"></div></div></div>
     <div class="row"><button class="btn ghost" data-act="storyShare" data-v="${id}">${icon("share")}${T("Partager")}</button>${feat("memories")?`<button class="btn ghost" data-act="storyKeep" data-v="${id}">${icon("star")}${T("Garder dans les souvenirs")}</button>`:""}<button class="btn danger" data-act="storyDel" data-v="${id}">${icon("trash")}</button></div>`, "wide");
+  $$("#layer img[data-stimg]").forEach(async im => { const d = await PhotoDB.get(im.dataset.stimg); if (d) im.src = d; else im.remove(); });
+}
+/* page « chapitre suivant » : précisions ou surprise */
+function storyNextSheet(id){
+  const s = S.stories.find(x => x.id === id); if (!s) return; const o = s.opts || {};
+  sheet(`<form class="stack" data-form="storyNextGo" data-id="${id}" style="gap:12px">${sheetHead(T("{t} · chapitre {n}",{t:esc(s.title), n:s.chapters.length+1}))}
+    <p class="small muted clamp2">${esc(s.chapters.at(-1)?.summary||"")}</p>
+    ${fld("sn-dir",T("Où va l'histoire ? (facultatif)"),inp("sn-dir","",`placeholder="${T("Ex. : ils trouvent une carte au trésor")}"`))}
+    <div id="nextIdeas"></div><button type="button" class="btn sm ghost" data-act="storyNextIdeas" data-v="${id}">${icon("bulb")}${T("Proposer des suites")}</button>
+    ${fld("sn-new",T("Nouveau personnage (facultatif)"),inp("sn-new","",`placeholder="${T("Ex. : un hibou qui a peur du noir")}"`))}
+    <div class="field"><label>${T("Ambiance")}</label>${checks("sn-mood", MOODS.map(x => [x, T(x)]), o.moods?.length ? o.moods : ["Doux"])}</div>
+    <div class="field"><label>${T("Longueur")}</label>${radios("sn-len",[["3",T("3 minutes")],["6",T("6 minutes")],["10",T("10 minutes")]], String(o.len||3))}</div>
+    <label class="switch"><input type="checkbox" id="sn-img"><span class="tg"></span><span class="grow">${T("Illustrer le chapitre (image)")}</span></label>
+    <div class="row" style="flex-wrap:wrap"><button type="button" class="btn ghost" data-act="storySurprise" data-v="${id}">${icon("auto")}${T("Surprise !")}</button><button class="btn kid grow" type="submit">${icon("spark")}${T("Écrire le chapitre {n}",{n:s.chapters.length+1})}</button></div></form>`);
+}
+function storyNextRun(id, surprise){
+  const s = S.stories.find(x => x.id === id); if (!s) return;
+  const dir = surprise ? T("surprends-nous : une suite inattendue mais douce") : [val("sn-dir"), val("sn-new") ? `introduis ce nouveau personnage : ${val("sn-new")}` : ""].filter(Boolean).join(" ; ");
+  const over = surprise ? {} : {moods:checked("sn-mood"), len:+radio("sn-len") || s.opts?.len || 3}, img = !!$("#sn-img")?.checked;
+  closeSheet(); const n = s.chapters.length;
+  const p = storyGen(s, null, dir, over);
+  if (img) Promise.resolve(p).then(() => { const t = setInterval(() => { if (s.chapters.length > n){ clearInterval(t); storyImage(id, n, true); } }, 1500); setTimeout(() => clearInterval(t), 180000); });
+}
+/* ---------- images d'histoire (modèle image de Gemini) ---------- */
+async function imageModels(){
+  if (S.settings.ai.imgModels?.at && Date.now() - S.settings.ai.imgModels.at < 7*864e5) return S.settings.ai.imgModels.list;
+  let list = [];
+  try { const d = await (await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {headers:{"x-goog-api-key":aiKey()}})).json();
+    list = (d.models||[]).filter(m => /image/i.test(m.name) && /gemini/i.test(m.name) && (m.supportedGenerationMethods||[]).includes("generateContent")).map(m => m.name.replace(/^models\//, ""))
+      .sort((a, b) => (parseFloat(b.match(/(\d+(\.\d+)?)/)?.[1])||0) - (parseFloat(a.match(/(\d+(\.\d+)?)/)?.[1])||0)); } catch(e){}
+  list = [...new Set([...list, "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"])];
+  S.settings.ai.imgModels = {at:Date.now(), list}; save(); return list;
+}
+async function storyLooks(s){
+  const need = s.characters.filter(x => x.id !== "narr" && !x.look); if (!need.length) return;
+  const schema = {type:"OBJECT", properties:{looks:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, look:{type:"STRING"}}, required:["name","look"]}}}, required:["looks"]};
+  const r = await gemini({tier:"fast", json:schema, temperature:0.4, contents:[{role:"user", parts:[{text:`Histoire pour enfants « ${s.title} ». Pour chaque personnage, écris une description visuelle fixe et précise en anglais (espèce, âge, taille, couleurs de peau/pelage/cheveux, coiffure, vêtements et accessoires toujours portés), pour qu'un illustrateur le dessine toujours pareil. Personnages : ${need.map(x => `${x.name} (${x.kind}) : ${x.desc}`).join(" ; ")}. Résumé : ${s.chapters.map(c => c.summary).join(" ")}`}]}]});
+  (parseJSON(r.text).looks||[]).forEach(l => { const ch = s.characters.find(x => x.name.toLowerCase() === String(l.name).toLowerCase()); if (ch) ch.look = l.look; });
+  need.forEach(ch => { if (!ch.look) ch.look = ch.desc || ch.name; }); s.style = s.style || "soft watercolor children's picture book illustration, warm gentle light, rounded friendly shapes"; save();
+}
+function storyImage(sid, ci, quiet){
+  const s = S.stories.find(x => x.id === sid), ch = s?.chapters[+ci]; if (!ch) return;
+  return aiJob("story", T("Image · {t}",{t:ch.title}), async () => {
+    await storyLooks(s);
+    const prevCh = s.chapters.slice(0, +ci).reverse().find(x => x.img) || s.chapters.find((x, i) => i !== +ci && x.img), ref = prevCh ? await PhotoDB.get(prevCh.img) : null;
+    const who = s.characters.filter(x => x.id !== "narr" && ch.segs.some(sg => sg.c === x.id) || x.desc === T("le héros")).filter(x => x.look);
+    const cast = (who.length ? who : s.characters.filter(x => x.id !== "narr" && x.look)).slice(0, 5);
+    const prompt = `${s.style}. One single illustration for the chapter "${ch.title}" of the bedtime story "${s.title}". Scene: ${ch.summary}. Characters (draw them EXACTLY like this, same look in every picture): ${cast.map(x => `${x.name}: ${x.look}`).join(" | ")}. ${ref ? "Keep the characters' appearance and the art style identical to the reference image provided." : ""} No text, no letters, no words in the image. Child-friendly, calm.`;
+    const parts = [...(ref ? [{inline_data:{mime_type:"image/jpeg", data:ref.split(",")[1]}}] : []), {text:prompt}];
+    let lastErr;
+    for (const model of await imageModels()){
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {method:"POST", headers:{"Content-Type":"application/json", "x-goog-api-key":aiKey()}, body:JSON.stringify({contents:[{role:"user", parts}], generationConfig:{responseModalities:["IMAGE","TEXT"]}})});
+        const d = await r.json(); if (!r.ok) throw new Error(d.error?.message || `Gemini ${r.status}`);
+        const img = (d.candidates?.[0]?.content?.parts||[]).find(p => p.inlineData || p.inline_data); const id2 = img?.inlineData || img?.inline_data;
+        if (!id2?.data) throw new Error(d.candidates?.[0]?.finishReason || T("pas d'image"));
+        const small = await shrinkImage(`data:${id2.mimeType||id2.mime_type||"image/png"};base64,${id2.data}`, 1024, 0.85);
+        if (ch.img) await PhotoDB.del(ch.img).catch(() => {});
+        ch.img = "stimg-" + uid(); await PhotoDB.put(ch.img, small); ch.imgModel = model; save();
+        return {open:() => storyOpen(sid)};
+      } catch(e){ lastErr = e; AI_LAST_ERR = `${model} : ${e.message}`.slice(0, 300); if (/API_KEY_INVALID|PERMISSION_DENIED/i.test(e.message)) break; }
+    }
+    throw new Error(T("Image impossible : {e}",{e:lastErr?.message||"?"}));
+  }, {kid:s.kid, open:() => storyOpen(sid)});
 }
 async function storyNextIdeas(id){
   const s = S.stories.find(x => x.id === id), box = $("#nextIdeas");
@@ -260,10 +325,12 @@ Object.assign(ACT, {
   storyEngine: v => { const s = S.stories.find(x => x.id === UI.storyId); s.engine = v; save(); stopPlay(); storyOpenKeepScroll(s.id); },
   storyPlay: v => { const [sid, ci] = v.split("|"); if (PL.on && PL.story === sid && PL.ch === +ci){ stopPlay(); storyOpenKeepScroll(sid); } else playChapter(sid, +ci); },
   storyNext: v => { const s = S.stories.find(x => x.id === v); storyGen(s, null, val("st-dir")); },
-  storyNextIdeas: v => storyNextIdeas(v), storyDir: v => { const i = $("#st-dir"); if (i){ i.value = v; i.focus(); } },
+  storyNextIdeas: v => storyNextIdeas(v), storyDir: v => { const i = $("#sn-dir") || $("#st-dir"); if (i){ i.value = v; i.focus(); } },
+  storyNextSheet: v => storyNextSheet(v), storySurprise: v => storyNextRun(v, true),
+  storyImg: v => { const [sid, ci] = v.split("|"); storyImage(sid, +ci); },
   storyShare: v => { const s = S.stories.find(x => x.id === v); Native.share({title:s.title, text:`${s.title}\n\n${s.chapters.map(ch => `${T("Chapitre {n}",{n:ch.n})} · ${ch.title}\n\n${ch.segs.map(sg => (sg.c!=="narr"?`${s.characters.find(x=>x.id===sg.c)?.name} : `:"") + sg.t).join("\n")}`).join("\n\n")}`}); },
-  storyKeep: v => { const s = S.stories.find(x => x.id === v); S.memories.push({id:uid(), kind:"story", date:iso(today()), title:s.title, text:s.chapters.map(ch => `## ${ch.title}\n${ch.segs.map(sg => sg.t).join("\n")}`).join("\n\n"), kidIds:s.kid?[s.kid]:[]}); save(); toast(T("Souvenir enregistré")); },
-  storyDel: v => { if (!confirmDel()) return; stopPlay(); S.stories = S.stories.filter(x => x.id !== v); closeSheet(); commit(); },
+  storyKeep: v => { const s = S.stories.find(x => x.id === v); S.memories.push({id:uid(), kind:"story", date:iso(today()), title:s.title, text:s.chapters.map(ch => `## ${ch.title}\n${ch.segs.map(sg => sg.t).join("\n")}`).join("\n\n"), kidIds:s.kid?[s.kid]:[]}); save(); driveQ("mem", S.memories.at(-1).id); toast(T("Souvenir enregistré")); },
+  storyDel: v => { if (!confirmDel()) return; stopPlay(); (S.stories.find(x => x.id === v)?.chapters||[]).forEach(ch => ch.img && PhotoDB.del(ch.img).catch(() => {})); S.stories = S.stories.filter(x => x.id !== v); closeSheet(); commit(); },
   charForm: v => charForm(v),
   charTest: async v => { const vc = readVoice(), txt = LANG === "en" ? "Hello! Here is my voice for the story." : "Bonjour ! Voici ma voix pour l'histoire."; stopPlay();
     try { if (v === "gemini"){ toast(T("Génération de la voix…")); const url = await TTS.gemini(txt, vc); const a = new Audio(url); PL.audio = a; a.play(); } else await TTS.speakDevice(txt, vc); } catch(e){ toast(e.message); } },
@@ -293,3 +360,4 @@ Object.assign(FORMS, {
     if (cid !== "narr"){ ch.name = val("cv-name") || ch.name; ch.desc = val("cv-desc"); } ch.fav = $("#cv-fav").checked; ch.voice = readVoice(); save(); toast(T("Voix enregistrée")); storyOpen(sid); },
 });
 Object.assign(CHANGE, { rcQ: t => { UI.rcQ = t.value; render(); } });
+Object.assign(FORMS, { storyNextGo: f => storyNextRun(f.dataset.id, false) });

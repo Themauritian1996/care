@@ -313,7 +313,7 @@ td{padding:9px 8px;border-top:1px solid var(--line);font-variant-numeric:tabular
 .kbd-num{font-family:var(--display);font-weight:600}
 .pre{white-space:pre-wrap;font-size:.86rem;background:var(--surface2);border-radius:14px;padding:14px;max-height:420px;overflow:auto;font-variant-numeric:tabular-nums}
 .phone{font-family:var(--display);font-size:1.45rem;font-weight:600;user-select:all}
-.weekbars{display:grid;grid-template-columns:repeat(var(--n,7),1fr);gap:5px;align-items:end;height:96px;position:relative}
+.weekbars{display:grid;grid-template-columns:repeat(var(--n,7),minmax(0,1fr));gap:5px;align-items:end;height:96px;position:relative}
 .weekbars .wb{display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end;min-width:0}
 .weekbars .wb i{width:100%;max-width:26px;border-radius:7px 7px 3px 3px;min-height:3px}
 .weekbars .wb span{font-size:.66rem;color:var(--muted);font-weight:700;height:14px}
@@ -468,3 +468,36 @@ a.place:hover{text-decoration:underline}
 .mday .tiny{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .mday.today{border-color:var(--line)}
 .mday.on{background:var(--kid-bg);border-color:var(--kid);color:var(--kid-ink)}
+/* saisie avec suggestions */
+.ac-wrap{position:relative;display:flex;align-items:center;gap:6px;min-width:0}
+.ac-wrap .inp{flex:1;min-width:0}
+.ac-map{flex:none;width:42px;height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--teal-ink);display:grid;place-items:center;cursor:pointer}
+.ac-map svg{width:20px;height:20px}
+.ac-pop{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:80;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 30px -8px rgba(20,10,40,.35);max-height:260px;overflow:auto;padding:4px}
+.ac-opt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;padding:9px 10px;border-radius:10px;cursor:pointer;color:var(--ink);font:inherit}
+.ac-opt:hover,.ac-opt:focus{background:var(--surface2)}
+.ac-opt svg{width:16px;height:16px;flex:none;color:var(--teal-ink)}
+.ac-opt span{display:flex;flex-direction:column;min-width:0}
+.ac-opt small{color:var(--muted);font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* corrections : rien ne rétrécit dans les feuilles (tableaux coupés), titres longs, boutons longs */
+.sheet>*{flex-shrink:0}
+h1,h2,h3{overflow-wrap:anywhere;min-width:0}
+.btn.wrap{white-space:normal;text-align:left;justify-content:flex-start;line-height:1.3}
+/* croissance */
+.gtiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.gtile{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px;border-radius:16px;border:2px solid transparent;background:var(--surface2);cursor:pointer;color:inherit;font:inherit;text-align:left;min-width:0}
+.gtile b{font-family:var(--display);font-size:1.35rem;line-height:1}
+.gtile b small{font-size:.8rem;color:var(--muted);font-weight:500}
+.gtile.on{border-color:var(--kid);background:var(--kid-bg)}
+.gchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.gchip{display:inline-flex;flex-direction:column;padding:6px 10px;border-radius:12px;background:var(--surface2);min-width:0;line-height:1.25}
+.gchip small{font-size:.68rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.gchip b{font-size:.92rem}
+.gchip em{font-style:normal;font-size:.72rem;color:var(--kid-ink);font-weight:700}
+.chart-wrap{touch-action:pan-y}
+#chartBig{touch-action:none}
+.mitem{border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.mitem.off{opacity:.5}.mitem.off b{text-decoration:line-through}
+.story-row{display:flex;gap:8px;align-items:stretch}.story-row>.story-card{flex:1;min-width:0}
+.story-next{flex:0 0 auto;width:64px;border-radius:18px;border:1px solid var(--line);background:var(--lilac-bg,var(--surface2));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:.7rem;font-weight:700;color:var(--ink);padding:6px;text-align:center}
+.story-img{width:100%;border-radius:16px;object-fit:cover;aspect-ratio:4/3;max-height:340px}

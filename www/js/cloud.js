@@ -247,8 +247,9 @@ if (cfg && cfg.apiKey){
     C.googleToken = A.GoogleAuthProvider.credentialFromResult(r)?.accessToken; C.tokenAt = Date.now(); return C.googleToken;
   }
   async function driveFolder(tok){
+    const name = DRIVE_ROOT;
+    if (S.settings.driveRoot !== name){ S.settings.driveFolder = null; S.settings.driveDirs = {}; S.settings.driveRoot = name; }
     if (S.settings.driveFolder) return S.settings.driveFolder;
-    const name = `${appName()} – ${T("Souvenirs")}`;
     const q = encodeURIComponent(`name='${name.replace(/'/g,"\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
     const l = await (await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {headers:{Authorization:"Bearer "+tok}})).json();
     let id = l.files?.[0]?.id;
@@ -264,6 +265,10 @@ if (cfg && cfg.apiKey){
     if (!id){ const r = await (await fetch("https://www.googleapis.com/drive/v3/files", {method:"POST", headers:{Authorization:"Bearer "+tok, "Content-Type":"application/json"}, body:JSON.stringify({name, mimeType:"application/vnd.google-apps.folder", parents:[parent]})})).json(); id = r.id; }
     if (!id) throw new Error("Drive"); dirs[key] = id; save(); return id;
   }
+  C.driveReady = () => !!C.googleToken && Date.now() - C.tokenAt < 50*60e3;
+  C.driveDelete = async id => { if (!id) return; const tok = await driveToken();
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`, {method:"DELETE", headers:{Authorization:"Bearer "+tok}});
+    if (!r.ok && r.status !== 404 && r.status !== 403){ if (r.status === 401) C.googleToken = null; throw new Error(`Drive ${r.status}`); } };
   C.driveUpload = async (name, mime, base64, description = "", path = []) => {
     const tok = await driveToken(); if (!tok) throw new Error(T("Connexion Google requise"));
     let folder = await driveFolder(tok); for (const p of path.filter(Boolean)) folder = await driveSub(tok, folder, String(p).replace(/[\/]/g, "-").slice(0, 100));

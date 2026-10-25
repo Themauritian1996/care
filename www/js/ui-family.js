@@ -24,7 +24,7 @@ function allEvents(from = addDays(today(), -60), to = addDays(today(), 400)){
     const b = parseD(c.dob), y = today().getFullYear();
     [y, y+1].forEach(yy => { const d = new Date(yy, b.getMonth(), b.getDate()); if (d > b) ev.push({id:"b"+c.id+yy, date:iso(d), title:T("Anniversaire de {n} · {a} an(s)",{n:nm, a:yy-b.getFullYear()}), type:"anniv", auto:true, kidIds:[c.id]}); });
     const nv = nextVisit(c); if (nv && !S.events.some(e => e.type==="medecin" && (e.kidIds||[]).includes(c.id) && Math.abs(parseD(e.date) - nv.date) < 45*DAY)) ev.push({id:"vis"+c.id, date:iso(nv.date), title:T("Visite de suivi à planifier · {n}",{n:nm}), type:"visite", auto:true, kidIds:[c.id]});
-    if (mod(c,"sports")) (c.activities||[]).forEach(a => { for (let i = -7; i <= 60; i++){ const d = addDays(today(), i); if (a.days.map(Number).includes(d.getDay())) ev.push({id:"a"+a.id+iso(d), date:iso(d), time:a.time, title:`${a.name} · ${nm}`, type:"sport", auto:true, kidIds:[c.id]}); } });
+    if (mod(c,"sports")) (c.activities||[]).forEach(a => { for (let i = -7; i <= 60; i++){ const d = addDays(today(), i); if (a.days.map(Number).includes(d.getDay())) ev.push({id:"a"+a.id+iso(d), date:iso(d), time:a.time, title:`${a.name} · ${nm}${a.dur?` · ${fmtMin(a.dur)}`:""}`, type:"sport", auto:true, kidIds:[c.id], place:a.place, sport:`${c.id}|${a.id}|${iso(d)}`}); } });
   });
   if (feat("memories")) S.memories.forEach(m => ev.push({id:"mem"+m.id, date:m.date, title:m.title, type:"souvenir", auto:true, memId:m.id}));
   if (feat("photos")) S.photos.forEach(p => ev.push({id:"ph"+p.id, date:p.date, title:p.caption || T("Photo du jour"), type:"photo", auto:true, photoId:p.id}));
@@ -37,7 +37,7 @@ function eventRow(e){
   const who = (e.kidIds||[]).map(id => kidById(id)).filter(Boolean).map(k => k.nick||k.name).concat((e.memberIds||[]).map(id => member(id)?.name).filter(Boolean));
   const act = e.memId ? `data-act="openMemory" data-v="${e.memId}"` : e.photoId ? `data-act="openPhoto" data-v="${e.photoId}"` : e.kidEv ? `data-act="kidEventForm" data-v="${e.id}"` : e.auto ? "" : `data-act="eventForm" data-v="edit:${e.id}"`;
   return `<div class="li" ${act} style="${act?"cursor:pointer":""}"><div class="ic" style="background:var(--${col}-bg);color:var(--${col}-ink);display:flex;flex-direction:column;justify-content:center;line-height:1"><b style="font-family:var(--display);font-size:1rem">${d.getDate()}</b><span style="font-size:.6rem;text-transform:uppercase;font-weight:700">${d.toLocaleDateString(LOCALE(),{month:"short"}).replace(".","")}</span></div>
-    <div class="grow"><div class="li-title">${e.pinned?icon("pin").replace("<svg",'<svg style="width:14px;height:14px;vertical-align:-2px"')+" ":""}${esc(e.title)}</div><div class="small muted">${T(lbl)}${e.time?` · ${e.time}`:""}${e.recur&&e.recur!=="none"?` · ${T({daily:"chaque jour",weekly:"chaque semaine",monthly:"chaque mois",yearly:"chaque année"}[e.recur])}`:""}${who.length?` · ${esc(who.join(", "))}`:""}</div>${e.place?`<div class="small">${placeLink(e.place)}</div>`:""}</div></div>`;
+    <div class="grow"><div class="li-title">${e.pinned?icon("pin").replace("<svg",'<svg style="width:14px;height:14px;vertical-align:-2px"')+" ":""}${esc(e.title)}</div><div class="small muted">${T(lbl)}${e.time?` · ${e.time}`:""}${e.recur&&e.recur!=="none"?` · ${T({daily:"chaque jour",weekly:"chaque semaine",monthly:"chaque mois",yearly:"chaque année"}[e.recur])}`:""}${who.length?` · ${esc(who.join(", "))}`:""}</div>${e.place?`<div class="small">${placeLink(e.place)}</div>`:""}</div>${e.sport && e.date <= iso(today()) ? (() => { const [cid, aid, ds] = e.sport.split("|"), c = kidById(cid), a = c?.activities.find(x => x.id === aid); if (!a?.dur || a.auto === false) return ""; const skip = (c.sportSkip||{})[aid+"|"+ds]; return `<button class="chip ${skip?"":"mint"}" data-act="sportToggle" data-v="${e.sport}" onclick="event.stopPropagation()">${skip?T("Pas fait"):"✓ "+T("Fait")}</button>`; })() : ""}</div>`;
 }
 
 /* ======== AGENDA ======== */
@@ -79,7 +79,7 @@ function eventForm(v){
   sheet(`<form class="stack" data-form="event" data-id="${e.id||""}" style="gap:14px">${sheetHead(e.id?T("Modifier"):T("Nouvel événement"))}
     ${fld("e-title",T("Titre"),inp("e-title",e.title,`required placeholder="${T("Ex. : souper chez grand-maman")}"`))}
     <div class="fgrid">${fld("e-date",T("Date"),inp("e-date",e.date,'type="date" required'))}${fld("e-time",T("Heure (facultatif)"),inp("e-time",e.time,'type="time"'))}</div>
-    ${fld("e-place",T("Adresse ou lieu (facultatif, ouvre la carte)"),inp("e-place",e.place||"",`placeholder="${T("Ex. : 4777 av. Pierre-De Coubertin, Montréal")}" autocomplete="street-address"`))}
+    ${fld("e-place",T("Adresse ou lieu (facultatif, ouvre la carte)"),addrInput("e-place", e.place||""))}
     <div class="field"><label>${T("Type")}</label>${radios("etype",["famille","medecin","dentiste","vaccin","garde","therapie","sport","note","autre"].map(k=>[k,T(EVT[k][1])]),e.type)}</div>
     <div class="field"><label>${T("Répéter")}</label>${radios("erecur",[["none",T("Jamais")],["daily",T("Chaque jour")],["weekly",T("Chaque semaine")],["monthly",T("Chaque mois")],["yearly",T("Chaque année")]],e.recur||"none")}</div>
     <label class="switch"><input type="checkbox" id="e-pin" ${e.pinned?"checked":""}><span class="tg"></span><span class="grow"><b>${T("Épingler (reste visible en haut de l'agenda)")}</b></span></label>
@@ -144,7 +144,7 @@ function availView(){
 function souvenirsView(){
   const tabs = [feat("photos")&&["photos",T("Photos")], feat("memories")&&["speciaux",T("Spéciaux")], feat("memories")&&["moments",T("Moments")]].filter(Boolean);
   if (!tabs.some(t=>t[0]===UI.sub.souv)) UI.sub.souv = tabs[0][0];
-  let h = tabs.length > 1 ? `<div class="seg">${tabs.map(([id,l])=>`<button data-act="souvTab" data-v="${id}" aria-pressed="${UI.sub.souv===id}">${l}</button>`).join("")}</div>` : "";
+  let h = (tabs.length > 1 ? `<div class="seg">${tabs.map(([id,l])=>`<button data-act="souvTab" data-v="${id}" aria-pressed="${UI.sub.souv===id}">${l}</button>`).join("")}</div>` : "") + driveBanner();
   if (UI.sub.souv === "speciaux") return h + specialView();
   if (UI.sub.souv === "photos"){
     const list = S.photos.filter(p => UI.photoCat === "all" || p.cat === UI.photoCat).sort((a,b)=>a.date<b.date?1:-1);
@@ -358,7 +358,7 @@ function kidEventForm(v){
   sheet(`<form class="stack" data-form="kidEvent" data-id="${isNew?"":e.id}" style="gap:14px">${sheetHead(isNew?T("Mon activité"):T("Activité d'enfant"))}
     ${fld("ke-t",T("Quoi ?"),inp("ke-t",e.title,`required placeholder="${T("Fête chez Zoé, pratique de soccer…")}" ${canEdit?"":"disabled"}`))}
     <div class="fgrid">${fld("ke-d",T("Date"),inp("ke-d",e.date,'type="date" required'))}${fld("ke-h",T("Heure"),inp("ke-h",e.time||"",'type="time"'))}</div>
-    ${fld("ke-p",T("Adresse ou lieu (facultatif)"),inp("ke-p",e.place||""))}${e.place?placeLink(e.place, T("Voir sur la carte")):""}
+    ${fld("ke-p",T("Adresse ou lieu (facultatif)"),addrInput("ke-p", e.place||""))}
     <div class="field"><label>${T("Répéter")}</label>${radios("ke-r",[["none",T("Jamais")],["weekly",T("Chaque semaine")]],e.recur||"none")}</div>
     ${!isKidUser() && kids.length ? `<div class="field"><label>${T("Pour qui ?")}</label>${radios("ke-by", kids.map(k => [k.id, k.name]), e.by || kids[0].id)}</div>` : ""}
     ${fld("ke-n",T("Notes (cadeau à apporter, transport…)"),`<textarea class="inp" id="ke-n">${esc(e.notes||"")}</textarea>`)}

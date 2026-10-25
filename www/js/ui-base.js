@@ -10,15 +10,19 @@ let toastT;
 function toast(msg){ clearTimeout(toastT); let el = $("#toast"); if (!el){ el = document.createElement("div"); el.id="toast"; el.className="toast"; el.setAttribute("role","status"); document.body.appendChild(el); } el.textContent = msg; el.hidden = false; toastT = setTimeout(()=>el.hidden = true, 2400); }
 function commit(msg){ save(); render(); if (msg) toast(msg); }
 function sheet(inner, cls=""){
-  const prev = $("#layer .sheet"), keep = prev && prev.dataset.key === (UI.sheetKey||"") ? prev.scrollTop : 0;
-  $("#layer").innerHTML = `<div class="scrim" data-act="closeSheet"><div class="sheet ${cls}" role="dialog" aria-modal="true" data-key="${UI.sheetKey||""}"><div class="sheet-grab"></div>${inner}</div></div>`;
+  const prev = $("#layer .sheet");
+  if (prev){ // mise à jour sur place : pas de nouvelle animation (évite l'effet transparent), garde la position si c'est la même fiche
+    const oldT = prev.querySelector("h2")?.textContent || "", top = prev.scrollTop;
+    prev.className = `sheet ${cls}`; prev.innerHTML = `<div class="sheet-grab"></div>${inner}`;
+    if ((prev.querySelector("h2")?.textContent || "") === oldT) prev.scrollTop = top; else prev.scrollTop = 0;
+  } else $("#layer").innerHTML = `<div class="scrim" data-act="closeSheet"><div class="sheet ${cls}" role="dialog" aria-modal="true"><div class="sheet-grab"></div>${inner}</div></div>`;
   centerPressed("#layer");
   if (!Native.isApp && window.matchMedia("(min-width:821px)").matches){ const f = $("#layer input:not([type=radio]):not([type=checkbox]):not([type=file]), #layer textarea"); if (f) setTimeout(()=>f.focus({preventScroll:true}), 60); }
 }
 /* barres défilantes : garde l'onglet choisi au centre (au lieu de revenir au début) */
 function centerPressed(root){
   $$(`${root} .ai-tabs, ${root} .seg, ${root} .pick, ${root} .chips-scroll`).forEach(el => {
-    if (el.scrollWidth <= el.clientWidth + 2) return; const on = el.querySelector('[aria-pressed="true"]'); if (!on) return;
+    if (el.scrollWidth <= el.clientWidth + 12) return; const on = el.querySelector('[aria-pressed="true"]'); if (!on) return;
     const a = el.getBoundingClientRect(), b = on.getBoundingClientRect(); el.scrollLeft += (b.left - a.left) - (a.width - b.width) / 2;
   });
 }
@@ -214,7 +218,7 @@ function plusView(){
         : Cloud.configured ? `<p class="small muted">${T("Créez un compte pour partager avec la famille, discuter, et retrouver vos données sur tous vos appareils.")}</p><button class="btn kid" data-act="showLogin">${T("Se connecter ou créer un compte")}</button>`
         : `<div class="banner soft">${icon("info")}<div class="small">${T("Les comptes seront actifs dès que la configuration Firebase sera ajoutée à l'app. Pour l'instant, tout reste sur cet appareil.")}</div></div>`}
       <div class="list">${row("memberForm","user",T("Mon profil"),T("Nom, avatar, couleur"),`data-v="${S.me}"`)}${row("familySheet","people",T("Ma famille"),T("Membres, invitation, rôles"))}</div>
-      ${Cloud.user ? `<div class="sep"></div><h3>${icon("drive").replace("<svg",'<svg style="width:18px;height:18px;vertical-align:-3px"')} Google Drive</h3>${Cloud.canDrive?.() ? `<p class="small muted">${T("Les souvenirs et photos envoyés vont dans le dossier « {f} » de votre Drive, classés par catégorie puis par date.",{f:`${esc(appName())} – ${T("Souvenirs")}`})}</p><div class="row" style="flex-wrap:wrap"><button class="btn sm kid" data-act="driveTest">${icon("drive")}${T("Tester Google Drive")}</button>${S.settings.driveFolder?`<a class="btn sm ghost" href="https://drive.google.com/drive/folders/${esc(S.settings.driveFolder)}" target="_blank" rel="noopener">${T("Ouvrir le dossier")}</a>`:""}</div><div id="driveOut" class="small">${S.settings.driveErr?`<span style="color:var(--danger)">${esc(S.settings.driveErr)}</span>`:""}</div>` : `<p class="small muted">${T("Pour copier les souvenirs dans Google Drive, connectez-vous avec Google (pas seulement par courriel).")}</p>`}` : ""}</div>
+      ${Cloud.user ? `<div class="sep"></div><h3>${icon("drive").replace("<svg",'<svg style="width:18px;height:18px;vertical-align:-3px"')} Google Drive</h3>${Cloud.canDrive?.() ? `<p class="small muted">${T("Photos, moments, spéciaux et histoires sont copiés dans le dossier « Tribe » de votre Drive (sous-dossiers Photos du jour, Moments, Spéciaux, Histoires). Une modification remplace la copie ; une suppression la retire du Drive. Les lettres scellées restent privées.")}</p><label class="switch"><input type="checkbox" data-change="driveAuto" ${S.settings.driveAuto!==false?"checked":""}><span class="tg"></span><span class="grow">${T("Copie automatique dans Google Drive")}</span></label>${driveBanner()}<div class="row" style="flex-wrap:wrap"><button class="btn sm ghost" data-act="driveAll">${icon("auto")}${T("Copier tout ce qui manque")}</button><button class="btn sm kid" data-act="driveTest">${icon("drive")}${T("Tester Google Drive")}</button>${S.settings.driveFolder?`<a class="btn sm ghost" href="https://drive.google.com/drive/folders/${esc(S.settings.driveFolder)}" target="_blank" rel="noopener">${T("Ouvrir le dossier")}</a>`:""}</div><div id="driveOut" class="small">${S.settings.driveErr?`<span style="color:var(--danger)">${esc(S.settings.driveErr)}</span>`:""}</div>` : `<p class="small muted">${T("Pour copier les souvenirs dans Google Drive, connectez-vous avec Google (pas seulement par courriel).")}</p>`}` : ""}</div>
     <div class="card c6"><div class="card-h"><h2>${T("Apparence")}</h2></div>
       <div class="field"><label>${T("Langue")}</label><div class="pick">${[["fr","Français"],["en","English"]].map(([k,l])=>`<button data-act="setLang" data-v="${k}" aria-pressed="${LANG===k}">${l}</button>`).join("")}</div></div>
       <div class="field"><label>${T("Unités")}</label><div class="stack" style="gap:6px">${[["w",T("Poids"),[["kg","kg"],["lb","lb"]]],["l",T("Taille"),[["cm","cm"],["in",T("pouces")]]],["v",T("Volumes"),[["ml","ml"],["oz","oz"]]],["t",T("Température"),[["C","°C"],["F","°F"]]]].map(([k,l,opts]) => `<div class="row" style="gap:8px"><span class="small muted" style="width:96px">${l}</span><div class="seg" style="width:auto">${opts.map(([v,lb]) => `<button data-act="setUnit" data-v="${k}:${v}" aria-pressed="${UN()[k]===v}">${lb}</button>`).join("")}</div></div>`).join("")}<p class="tiny muted">${T("Les courbes OMS restent calculées en métrique ; seul l'affichage change.")}</p></div></div>
@@ -266,7 +270,7 @@ function kidForm(id){
   const prenatal = pre || isPrenatal(c);
   UI.photoDraft = {kid: c.photo || null};
   sheet(`<form class="stack" data-form="kid" data-id="${S.children.includes(c)?c.id:""}" style="gap:14px">${sheetHead(S.children.includes(c)?T("Profil"):prenatal?T("Bébé à naître"):T("Nouvel enfant"))}
-    <div class="field"><label>${T("Statut")}</label>${radios("born",[["oui",T("Né·e")],["non",T("À naître")]], prenatal?"non":"oui")}</div>
+    <div class="field"><label>${T("Statut")}</label>${radios("born",[["oui",T("Né·e")],["non",T("À naître")],["adulte",T("Adulte (parent qui veut se suivre)")]], c.adult?"adulte":prenatal?"non":"oui")}<p class="tiny muted">${T("Un profil adulte permet au parent de montrer l'exemple : activités et sports, nutrition, lecture, écrans, humeur et défis.")}</p></div>
     <div class="fgrid">${fld("k-name",T("Prénom (ou surnom en attendant)"),inp("k-name",c.name,"required"))}${fld("k-nick",T("Surnom affiché (facultatif)"),inp("k-nick",c.nick||""))}</div>
     <div class="fgrid" id="bornFields" ${prenatal?"hidden":""}>${fld("k-dob",T("Date de naissance"),inp("k-dob",c.dob||"",`type="date" max="${iso(today())}"`))}${fld("k-gaw",T("Âge gestationnel (semaines)"),inp("k-gaw",c.gaW||40,'type="number" inputmode="numeric" min="22" max="44"'))}${fld("k-gad",T("+ jours"),inp("k-gad",c.gaD||0,'type="number" inputmode="numeric" min="0" max="6"'))}</div>
     <div class="fgrid" id="preFields" ${prenatal?"":"hidden"}>${fld("k-due",T("Date prévue d'accouchement"),inp("k-due",c.dueDate||"",'type="date"'))}</div>
@@ -319,7 +323,7 @@ function urgence(){
   const n = (l, num, sub, col) => `<div class="li"><div class="ic" style="background:var(--${col}-bg);color:var(--${col}-ink)">${icon("phone")}</div><div class="grow"><div class="small muted" style="font-weight:700">${l}</div><div class="phone num">${num}</div>${sub?`<div class="tiny muted">${sub}</div>`:""}</div><a class="btn sm ${col==="rose"?"danger":"ghost"}" href="tel:${num.replace(/[^0-9]/g,"")}">${T("Appeler")}</a></div>`;
   sheet(`${sheetHead(T("Urgence et ressources"))}
     <div class="banner alert">${icon("alert")}<div>${T("Difficulté à respirer, lèvres bleues, convulsion, perte de conscience, étouffement : <b>911</b> immédiatement.")}</div></div>
-    <button class="btn kid" data-act="firstAid" style="justify-content:flex-start">${icon("heart")}<span class="grow" style="text-align:left">${T("Premiers soins : RCR, étouffement, position de sécurité (selon l'âge)")}</span>${icon("right")}</button>
+    <button class="btn kid wrap" data-act="firstAid">${icon("heart")}<span class="grow" style="text-align:left">${T("Premiers soins : RCR, étouffement, position de sécurité (selon l'âge)")}</span>${icon("right")}</button>
     <div class="list">${n(T("Urgence"),"911","","rose")}${n(T("Info-Santé · Info-Social"),"811",T("Infirmière 24 h/24 (option 1), intervenant psychosocial (option 2)"),"sky")}${n(T("Centre antipoison du Québec"),"1-800-463-5060",T("24 h/24"),"butter")}${n("Tel-jeunes","1-800-263-2266",T("Pour les jeunes. Texto : 514-600-1002"),"lilac")}${n("LigneParents","1-800-361-5085",T("Soutien aux parents, 24 h/24"),"mint")}${n(T("Ligne de crise suicide"),"988",T("Appel ou texto, 24 h/24"),"rose")}</div>`);
 }
 
@@ -339,3 +343,15 @@ function onboardKids(){
     <div class="stack"><button class="btn kid" data-act="kidForm">${icon("kid")}${T("Ajouter un enfant")}</button><button class="btn ghost" data-act="kidForm" data-v="__pre">${icon("baby")}${T("Bébé à naître")}</button><button class="btn line" data-act="closeSheet">${T("Plus tard")}</button></div>`);
 }
 Object.assign(FORMS, { onboard: () => { const m = me(), n = val("ob-name"); if (!n) return toast(T("Votre prénom")); m.name = n; m.color = radio("obcolor") || m.color || "lilac"; if (val("ob-fam")) S.family.name = val("ob-fam"); S.settings.onboarded = true; save(); render(); if (!S.children.length) onboardKids(); else closeSheet(); } });
+
+/* aperçu en direct quand on change la couleur ou l'avatar d'un profil */
+document.addEventListener("change", e => {
+  const t = e.target; if (t.type !== "radio") return;
+  const form = t.closest("form"); if (!form) return;
+  const prefix = form.querySelector("#kidPrev") ? "kid" : form.querySelector("#memPrev") ? "mem" : null; if (!prefix) return;
+  if (!["color","mcolor",prefix+"av"].includes(t.name)) return;
+  const color = radio(prefix === "kid" ? "color" : "mcolor") || "peach", av = readAvatar(prefix);
+  const base = prefix === "kid" ? (S.children.find(k => k.id === form.dataset.id) || {dob:val("k-dob")||iso(today())}) : (member(form.dataset.id) || {role:"parent"});
+  const prev = $("#"+prefix+"Prev"); if (prev) prev.innerHTML = avatarOf({...base, color, avatar:av, photo:UI.photoDraft?.[prefix] ?? base.photo}, 64);
+  form.querySelectorAll(`input[name="${prefix}av"]`).forEach(r => { const svg = r.parentElement.querySelector("svg"); if (svg) svg.innerHTML = avatarArt(r.value, color); });
+});

@@ -9,7 +9,8 @@ const STAGES = [
   {max:36,   id:"bamb", label:"Bambin",         color:"butter"},
   {max:72,   id:"pres", label:"Préscolaire",    color:"mint"},
   {max:144,  id:"scol", label:"Âge scolaire",   color:"sky"},
-  {max:9999, id:"ado",  label:"Adolescent·e",   color:"lilac"},
+  {max:216,  id:"ado",  label:"Adolescent·e",   color:"lilac"},
+  {max:99999,id:"adulte",label:"Adulte",        color:"mint"},
 ];
 
 /* ---------- PIQ (quebec.ca, calendrier régulier 2025-2026) ---------- */
@@ -169,7 +170,8 @@ function guide(m){
   if (m < 36)  return {sleep:[11,14], act:180, actLbl:"Activité, toutes intensités", screen:60, read:15, band:"2 ans"};
   if (m < 60)  return {sleep:[10,13], act:180, actLbl:"Activité, dont 60 min énergique", screen:60, read:15, band:"3-4 ans"};
   if (m < 168) return {sleep:[9,11],  act:60,  actLbl:"Activité modérée à intense", screen:120, read:20, band:"5-13 ans"};
-  return {sleep:[8,10], act:60, actLbl:"Activité modérée à intense", screen:120, read:20, band:"14-17 ans"};
+  if (m < 216) return {sleep:[8,10], act:60, actLbl:"Activité modérée à intense", screen:120, read:20, band:"14-17 ans"};
+  return {sleep:[7,9], act:22, actLbl:"150 min par semaine d'activité modérée à intense", screen:180, read:20, band:"Adulte"};
 }
 
 /* ---------- dents de lait : position sur le schéma (arcade) ---------- */
