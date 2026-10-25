@@ -27,7 +27,7 @@ jobs:
         env:
           KS: ${{ secrets.TRIBE_KEYSTORE }}
         run: |
-          if [ -n "$KS" ]; then echo "$KS" | base64 -d > android-config/tribu.keystore; echo "Clé de signature trouvée"; else echo "Aucune clé : APK de test signé avec une clé temporaire"; fi
+          if [ -n "$KS" ]; then printf '%s' "$KS" | tr -cd 'A-Za-z0-9+/=' | base64 -d > android-config/tribu.keystore; echo "Clé de signature trouvée"; else echo "Aucune clé : APK de test signé avec une clé temporaire"; fi
       - name: Projet Android
         run: |
           npx cap add android
@@ -42,6 +42,7 @@ jobs:
           if [ -f android-config/tribu.keystore ]; then
           cat >> android/app/build.gradle <<'GRADLE'
 
+          // TRIBE-SIGN-START
           android {
               signingConfigs {
                   tribe {
@@ -56,6 +57,7 @@ jobs:
                   debug { signingConfig signingConfigs.tribe }
               }
           }
+          // TRIBE-SIGN-END
           GRADLE
           fi
           npx cap sync android
@@ -69,8 +71,14 @@ jobs:
           chmod +x gradlew
           report(){ grep -A6 "What went wrong" build.log | head -12 | while IFS= read -r l; do echo "::error::$l"; done; }
           if [ -f ../android-config/tribu.keystore ]; then
+            export TRIBE_KEY_PASS="$(printf '%s' "$TRIBE_KEY_PASS" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             if ! keytool -list -keystore ../android-config/tribu.keystore -storepass "$TRIBE_KEY_PASS" -alias tribu >/dev/null 2>&1; then
-              echo "::error::Clé de signature illisible : vérifiez TRIBE_KEYSTORE (texte base64 complet, sans espace) et TRIBE_KEY_PASS (mot de passe exact)"; exit 1; fi
+              echo "::warning::Clé de signature illisible : vérifiez TRIBE_KEYSTORE (toute la longue ligne base64) et TRIBE_KEY_PASS. APK de test produit en attendant."
+              rm -f ../android-config/tribu.keystore
+              sed -i '/TRIBE-SIGN-START/,/TRIBE-SIGN-END/d' app/build.gradle
+            fi
+          fi
+          if [ -f ../android-config/tribu.keystore ]; then
             ./gradlew assembleRelease --no-daemon -x lintVitalAnalyzeRelease -x lintVitalReportRelease 2>&1 | tee build.log; [ ${PIPESTATUS[0]} -eq 0 ] || { report; exit 1; }
             cp app/build/outputs/apk/release/app-release.apk ../Tribe.apk
           else
