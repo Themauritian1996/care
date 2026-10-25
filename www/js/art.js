@@ -1,0 +1,170 @@
+/* =========================================================================
+   TRIBU — icônes, avatars, logo, décors selon l'âge (SVG maison)
+   ========================================================================= */
+const I = {
+  home:'<path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z"/>',
+  kid:'<circle cx="12" cy="8" r="3.5"/><path d="M6 20c.5-4 3-6 6-6s5.5 2 6 6"/><path d="M10.5 4.8c.4-1.4 2.6-1.4 3 0"/>',
+  sunrise:'<path d="M4 18h16M7 18a5 5 0 0 1 10 0M12 6v3M5.6 10.6l1.5 1.5M18.4 10.6l-1.5 1.5"/>',
+  chart:'<path d="M4 19c4-1 6-5 9-9s5-5 7-5"/><path d="M4 19h16M4 5v14"/>',
+  heart:'<path d="M12 19s-7-4.4-7-9.5A3.8 3.8 0 0 1 12 7a3.8 3.8 0 0 1 7 2.5C19 14.6 12 19 12 19z"/>',
+  cal:'<rect x="4" y="5.5" width="16" height="14" rx="3"/><path d="M4 10h16M9 3.5v4M15 3.5v4"/>',
+  people:'<circle cx="9" cy="8.5" r="3"/><circle cx="17" cy="9.5" r="2.3"/><path d="M3.5 19c.5-3.4 2.7-5 5.5-5s5 1.6 5.5 5M15 14.2c2.6-.3 4.8 1.2 5.3 4.3"/>',
+  camera:'<path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.5-2h5L16 6h1.5A2.5 2.5 0 0 1 20 8.5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.5" r="3.5"/>',
+  more:'<circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/>',
+  bottle:'<path d="M9.5 3h5M10 3v3l-2 2.5V19a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V8.5L14 6V3"/><path d="M8 12h8M8 15.5h8"/>',
+  moon:'<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>',
+  drop:'<path d="M12 4s-6 6.5-6 10.5a6 6 0 0 0 12 0C18 10.5 12 4 12 4z"/>',
+  thermo:'<path d="M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 9v7"/>',
+  pill:'<rect x="3.5" y="9" width="17" height="6" rx="3" transform="rotate(-35 12 12)"/><path d="m9.5 8.5 5 7"/>',
+  spoon:'<ellipse cx="12" cy="7" rx="3.5" ry="4"/><path d="M12 11v10"/>',
+  smile:'<circle cx="12" cy="12" r="8"/><path d="M9 14c1.6 1.6 4.4 1.6 6 0M9.5 10h0M14.5 10h0"/>',
+  screen:'<rect x="4" y="5" width="16" height="11" rx="2"/><path d="M9 20h6M12 16v4"/>',
+  run:'<circle cx="14" cy="5" r="2"/><path d="m6 20 3-5 3 2 2-5 3 3h2M9 15l1-5 4-1"/>',
+  book:'<path d="M4 5.5C6.5 4 9.5 4 12 6c2.5-2 5.5-2 8-.5V19c-2.5-1.5-5.5-1.5-8 .5-2.5-2-5.5-2-8-.5z"/><path d="M12 6v13.5"/>',
+  tummy:'<circle cx="7" cy="12" r="3"/><path d="M10 14h9a2 2 0 0 0 0-4h-6"/><path d="M4 18h16"/>',
+  ball:'<circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16M6.3 6.3c3 3 3 8.4 0 11.4M17.7 6.3c-3 3-3 8.4 0 11.4"/>',
+  note:'<path d="M5 19 6 15 15.5 5.5a2 2 0 0 1 3 3L9 18z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  minus:'<path d="M5 12h14"/>',
+  syringe:'<path d="m18 6-2-2M15 5l4 4M17 7l-8.5 8.5-3 .5.5-3L14.5 4.5M9.5 10.5l2 2M7.5 12.5l2 2M4 20l2.5-2.5"/>',
+  star:'<path d="m12 4 2.3 4.8 5.2.7-3.8 3.6.9 5.2L12 15.8l-4.6 2.5.9-5.2-3.8-3.6 5.2-.7z"/>',
+  tooth:'<path d="M7 4c-2 0-3 1.8-3 4 0 3 1.5 4 2 7 .4 2.5 1 5 2.3 5 1.4 0 1.4-4.5 3.7-4.5s2.3 4.5 3.7 4.5c1.3 0 1.9-2.5 2.3-5 .5-3 2-4 2-7 0-2.2-1-4-3-4-1.8 0-3 1-5 1S8.8 4 7 4z"/>',
+  phone:'<path d="M6.5 4h3l1.5 4-2 1.5a10 10 0 0 0 5.5 5.5L16 13l4 1.5v3A2 2 0 0 1 18 19.5 15.5 15.5 0 0 1 4.5 6 2 2 0 0 1 6.5 4z"/>',
+  doc:'<path d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"/><path d="M14 3.5V8h4M9 13h6M9 16.5h6"/>',
+  db:'<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
+  info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h0"/>',
+  alert:'<path d="M12 4 21 19H3z"/><path d="M12 10v4M12 17h0"/>',
+  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  x:'<path d="M6 6l12 12M18 6 6 18"/>',
+  left:'<path d="m14.5 6-6 6 6 6"/>', right:'<path d="m9.5 6 6 6-6 6"/>',
+  edit:'<path d="M5 19 6 15 15.5 5.5a2 2 0 0 1 3 3L9 18z"/>',
+  trash:'<path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
+  auto:'<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>',
+  copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  user:'<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  sliders:'<path d="M5 7h9M18 7h1M5 17h3M12 17h7"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  bulb:'<path d="M9 17h6M10 20h4M12 4a5.5 5.5 0 0 0-3.2 10c.7.5 1.2 1.3 1.2 2v1h4v-1c0-.7.5-1.5 1.2-2A5.5 5.5 0 0 0 12 4z"/>',
+  spark:'<path d="M12 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7z"/><path d="M19 3v3M17.5 4.5h3"/>',
+  chat:'<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.5V15h0A2 2 0 0 1 5 13z"/>',
+  send:'<path d="M5 12 19 5l-4 14-3-6z"/><path d="m12 13 7-8"/>',
+  gift:'<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M4 13h16M12 9v11M12 9c-2-4-6-4-6-1.5S10 9 12 9zm0 0c2-4 6-4 6-1.5S14 9 12 9z"/>',
+  trophy:'<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7l-1-3h-5z"/>',
+  bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  unlock:'<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>',
+  share:'<circle cx="17" cy="6" r="2.5"/><circle cx="7" cy="12" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="m9.2 10.8 5.6-3.4M9.2 13.2l5.6 3.4"/>',
+  mail:'<rect x="3.5" y="6" width="17" height="12" rx="2.5"/><path d="m4.5 7.5 7.5 6 7.5-6"/>',
+  drive:'<path d="M8.5 4h7l5 8.5-3.5 6h-10L3.5 12.5z"/><path d="M8.5 4l5.5 9.5M3.5 12.5h11M17 18.5l-3-5"/>',
+  pause:'<rect x="7" y="5" width="3.5" height="14" rx="1.2"/><rect x="13.5" y="5" width="3.5" height="14" rx="1.2"/>',
+  play:'<path d="M8 5.5v13l10-6.5z"/>',
+  zoomin:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4M11 8v6M8 11h6"/>',
+  zoomout:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4M8 11h6"/>',
+  expand:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  pin:'<path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>',
+  clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
+  key:'<circle cx="8" cy="14" r="3.5"/><path d="m10.5 11.5 8-8M16 6l2.5 2.5M13.5 8.5 16 11"/>',
+  google:'<path d="M20 12.2c0-.6-.1-1.2-.2-1.7H12v3.3h4.5a3.9 3.9 0 0 1-1.7 2.5v2.1h2.7c1.6-1.5 2.5-3.6 2.5-6.2z" fill="#4285F4" stroke="none"/><path d="M12 20.5c2.3 0 4.2-.8 5.5-2.1l-2.7-2.1c-.7.5-1.7.8-2.8.8-2.2 0-4-1.5-4.7-3.4H4.5v2.2A8.5 8.5 0 0 0 12 20.5z" fill="#34A853" stroke="none"/><path d="M7.3 13.7a5 5 0 0 1 0-3.4V8.1H4.5a8.5 8.5 0 0 0 0 7.8z" fill="#FBBC05" stroke="none"/><path d="M12 6.9c1.2 0 2.3.4 3.2 1.3l2.4-2.4A8.4 8.4 0 0 0 12 3.5a8.5 8.5 0 0 0-7.5 4.6l2.8 2.2C8 8.4 9.8 6.9 12 6.9z" fill="#EA4335" stroke="none"/>',
+  bed:'<path d="M3 18V7M3 13h18v5M21 18v-3a3 3 0 0 0-3-3h-7v1"/><circle cx="7" cy="10.5" r="1.6"/>',
+  broom:'<path d="M14 4 9.5 12M6 13.5h7l1.5 6.5H4.5z"/>', pencil:'<path d="M5 19 6 15 15.5 5.5a2 2 0 0 1 3 3L9 18z"/><path d="m13.5 7.5 3 3"/>',
+  dish:'<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="4"/>',
+  target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  baby:'<circle cx="12" cy="12" r="8"/><path d="M9.5 15c1.4 1 3.6 1 5 0M9.5 11h0M14.5 11h0M12 4c-1 1.5 0 3 1.5 3"/>',
+  stork:'<circle cx="12" cy="11" r="6.5"/><path d="M8 18.5c2.5 1.5 5.5 1.5 8 0"/><path d="M10 10.5h0M14 10.5h0M10.5 13.5c.8.6 2.2.6 3 0"/>',
+  logout:'<path d="M14 5H6.5A1.5 1.5 0 0 0 5 6.5v11A1.5 1.5 0 0 0 6.5 19H14M10 12h10M17 9l3 3-3 3"/>',
+  tag:'<path d="M4 12V5a1 1 0 0 1 1-1h7l8 8-8 8z"/><circle cx="8.5" cy="8.5" r="1.3"/>',
+};
+const icon = (n, cls="") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" class="${cls}" aria-hidden="true">${I[n]||I.star}</svg>`;
+
+/* ---------- logo : trois têtes (parent, enfant, bébé) dans un nid ---------- */
+function logo(s = 36){
+  return `<svg viewBox="0 0 64 64" width="${s}" height="${s}" aria-hidden="true">
+    <rect width="64" height="64" rx="15" fill="var(--peach-bg)"/>
+    <circle cx="22" cy="24" r="12" fill="#FF9E7A"/><circle cx="42" cy="27" r="9.5" fill="#62C9A4"/><circle cx="32" cy="36" r="7.5" fill="#FFD36E"/>
+    <g fill="#2A2340"><circle cx="18.5" cy="23" r="1.9"/><circle cx="25.5" cy="23" r="1.9"/><circle cx="39.3" cy="26.3" r="1.5"/><circle cx="44.7" cy="26.3" r="1.5"/><circle cx="30" cy="35.2" r="1.25"/><circle cx="34" cy="35.2" r="1.25"/></g>
+    <g fill="#F4A0B9"><circle cx="16" cy="27.5" r="2.4"/><circle cx="28" cy="27.5" r="2.4"/><circle cx="38" cy="30" r="1.8"/><circle cx="46" cy="30" r="1.8"/></g>
+    <path d="M19.6 27.6a2.6 2.6 0 0 0 4.8 0M40.3 30.2a2 2 0 0 0 3.4 0" fill="none" stroke="#2A2340" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M6 44h52a26 14 0 0 1-52 0z" fill="#ECB084" stroke="#B24A22" stroke-width="3.2" stroke-linejoin="round"/>
+    <path d="M12 48l7-2M21 52l7-2M34 52l7-2M45 49l7-2.5" stroke="#B24A22" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+}
+/* ---------- avatars : 10 animaux + 10 symboles ---------- */
+const EYES = (y=32, dx=8, r=2.6) => `<circle cx="${32-dx}" cy="${y}" r="${r}" fill="#2A2340"/><circle cx="${32+dx}" cy="${y}" r="${r}" fill="#2A2340"/><circle cx="${32-dx+.9}" cy="${y-.9}" r=".8" fill="#fff"/><circle cx="${32+dx+.9}" cy="${y-.9}" r=".8" fill="#fff"/>`;
+const CHEEKS = (y=39) => `<circle cx="19" cy="${y}" r="3.2" fill="var(--rose)" opacity=".5"/><circle cx="45" cy="${y}" r="3.2" fill="var(--rose)" opacity=".5"/>`;
+const SMILE = (y=41) => `<path d="M28 ${y}c2.4 2 5.6 2 8 0" stroke="#2A2340" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
+function avatarArt(id, col){
+  const C = `var(--${col})`, B = `var(--${col}-bg)`, K = `var(--${col}-ink)`;
+  switch(id){
+    case "poussin": return `<circle cx="32" cy="35" r="23" fill="${C}"/><path d="M30 12c-3-4 2-8 6-5" stroke="${K}" stroke-width="2.5" fill="none" stroke-linecap="round"/>${EYES(32)}<path d="M28 38l4 4 4-4z" fill="var(--peach)"/>${CHEEKS(40)}`;
+    case "ourson": return `<circle cx="14" cy="16" r="8" fill="${C}"/><circle cx="50" cy="16" r="8" fill="${C}"/><circle cx="14" cy="16" r="4" fill="${B}"/><circle cx="50" cy="16" r="4" fill="${B}"/><circle cx="32" cy="35" r="23" fill="${C}"/><ellipse cx="32" cy="42" rx="11" ry="8" fill="${B}"/>${EYES(31)}<ellipse cx="32" cy="39" rx="3" ry="2.2" fill="#2A2340"/>${SMILE(43)}`;
+    case "lapin": return `<ellipse cx="22" cy="14" rx="5.5" ry="13" fill="${C}"/><ellipse cx="42" cy="14" rx="5.5" ry="13" fill="${C}"/><ellipse cx="22" cy="15" rx="2.6" ry="9" fill="var(--rose)" opacity=".5"/><ellipse cx="42" cy="15" rx="2.6" ry="9" fill="var(--rose)" opacity=".5"/><circle cx="32" cy="38" r="21" fill="${C}"/>${EYES(35)}<path d="M30 40h4l-2 2.2z" fill="var(--rose)"/><path d="M32 42.2v2M29 45c1.5 1 4.5 1 6 0" stroke="#2A2340" stroke-width="1.8" fill="none" stroke-linecap="round"/>${CHEEKS(42)}`;
+    case "chat": return `<path d="M12 28 15 8l12 10zM52 28 49 8 37 18z" fill="${C}"/><path d="M15.5 14l1.5 8 5-4zM48.5 14 47 22l-5-4z" fill="var(--rose)" opacity=".5"/><circle cx="32" cy="36" r="22" fill="${C}"/>${EYES(33)}<path d="M30 39h4l-2 2z" fill="var(--rose)"/><path d="M32 41v1.5M28.5 43c1.5 1.2 2.5 1.2 3.5 0 1 1.2 2 1.2 3.5 0M10 38h9M10 43l9-2M54 38h-9M54 43l-9-2" stroke="#2A2340" stroke-width="1.5" fill="none" stroke-linecap="round"/>`;
+    case "renard": return `<path d="M10 30 13 7l14 13zM54 30 51 7 37 20z" fill="${C}"/><path d="M14.5 13l1.5 8 5-4zM49.5 13 48 21l-5-4z" fill="#2A2340" opacity=".55"/><path d="M10 30c0-12 10-18 22-18s22 6 22 18c0 14-10 24-22 24S10 44 10 30z" fill="${C}"/><path d="M10 32c6 0 14 4 22 18 8-14 16-18 22-18-2 13-11 22-22 22S12 45 10 32z" fill="#FFFFFF" opacity=".92"/>${EYES(31)}<circle cx="32" cy="47" r="2.8" fill="#2A2340"/>`;
+    case "panda": return `<circle cx="14" cy="15" r="8" fill="#2A2340"/><circle cx="50" cy="15" r="8" fill="#2A2340"/><circle cx="32" cy="35" r="23" fill="#FFFFFF" stroke="${C}" stroke-width="3"/><ellipse cx="23" cy="32" rx="5.5" ry="7" fill="#2A2340" transform="rotate(-20 23 32)"/><ellipse cx="41" cy="32" rx="5.5" ry="7" fill="#2A2340" transform="rotate(20 41 32)"/><circle cx="23.5" cy="31" r="1.8" fill="#fff"/><circle cx="40.5" cy="31" r="1.8" fill="#fff"/><ellipse cx="32" cy="40" rx="3" ry="2.2" fill="#2A2340"/>${SMILE(43)}<circle cx="16" cy="42" r="3" fill="${C}" opacity=".6"/><circle cx="48" cy="42" r="3" fill="${C}" opacity=".6"/>`;
+    case "grenouille": return `<circle cx="20" cy="18" r="9" fill="${C}"/><circle cx="44" cy="18" r="9" fill="${C}"/><circle cx="20" cy="18" r="5" fill="#fff"/><circle cx="44" cy="18" r="5" fill="#fff"/><circle cx="20.5" cy="18.5" r="2.8" fill="#2A2340"/><circle cx="43.5" cy="18.5" r="2.8" fill="#2A2340"/><ellipse cx="32" cy="38" rx="24" ry="19" fill="${C}"/><path d="M20 40c6 6 18 6 24 0" stroke="#2A2340" stroke-width="2.4" fill="none" stroke-linecap="round"/>${CHEEKS(36)}`;
+    case "pingouin": return `<ellipse cx="32" cy="36" rx="22" ry="22" fill="#2F3550"/><ellipse cx="32" cy="40" rx="15" ry="15" fill="#FFFFFF"/><ellipse cx="32" cy="27" rx="13" ry="9" fill="#FFFFFF"/>${EYES(28,6.5,2.4)}<path d="M28.5 33h7L32 37.5z" fill="var(--butter)"/><circle cx="21" cy="35" r="3" fill="${C}" opacity=".7"/><circle cx="43" cy="35" r="3" fill="${C}" opacity=".7"/><path d="M20 12c6-5 18-5 24 0" stroke="${C}" stroke-width="5" fill="none" stroke-linecap="round"/>`;
+    case "hibou": return `<path d="M12 16l8 8M52 16l-8 8" stroke="${K}" stroke-width="4" stroke-linecap="round"/><ellipse cx="32" cy="36" rx="21" ry="22" fill="${C}"/><circle cx="23" cy="31" r="8" fill="#fff"/><circle cx="41" cy="31" r="8" fill="#fff"/><circle cx="23" cy="31" r="3.6" fill="#2A2340"/><circle cx="41" cy="31" r="3.6" fill="#2A2340"/><path d="M29 38h6l-3 4.5z" fill="var(--butter)"/><path d="M22 47c3 2 5 2 7 0M35 47c2 2 4 2 7 0" stroke="${K}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+    case "baleine": return `<path d="M6 36c0-12 12-20 26-20s24 8 24 18c0 10-10 18-26 18-6 0-10-2-13-4l-7 4 2-8c-4-2-6-5-6-8z" fill="${C}"/><path d="M14 40c6 6 24 8 36 0" fill="${B}"/>${EYES(32,6,2.4).replace(/cx="(\d+(\.\d+)?)"/g,(m,v)=>`cx="${(+v+6).toFixed(1)}"`)}<path d="M33 9c0-4 4-4 4 0M29 7c1-4 4-3 4 1M41 7c-1-4-4-3-4 1" stroke="var(--sky)" stroke-width="2" fill="none" stroke-linecap="round"/>${CHEEKS(39).replace('cx="19"','cx="25"')}`;
+    case "etoile": return `<circle cx="32" cy="32" r="28" fill="${B}"/><path d="m32 9 6.8 14 15.4 2.1-11.2 10.7 2.7 15.2L32 43.8 18.3 51l2.7-15.2L9.8 25.1 25.2 23z" fill="${C}" stroke="${K}" stroke-width="1.5" stroke-linejoin="round"/>${EYES(31,5,2)}${SMILE(36).replace(/M28/,"M29.5").replace("c2.4 2 5.6 2 8 0","c1.5 1.4 3.5 1.4 5 0")}`;
+    case "fusee": return `<circle cx="32" cy="32" r="28" fill="${B}"/><path d="M32 8c9 7 11 18 8 30H24c-3-12-1-23 8-30z" fill="${C}"/><circle cx="32" cy="24" r="5" fill="#fff" stroke="${K}" stroke-width="2"/><path d="M24 34l-7 8 8-1zM40 34l7 8-8-1z" fill="${K}"/><path d="M27 40c1 7 3 10 5 12 2-2 4-5 5-12z" fill="var(--butter)"/>`;
+    case "ballon": return `<circle cx="32" cy="32" r="28" fill="${B}"/><circle cx="32" cy="32" r="18" fill="#fff" stroke="${K}" stroke-width="2"/><path d="M32 23l7 5-2.7 8h-8.6L25 28z" fill="${C}"/><path d="M32 14v9M39 28l8-4M36.3 36l5 7M27.7 36l-5 7M25 28l-8-4" stroke="${K}" stroke-width="1.8"/>`;
+    case "note": return `<circle cx="32" cy="32" r="28" fill="${B}"/><path d="M26 44V18l18-4v24" fill="none" stroke="${K}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="22" cy="44" rx="6" ry="4.5" fill="${C}"/><ellipse cx="40" cy="38" rx="6" ry="4.5" fill="${C}"/>`;
+    case "eclair": return `<circle cx="32" cy="32" r="28" fill="${B}"/><path d="M36 8 18 36h12l-4 20 20-30H34z" fill="${C}" stroke="${K}" stroke-width="2" stroke-linejoin="round"/>`;
+    case "couronne": return `<circle cx="32" cy="32" r="28" fill="${B}"/><path d="M14 42 12 20l11 9 9-15 9 15 11-9-2 22z" fill="${C}" stroke="${K}" stroke-width="2" stroke-linejoin="round"/><rect x="14" y="42" width="36" height="6" rx="2" fill="${K}"/><circle cx="32" cy="34" r="3" fill="var(--rose)"/>`;
+    case "manette": return `<circle cx="32" cy="32" r="28" fill="${B}"/><path d="M18 24h28c5 0 8 4 9 10l1 6c.5 4-3 6-6 4l-6-5H20l-6 5c-3 2-6.5 0-6-4l1-6c1-6 4-10 9-10z" fill="${C}"/><path d="M20 31v6M17 34h6" stroke="#2A2340" stroke-width="2.5" stroke-linecap="round"/><circle cx="42" cy="31" r="2" fill="#2A2340"/><circle cx="46" cy="35" r="2" fill="#2A2340"/>`;
+    case "guitare": return `<circle cx="32" cy="32" r="28" fill="${B}"/><path d="M38 12l6-4 4 4-4 6z" fill="${K}"/><path d="M41 15 30 27" stroke="${K}" stroke-width="3"/><path d="M30 25c-3-3-9-2-11 2-2 3 0 5-2 8-3 4 0 12 7 12s9-4 10-7c1-3 3-4 5-6 3-4 0-9-4-9-2 0-3 1-5 0z" fill="${C}"/><circle cx="26" cy="36" r="3" fill="#2A2340"/>`;
+    case "coeur": return `<circle cx="32" cy="32" r="28" fill="${B}"/><path d="M32 50S14 39 14 26a9 9 0 0 1 18-3 9 9 0 0 1 18 3c0 13-18 24-18 24z" fill="${C}" stroke="${K}" stroke-width="1.5"/>${EYES(29,6,2)}${SMILE(34).replace("c2.4 2 5.6 2 8 0","c1.6 1.4 6.4 1.4 8 0")}`;
+    case "feuille": return `<circle cx="32" cy="32" r="28" fill="${B}"/><path d="M14 46C14 24 28 12 50 12c0 22-12 36-34 36z" fill="${C}"/><path d="M16 46c8-8 16-18 30-30" stroke="${K}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+  }
+  return avatarArt("poussin", col);
+}
+/* Avatar d'un enfant ou d'un membre : photo, animal/symbole choisi, ou automatique selon l'âge */
+function avatarOf(p, size = 32){
+  if (p?.photo) return `<img class="avatar" src="${p.photo}" alt="" style="width:${size}px;height:${size}px">`;
+  const col = p?.color || "peach";
+  let id = p?.avatar?.id;
+  if (!id || p?.avatar?.kind === "auto"){
+    const st = p?.dob || p?.dueDate ? lookOf(p).id : "scol";
+    id = st === "pre" ? "poussin" : st === "nour" ? "poussin" : st === "bamb" ? "ourson" : st === "pres" ? "lapin" : st === "scol" ? "etoile" : "eclair";
+    if (p?.avatar?.kind === "auto" && p?.role === "parent") id = "coeur";
+  }
+  return `<svg class="avatar" style="width:${size}px;height:${size}px" viewBox="0 0 64 64" aria-hidden="true">${avatarArt(id, col)}</svg>`;
+}
+
+/* ---------- décor de fond selon le stade ---------- */
+const star5 = (x,y,r,f) => { let p=""; for (let i=0;i<10;i++){ const a = Math.PI/5*i - Math.PI/2, rr = i%2 ? r*.45 : r; p += `${i?"L":"M"}${(x+Math.cos(a)*rr).toFixed(1)},${(y+Math.sin(a)*rr).toFixed(1)}`; } return `<path d="${p}Z" fill="${f}"/>`; };
+const cloud = (x,y,s,f) => `<g transform="translate(${x} ${y}) scale(${s})" fill="${f}"><circle cx="0" cy="10" r="22"/><circle cx="28" cy="0" r="30"/><circle cx="60" cy="12" r="22"/><rect x="-10" y="10" width="80" height="22" rx="11"/></g>`;
+function decoSVG(st){
+  const W = 1200, H = 900; let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">`;
+  if (st === "pre"){
+    s += `<g opacity=".5">${[[120,140,60],[1050,180,90],[220,760,80],[980,720,60]].map(([x,y,r],i)=>`<circle cx="${x}" cy="${y}" r="${r}" fill="var(--${["rose","lilac","peach","butter"][i]}-bg)"/>`).join("")}</g>`;
+    [[300,90,10],[640,60,8],[1100,420,12],[60,420,9],[520,820,10]].forEach(([x,y,r],i)=> s += `<path d="M${x} ${y+r}c-${r} -${r*.8} -${r*1.6} -${r*1.4} -${r*.8} -${r*1.9}c${r*.5} -${r*.4} ${r*.8} 0 ${r*.8} ${r*.4}c0 -${r*.4} ${r*.3} -${r*.8} ${r*.8} -${r*.4}c${r*.8} ${r*.5} 0 ${r*1.1} -${r*.8} ${r*1.9}z" fill="var(--rose)" opacity=".45"/>`);
+  } else if (st === "nour"){
+    s += cloud(80,120,1.4,"var(--sky-bg)") + cloud(900,80,1.8,"var(--lilac-bg)") + cloud(1020,620,1.3,"var(--peach-bg)") + cloud(180,700,1.6,"var(--mint-bg)");
+    [[300,90,12],[640,60,9],[1100,300,14],[60,420,10],[520,820,12],[860,420,8],[1150,820,10],[400,500,7]].forEach(([x,y,r],i)=> s += star5(x,y,r, i%2?"var(--butter)":"var(--lilac)"));
+    s += `<path d="M1120 140a46 46 0 1 1-36-70 36 36 0 0 0 36 70z" fill="var(--butter)"/>`;
+  } else if (st === "bamb"){
+    const cols = ["var(--peach)","var(--butter)","var(--mint)","var(--sky)","var(--lilac)","var(--rose)"];
+    [[90,140,40],[1080,110,56],[260,760,48],[980,720,40],[620,60,26],[40,520,30],[1160,460,34],[520,860,30]].forEach(([x,y,r],i)=>{ const f = cols[i%6];
+      s += i%3===0 ? `<circle cx="${x}" cy="${y}" r="${r}" fill="${f}" opacity=".35"/>` : i%3===1 ? `<rect x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="${r*.35}" fill="${f}" opacity=".35" transform="rotate(${i*13} ${x} ${y})"/>` : `<path d="M${x} ${y-r}L${x+r} ${y+r*.8}H${x-r}Z" fill="${f}" opacity=".35"/>`; });
+  } else if (st === "pres"){
+    s += `<g fill="none" stroke-width="22" stroke-linecap="round" opacity=".35"><path d="M-40 900a280 280 0 0 1 560 0" stroke="var(--rose)"/><path d="M0 900a240 240 0 0 1 480 0" stroke="var(--butter)"/><path d="M40 900a200 200 0 0 1 400 0" stroke="var(--mint)"/><path d="M80 900a160 160 0 0 1 320 0" stroke="var(--sky)"/></g><circle cx="1080" cy="130" r="60" fill="var(--butter)" opacity=".5"/>`;
+    for (let i=0;i<10;i++){ const a = i*Math.PI/5; s += `<line x1="${1080+Math.cos(a)*80}" y1="${130+Math.sin(a)*80}" x2="${1080+Math.cos(a)*104}" y2="${130+Math.sin(a)*104}" stroke="var(--butter)" stroke-width="8" stroke-linecap="round" opacity=".5"/>`; }
+  } else if (st === "scol"){
+    s += `<defs><pattern id="nb" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M0 39.5H40" stroke="var(--sky)" stroke-width="1" opacity=".35"/></pattern></defs><rect width="${W}" height="${H}" fill="url(#nb)"/><line x1="90" y1="0" x2="90" y2="${H}" stroke="var(--rose)" stroke-width="2" opacity=".35"/>`;
+    [[1040,140,22],[1140,520,16],[260,820,18]].forEach(([x,y,r],i)=> s += star5(x,y,r, ["var(--butter)","var(--mint)","var(--lilac)"][i]));
+  } else if (st === "ado"){
+    s += `<defs><filter id="bl"><feGaussianBlur stdDeviation="70"/></filter></defs><g filter="url(#bl)" opacity=".5"><circle cx="1050" cy="120" r="230" fill="var(--lilac)"/><circle cx="120" cy="780" r="220" fill="var(--sky)"/><circle cx="700" cy="900" r="160" fill="var(--rose)"/></g>`;
+  } else { // famille
+    s += `<g opacity=".4"><circle cx="1080" cy="120" r="140" fill="var(--peach-bg)"/><circle cx="90" cy="780" r="170" fill="var(--mint-bg)"/><circle cx="640" cy="40" r="60" fill="var(--butter-bg)"/></g>`;
+  }
+  return s + `</svg>`;
+}
+function heroIllu(st){
+  const v = `<svg class="hero-illu" viewBox="0 0 150 120" aria-hidden="true">`;
+  if (st === "pre") return v + `<circle cx="75" cy="62" r="40" fill="var(--rose-bg)"/><circle cx="75" cy="62" r="28" fill="var(--rose)" opacity=".5"/><path d="M75 78s-14-8-14-18a7 7 0 0 1 14-3 7 7 0 0 1 14 3c0 10-14 18-14 18z" fill="var(--surface)"/>${star5(122,24,9,"var(--butter)")}${star5(26,30,7,"var(--lilac)")}</svg>`;
+  if (st === "nour") return v + `<line x1="20" y1="10" x2="130" y2="10" stroke="var(--kid-ink)" stroke-width="3" stroke-linecap="round"/><line x1="40" y1="10" x2="40" y2="45" stroke="var(--kid-ink)" stroke-width="1.5"/><line x1="75" y1="10" x2="75" y2="65" stroke="var(--kid-ink)" stroke-width="1.5"/><line x1="110" y1="10" x2="110" y2="40" stroke="var(--kid-ink)" stroke-width="1.5"/>${star5(40,55,13,"var(--butter)")}<path d="M88 78a17 17 0 1 1-13-25 13 13 0 0 0 13 25z" fill="var(--lilac)"/>${cloud(97,46,.36,"var(--surface)")}</svg>`;
+  if (st === "bamb") return v + `<rect x="20" y="70" width="40" height="40" rx="8" fill="var(--peach)"/><text x="40" y="99" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="24" fill="#2A1A10">A</text><rect x="64" y="70" width="40" height="40" rx="8" fill="var(--sky)"/><text x="84" y="99" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="24" fill="#10243A">B</text><rect x="42" y="26" width="40" height="40" rx="8" fill="var(--mint)" transform="rotate(-8 62 46)"/><text x="62" y="55" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="24" fill="#0E3B2A" transform="rotate(-8 62 46)">C</text><circle cx="124" cy="94" r="16" fill="var(--butter)"/></svg>`;
+  if (st === "pres") return v + `<g fill="none" stroke-width="10" stroke-linecap="round"><path d="M20 110a55 55 0 0 1 110 0" stroke="var(--rose)"/><path d="M33 110a42 42 0 0 1 84 0" stroke="var(--butter)"/><path d="M46 110a29 29 0 0 1 58 0" stroke="var(--mint)"/></g>${cloud(10,92,.3,"var(--surface)")}${cloud(112,92,.3,"var(--surface)")}<circle cx="125" cy="22" r="12" fill="var(--butter)"/></svg>`;
+  if (st === "scol") return v + `<rect x="38" y="28" width="74" height="84" rx="16" fill="var(--sky)"/><rect x="50" y="62" width="50" height="34" rx="8" fill="var(--sky-bg)"/><path d="M58 28v-8a17 17 0 0 1 34 0v8" stroke="var(--sky-ink)" stroke-width="5" fill="none"/><rect x="50" y="62" width="50" height="10" rx="4" fill="var(--butter)"/>${star5(124,30,10,"var(--butter)")}</svg>`;
+  return v + `<path d="M30 70a45 45 0 0 1 90 0" fill="none" stroke="var(--kid-ink)" stroke-width="7" stroke-linecap="round"/><rect x="20" y="62" width="22" height="36" rx="10" fill="var(--kid)"/><rect x="108" y="62" width="22" height="36" rx="10" fill="var(--kid)"/><path d="M58 92l8-18 8 26 8-16 8 8" fill="none" stroke="var(--rose)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}

@@ -1,7 +1,7 @@
 {
-  "name": "Care",
-  "short_name": "Care",
-  "description": "Croissance, Activité, Rendez-vous, Éveil : le carnet de l'enfant de 0 à 18 ans",
+  "name": "Tribe",
+  "short_name": "Tribe",
+  "description": "L'app tout-en-un de la famille",
   "lang": "fr-CA",
   "start_url": "./",
   "scope": "./",

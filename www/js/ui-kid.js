@@ -1,0 +1,558 @@
+/* =========================================================================
+   TRIBE — carnet de l'enfant (onglets façonnés selon l'âge)
+   ========================================================================= */
+function kidTabs(c){
+  if (isPrenatal(c)) return [["grossesse",T("Grossesse")],["conseils",T("Conseils")]].filter(t => t[0] !== "conseils" || feat("tips"));
+  const m = ageMonths(c), tabs = [["quotidien",T("Quotidien")]];
+  if (mod(c,"solids") || mod(c,"feeding")) tabs.push(["repas", m < 12 ? T("Boires et repas") : T("Repas")]);
+  if (mod(c,"growth") && allow("health")) tabs.push(["croissance",T("Croissance")]);
+  if (allow("health")) tabs.push(["sante",T("Santé")]);
+  if (mod(c,"milestones") || mod(c,"older")) tabs.push(["dev", m < 72 ? T("Développement") : T("Repères")]);
+  if (feat("tips")) tabs.push(["conseils",T("Conseils")]);
+  return tabs;
+}
+function kidView(){
+  const c = child(); if (!c) return homeView();
+  const tabs = kidTabs(c);
+  if (!tabs.some(t => t[0] === UI.kidTab)) UI.kidTab = tabs[0][0];
+  const st = lookOf(c), m = ageMonths(c);
+  let h = `<section class="hero"><div>${avatarOf(c, 84)}</div><div class="stack" style="gap:6px;min-width:0">
+    <div class="row"><span class="chip ${stageKid(c).color}">${T(stageKid(c).label)}</span>${usesCorrected(c)?`<span class="chip lilac">${T("Prématuré·e")} · ${c.gaW} ${T("SA")} ${c.gaD||0} ${T("j")}</span>`:""}</div>
+    <h1>${esc(c.nick||c.name)}</h1>
+    <div class="age">${kidAge(c)}${usesCorrected(c)?` <span class="muted small">· ${T("âge corrigé")} ${ageLabel(effAge(c))}</span>`:""}</div>
+    </div>${heroIllu(st.id)}
+    ${isKidUser()?"":`<div class="hero-actions"><button class="btn sm ghost" data-act="kidForm" data-v="${c.id}">${icon("edit")}${T("Profil")}</button><button class="btn sm ghost" data-act="modules">${icon("sliders")}${T("Personnaliser")}</button>${isPrenatal(c)?"":`<button class="btn sm ghost" data-act="report">${icon("doc")}${T("Rapport")}</button>`}</div>`}</section>`;
+  h += timerBar(c) + feverAlert(c) + goalBandNotice(c);
+  if (tabs.length > 1) h += `<div class="seg" role="tablist">${tabs.map(([id,l]) => `<button data-act="kidTab" data-v="${id}" aria-pressed="${UI.kidTab===id}">${l}</button>`).join("")}</div>`;
+  return h + ({quotidien, repas, croissance, sante, dev, conseils, grossesse}[UI.kidTab])(c);
+}
+
+/* ---------- minuteries (avec pause) ---------- */
+const timerOf = c => (S.timers||{})[c.id];
+const timerElapsed = t => (t.pausedAt || Date.now()) - t.start - (t.pausedMs||0);
+function timerBar(c){
+  const t = timerOf(c); if (!t) return "";
+  const lbl = t.type === "sleep" ? (t.kind === "Sieste" ? T("Sieste en cours") : T("Dodo en cours")) : T("Tétée · {s}",{s:T(t.side)});
+  return `<div class="timer"><span class="pulse ${t.pausedAt?"off":""}"></span><div class="grow"><div class="small" style="font-weight:700">${lbl}${t.pausedAt?" · "+T("en pause"):""}</div><div class="t num" id="timerVal" data-kid="${c.id}">${fmtDur(timerElapsed(t))}</div></div>
+    <button class="btn sm ghost" data-act="pauseTimer">${icon(t.pausedAt?"play":"pause")}${t.pausedAt?T("Reprendre"):T("Pause")}</button><button class="btn sm" data-act="stopTimer">${T("Arrêter et noter")}</button></div>`;
+}
+function feverAlert(c){
+  const r = (c.logs||[]).filter(l => l.type === "temp" && Date.now() - l.t < 24*36e5).sort((a,b)=>b.t-a.t)[0];
+  if (!r) return "";
+  const v = Number(r.data.temp), site = r.data.site, thr = site === "Buccale" ? 37.5 : site === "Axillaire" ? 37.3 : 38.0;
+  if (!(v > thr)) return "";
+  if (ageMonths(c) < 3) return `<div class="banner alert">${icon("alert")}<div><b>${T("Fièvre chez un bébé de moins de 3 mois ({v} °C).",{v:fmtNum(v)})}</b> ${T("Consultez rapidement à l'urgence, ou appelez le 811 pour être orienté.")}</div></div>`;
+  return `<div class="banner warn">${icon("thermo")}<div><b>${T("Fièvre notée ({v} °C).",{v:fmtNum(v)})}</b> ${T("Consultez si l'enfant est très somnolent, respire difficilement, a des taches sur la peau, ou si la fièvre dure plus de 72 h. Info-Santé : 811.")}</div></div>`;
+}
+/* rappel quand l'âge change de tranche de recommandations */
+function goalBandNotice(c){
+  if (isPrenatal(c) || !c.goals || !Object.keys(c.goals).length) return "";
+  const band = guide(ageMonths(c)).band; if (!c.goalBand || c.goalBand === band) return "";
+  return `<div class="banner info">${icon("target")}<div class="grow">${T("{n} est maintenant dans la tranche {b} : les recommandations changent. Mettre à jour vos objectifs ?",{n:esc(c.nick||c.name), b:band})}</div><button class="btn sm ghost" data-act="goalsForm">${T("Revoir")}</button><button class="btn sm ghost" data-act="ackBand">${T("Garder")}</button></div>`;
+}
+
+/* ======== QUOTIDIEN ======== */
+const LOGT = {
+  feed:{label:"Boire", ic:"bottle", c:"peach", mod:"feeding"}, solid:{label:"Repas", ic:"spoon", c:"mint", mod:"solids"},
+  sleep:{label:"Dodo", ic:"moon", c:"lilac"}, diaper:{label:"Couche", ic:"drop", c:"sky", mod:"diapers"},
+  tummy:{label:"Sur le ventre", ic:"tummy", c:"butter", mod:"tummy"}, activity:{label:"Activité", ic:"run", c:"mint"},
+  read:{label:"Lecture", ic:"book", c:"peach", mod:"reading"}, screen:{label:"Écran", ic:"screen", c:"sky", mod:"screen"},
+  mood:{label:"Humeur", ic:"smile", c:"butter", mod:"mood"}, temp:{label:"Température", ic:"thermo", c:"rose"},
+  med:{label:"Médicament", ic:"pill", c:"butter"}, note:{label:"Note", ic:"note", c:"lilac"},
+};
+const typesFor = c => Object.keys(LOGT).filter(t => !LOGT[t].mod || mod(c, LOGT[t].mod)).filter(t => !(t === "activity" && ageMonths(c) < 9 && mod(c,"tummy")));
+const quickButtons = c => `<div class="quick">${typesFor(c).map(t => `<button class="qbtn" style="background:var(--${LOGT[t].c}-bg);color:var(--${LOGT[t].c}-ink)" data-act="log" data-v="${t}">${icon(LOGT[t].ic)}${T(LOGT[t].label)}</button>`).join("")}${(c.trackers||[]).map(t => `<button class="qbtn" style="background:var(--${t.color||"teal"}-bg);color:var(--${t.color||"teal"}-ink)" data-act="log" data-v="trk:${t.id}">${icon(t.icon||"target")}${esc(t.name)}</button>`).join("")}${isKidUser()?"":`<button class="qbtn" style="background:var(--surface2);color:var(--muted)" data-act="trackerForm">${icon("plus")}${T("Suivi perso")}</button>`}</div>`;
+function ring(pct, col, over=false){
+  const r = 20, C = 2*Math.PI*r, p = clamp(pct||0,0,1);
+  return `<svg viewBox="0 0 50 50"><circle cx="25" cy="25" r="${r}" fill="none" stroke="var(--line)" stroke-width="6"/>${p<=0?"":`<circle cx="25" cy="25" r="${r}" fill="none" stroke="${over?"var(--danger)":`var(--${col})`}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(C*p).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 25 25)"/>`}</svg>`;
+}
+function ringsCard(c){
+  const T0 = dayTotals(c, today()), G = goals(c), m = ageMonths(c), cells = [];
+  const cell = (key, valTxt, sub, pct, col, over=false) => `<button class="ring" data-act="trend" data-v="${key}" aria-label="${T("Voir la tendance")}">${ring(pct,col,over)}<div><div class="tiny muted">${T(METRICS[key]?.l || "")}</div><div class="v num">${valTxt}</div><div class="tiny muted">${sub}</div></div></button>`;
+  if (mod(c,"feeding")){ const lastF = c.logs.filter(l=>l.type==="feed").sort((a,b)=>b.t-a.t)[0]; cells.push(cell("feeds", `${T0.feeds}${T0.ml?` · ${T0.ml} ml`:""}`, lastF?T("dernier il y a {d}",{d:fmtDur(Date.now()-lastF.t)}):T("aucun"), T0.feeds/8, "peach")); }
+  cells.push(cell("sleep", T0.sleep?fmtMin(T0.sleep):"—", T("objectif {v} h",{v:G.sleep}) + (T0.nap?` · ${T("siestes")} ${fmtMin(T0.nap)}`:""), T0.sleep/60/G.sleep, "lilac"));
+  cells.push(`<button class="ring" data-act="trend" data-v="act">${ring(T0.act/G.act,"mint")}<div><div class="tiny muted">${m<12?T("Ventre / sol"):T("Activité")}</div><div class="v num">${fmtMin(T0.act)}</div><div class="tiny muted">${T("objectif {v}",{v:fmtMin(G.act)})}</div></div></button>`);
+  if (mod(c,"screen")) cells.push(cell("screen", fmtMin(T0.screen), G.screen?T("max {v}",{v:fmtMin(G.screen)}):T("aucun avant 2 ans"), G.screen?T0.screen/G.screen:(T0.screen?1:0), "sky", T0.screen > G.screen));
+  if (mod(c,"reading")) cells.push(cell("read", fmtMin(T0.read), T("objectif {v} min",{v:G.read}), T0.read/Math.max(1,G.read), "peach"));
+  if (mod(c,"diapers")) cells.push(cell("diapers", String(T0.diapers), T("aujourd'hui"), T0.diapers/6, "sky"));
+  (c.trackers||[]).forEach(t => { const v = T0.trk[t.id]||0; cells.push(`<button class="ring" data-act="trend" data-v="trk:${t.id}">${ring(t.goal?v/t.goal:(v?1:0), t.color||"teal", t.goalKind==="max" && t.goal && v>t.goal)}<div><div class="tiny muted">${esc(t.name)}</div><div class="v num">${fmtNum(v, v%1?1:0)} ${esc(t.unit||"")}</div><div class="tiny muted">${t.goal?(t.goalKind==="max"?T("max {v}",{v:t.goal}):T("objectif {v}",{v:t.goal})):""}</div></div></button>`); });
+  return `<div class="rings">${cells.join("")}</div>`;
+}
+function quotidien(c){
+  const m = ageMonths(c), G = goals(c);
+  let h = `<div class="card"><div class="card-h"><h2>${T("Noter")}</h2>${isKidUser()?"":`<button class="btn sm ghost" data-act="modules">${icon("sliders")}${T("Choisir les boutons")}</button>`}</div>${quickButtons(c)}</div>`;
+  h += `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Touchez une mesure pour voir sa tendance")}</span><h2>${T("Bien-être d'aujourd'hui")}</h2></div>${isKidUser()?"":`<button class="btn sm ghost" data-act="goalsForm">${icon("target")}${T("Objectifs")}</button>`}</div>${ringsCard(c)}
+    <p class="tiny muted">${T("Recommandations pour {b} (Directives canadiennes de mouvement sur 24 h) : sommeil {s1} à {s2} h, {a} {am}, écran {sc}.",{b:G.rec.band, s1:G.rec.sleep[0], s2:G.rec.sleep[1], a:T(G.rec.actLbl).toLowerCase(), am:fmtMin(G.rec.act), sc:G.rec.screen?T("au plus {v}",{v:fmtMin(G.rec.screen)}):T("aucun")})}</p></div>`;
+  h += weeklyStats(c);
+  if (mod(c,"mood")) h += moodCard(c);
+  if (mod(c,"sports")) h += sportsCard(c);
+  const days = [];
+  for (let i=0;i<7;i++){ const d = addDays(today(), -i); const L = dayLogs(c, d); if (L.length) days.push([d,L]); }
+  h += `<div class="card"><div class="card-h"><h2>${T("Journal, 7 derniers jours")}</h2></div>`;
+  if (!days.length) h += empty("sunrise", T("Aucune entrée cette semaine. Utilisez les boutons ci-dessus."));
+  days.forEach(([d,L]) => { h += `<div class="eyebrow" style="margin-top:6px">${dayName(d)}</div><div class="list">${L.map(l => logLine(c,l)).join("")}</div>`; });
+  return h + `</div>`;
+}
+const dayName = d => { const diff = Math.round((today()-d)/DAY); return diff===0?T("Aujourd'hui"):diff===1?T("Hier"):fmtD(d,{weekday:"long",day:"numeric",month:"long"}); };
+/* statistiques hebdomadaires : cette semaine vs la précédente */
+function weeklyStats(c){
+  const keys = ["sleep","act"].concat(mod(c,"screen")?["screen"]:[]).concat(mod(c,"reading")?["read"]:[]).concat(mod(c,"feeding")?["feeds"]:[]).concat((c.trackers||[]).map(t=>"trk:"+t.id));
+  const rows = keys.map(k => {
+    const M = metricOf(c, k), a = series(c, k, 14), cur = a.slice(7), prev = a.slice(0,7);
+    const avg = x => sum(x.map(p=>p.v))/7, A = avg(cur), B = avg(prev), goal = M.goal(c);
+    const hit = goal ? cur.filter(p => M.kind === "max" ? p.v <= goal : p.v >= goal).length : null;
+    const diff = B ? (A-B)/B : null, good = diff == null ? null : (M.kind === "max" ? diff <= 0 : diff >= 0);
+    const fmt = v => k === "sleep" ? fmtNum(v,1)+" h" : M.u === "min" ? fmtMin(v) : fmtNum(v, v%1?1:0)+(M.u?" "+M.u:"");
+    return `<tr data-act="trend" data-v="${k}" style="cursor:pointer"><td style="font-weight:600">${T(M.l)}</td><td><b>${fmt(A)}</b></td><td class="small">${diff==null?"—":`<span style="color:var(--${good?"mint":"rose"}-ink)">${diff>=0?"▲":"▼"} ${Math.abs(Math.round(diff*100))} %</span>`}</td><td class="small">${hit==null?"—":`${hit}/7`}</td></tr>`;
+  }).join("");
+  return `<div class="card"><div class="card-h"><h2>${T("Statistiques de la semaine")}</h2><span class="tiny muted">${T("moyenne par jour")}</span></div><div class="tbl"><table><thead><tr><th>${T("Mesure")}</th><th>${T("7 jours")}</th><th>${T("vs sem. préc.")}</th><th>${T("Objectif atteint")}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+/* graphique en barres (tendance) */
+function bars(pts, goal, col, kind, unitH){
+  const n = pts.length, max = Math.max(goal ? goal*1.25 : 0, ...pts.map(p=>p.v), 1), H = 74;
+  const lbl = d => n <= 7 ? d.toLocaleDateString(LOCALE(),{weekday:"narrow"}) : n <= 31 ? (d.getDate()%5===1 ? d.getDate() : "") : (d.getDate()===1 ? d.toLocaleDateString(LOCALE(),{month:"short"}) : "");
+  return `<div class="weekbars" style="--n:${n};gap:${n>40?1:n>14?2:5}px">${pts.map(p => { const bad = goal ? (kind === "max" ? p.v > goal : p.v < goal*0.8) : false;
+    return `<div class="wb" title="${fmtD(p.d,{weekday:"short",day:"numeric",month:"short"})} : ${unitH?fmtNum(p.v,1)+" h":fmtNum(p.v,p.v%1?1:0)}"><i style="height:${(p.v/max*H).toFixed(1)}px;background:var(--${bad&&kind==="max"?"danger":col});${bad&&kind!=="max"?"opacity:.5":""}"></i><span>${lbl(p.d)}</span></div>`; }).join("")}
+    ${goal?`<div class="goal" style="bottom:${(18+goal/max*H).toFixed(1)}px" aria-hidden="true"></div>`:""}</div>`;
+}
+function trendSheet(key){
+  const c = child(), M = metricOf(c, key); if (!M) return;
+  UI.trendKey = key; const days = UI.trendDays || 7;
+  const pts = series(c, key, days), goal = M.goal(c), unitH = key === "sleep";
+  const vals = pts.map(p=>p.v), avg = sum(vals)/days, prev = series(c, key, days*2).slice(0, days), pavg = sum(prev.map(p=>p.v))/days;
+  const hit = goal ? vals.filter(v => M.kind === "max" ? v <= goal : v >= goal).length : null;
+  const fmt = v => unitH ? fmtNum(v,1)+" h" : M.u === "min" ? fmtMin(v) : fmtNum(v, v%1?1:0)+(M.u?" "+M.u:"");
+  let extra = "";
+  if (key === "sleep"){ const naps = sum(pts.map(p => dayTotals(c, p.d).nap))/days; extra = `<div class="stat"><span class="muted tiny">${T("Siestes / jour")}</span><div class="v">${fmtMin(naps)}</div></div>`; }
+  sheet(`${sheetHead(T(M.l))}<div class="seg">${[7,30,90].map(n=>`<button data-act="trendDays" data-v="${n}" aria-pressed="${days===n}">${T("{n} jours",{n})}</button>`).join("")}</div>
+    ${bars(pts, goal, M.col, M.kind, unitH)}
+    <div class="stats"><div class="stat"><span class="muted tiny">${T("Moyenne / jour")}</span><div class="v">${fmt(avg)}</div></div><div class="stat"><span class="muted tiny">${T("Période précédente")}</span><div class="v">${fmt(pavg)}</div></div><div class="stat"><span class="muted tiny">${T("Min · max")}</span><div class="v" style="font-size:1.1rem">${fmt(Math.min(...vals))} · ${fmt(Math.max(...vals))}</div></div>${hit!=null?`<div class="stat"><span class="muted tiny">${T("Jours où l'objectif est atteint")}</span><div class="v">${hit}/${days}</div></div>`:""}${extra}</div>
+    ${goal?`<p class="tiny muted">${T("Ligne pointillée : objectif de {v}.",{v:fmt(goal)})}</p>`:""}`, "wide");
+}
+function moodCard(c){
+  const order = ["Difficile","Moyen","Bien","Super"], cols = ["rose","butter","mint","sky"];
+  const days = Array.from({length:14}, (_,i) => addDays(today(), i-13));
+  const cells = days.map(d => { const l = dayLogs(c, d).find(x => x.type==="mood"); const i = l ? order.indexOf(l.data.mood) : -1;
+    return `<div title="${fmtD(d,{day:"numeric",month:"short"})}${l?` : ${T(l.data.mood)}`:""}" style="flex:1;min-width:0;height:${i<0?8:14+i*12}px;border-radius:6px;background:${i<0?"var(--surface2)":`var(--${cols[i]})`}"></div>`; }).join("");
+  return `<div class="card"><div class="card-h"><h3>${T("Humeur, 14 jours")}</h3><div class="legend">${order.map((o,i)=>`<span><i style="background:var(--${cols[i]});width:10px;height:10px;border-radius:3px"></i>${T(o)}</span>`).join("")}</div></div><div style="display:flex;gap:4px;align-items:flex-end;height:56px">${cells}</div><p class="tiny muted">${T("Plusieurs jours difficiles de suite ? Prenez un moment pour en parler. LigneParents : 1-800-361-5085.")}</p></div>`;
+}
+const WD = () => LANG === "en" ? ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"] : ["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
+function sportsCard(c){
+  const m = ageMonths(c);
+  const sugg = m < 72 ? T("Jeu libre dehors, natation parent-enfant, vélo à pousser, danse, parc") : m < 144 ? T("Varier : natation, vélo, soccer, gymnastique, arts martiaux, ski, escalade") : T("Un sport d'équipe, une activité d'endurance et du renforcement 3 fois par semaine");
+  const weekMin = sum(Array.from({length:7},(_,i)=>dayTotals(c, addDays(today(), -i)).act));
+  return `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Sports et activités")}</span><h2>${T("Horaire de la semaine")}</h2></div>${isKidUser()?"":`<button class="btn sm kid" data-act="activityForm">${icon("plus")}${T("Activité")}</button>`}</div>
+    ${c.activities.length?`<div class="list">${c.activities.map(a=>`<div class="li"><div class="ic" style="background:var(--mint-bg);color:var(--mint-ink)">${icon("ball")}</div><div class="grow"><div class="li-title">${esc(a.name)}</div><div class="small muted">${a.days.map(d=>WD()[d]).join(", ")}${a.time?` · ${a.time}`:""}${a.place?` · ${esc(a.place)}`:""}</div></div>${isKidUser()?"":`<button class="icon-btn flat" data-act="delActivity" data-v="${a.id}" aria-label="${T("Supprimer")}">${icon("trash")}</button>`}</div>`).join("")}</div>`:`<p class="small muted">${T("Aucune activité régulière. Elles apparaîtront aussi dans l'agenda.")}</p>`}
+    <div class="banner ok">${icon("run")}<div><b class="num">${fmtMin(weekMin)}</b> ${T("d'activité notée sur 7 jours.")} ${T("Idées pour cet âge :")} ${sugg}.</div></div></div>`;
+}
+function logLine(c, l){
+  let T0 = LOGT[l.type], tr = null;
+  if (l.type === "trk"){ tr = (c.trackers||[]).find(x => x.id === l.data.tid); T0 = {label:tr?.name||T("Suivi"), ic:tr?.icon||"target", c:tr?.color||"teal"}; }
+  T0 = T0 || LOGT.note; const d = l.data || {};
+  let txt = T(T0.label), sub = "";
+  if (l.type === "feed") { txt = T(d.mode || "Boire"); sub = [d.ml?`${d.ml} ml`:"", l.end?fmtDur(l.end-l.t-(d.pausedMin||0)*6e4):""].filter(Boolean).join(" · "); }
+  if (l.type === "sleep") { txt = T(d.kind || "Dodo"); sub = l.end ? `${fmtT(l.t)} → ${fmtT(l.end)} · ${fmtDur(l.end-l.t-(d.pausedMin||0)*6e4)}${d.where?` · ${T(d.where)}`:""}` : T("en cours"); }
+  if (l.type === "diaper") { txt = `${T("Couche")} · ${T(d.kind)}`; sub = [d.color, d.texture].filter(Boolean).map(T).join(", "); }
+  if (l.type === "solid") { txt = (d.items||[]).map(i => i.name).join(", ") || d.food || T("Repas"); sub = [d.allergen?T("Allergène : {a}",{a:T(d.allergen)}):"", d.reaction?T("réaction : {r}",{r:d.reaction}):"", d.ai?T("analysé par photo"):""].filter(Boolean).join(" · "); }
+  if (l.type === "temp") { txt = `${fmtNum(d.temp)} °C`; sub = T(d.site); }
+  if (l.type === "med") { txt = d.name || T("Médicament"); sub = d.dose || ""; }
+  if (l.type === "mood") txt = `${T("Humeur")} · ${T(d.mood)}`;
+  if (l.type === "screen") txt = `${T("Écran")} · ${fmtMin(d.min)}`;
+  if (l.type === "tummy") txt = `${T("Sur le ventre")} · ${fmtMin(d.min)}`;
+  if (l.type === "read") { txt = `${T("Lecture")} · ${fmtMin(d.min)}`; sub = d.title || ""; }
+  if (l.type === "activity") { txt = `${T(d.what || "Activité")} · ${fmtMin(d.min)}`; sub = T(d.intensity || ""); }
+  if (l.type === "trk") { txt = `${esc(tr?.name||"")} · ${fmtNum(d.v, d.v%1?1:0)} ${tr?.unit||""}`; }
+  if (l.type === "note") txt = d.text;
+  if (d.note && l.type!=="note") sub = [sub, d.note].filter(Boolean).join(" · ");
+  const canDel = !isKidUser() || allow("delete");
+  return `<div class="li"><div class="ic" style="background:var(--${T0.c}-bg);color:var(--${T0.c}-ink)">${icon(T0.ic)}</div><div class="grow"><div class="li-title">${esc(txt)}</div>${sub?`<div class="small muted">${esc(sub)}</div>`:""}</div><span class="small muted num">${fmtT(l.t)}</span>${canDel?`<button class="icon-btn flat" data-act="delLog" data-v="${l.id}" aria-label="${T("Supprimer")}">${icon("trash")}</button>`:""}</div>`;
+}
+
+/* ---------- formulaires du journal (choix rapides + note facultative) ---------- */
+const pick = (name, opts, sel) => `<div class="pick" data-pick="${name}">${opts.map(o => `<button type="button" data-act="pickOpt" data-v="${esc(o)}" aria-pressed="${o===sel}">${esc(T(o))}</button>`).join("")}</div><input type="hidden" id="pk-${name}" value="${esc(sel||"")}">`;
+const pickVal = name => val("pk-"+name);
+function logForm(type){
+  const c = child(), m = ageMonths(c); let body = "", title;
+  const time = fld("f-t",T("Heure"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(Date.now())}">`);
+  const note = fld("f-note",T("Note (facultatif)"),`<input class="inp" id="f-note">`);
+  if (type.startsWith("trk:")){
+    const t = c.trackers.find(x => "trk:"+x.id === type); title = t.name;
+    body = t.type === "yesno" ? `<p class="small muted">${T("Touchez Enregistrer pour noter « oui » maintenant.")}</p>${time}${note}`
+      : t.type === "scale" ? `${fld("f-v",T("Note de 1 à 5"),pick("scale",["1","2","3","4","5"],"3"))}${time}${note}`
+      : `${fld("f-v",`${T("Valeur")}${t.unit?` (${esc(t.unit)})`:""}`,numIn("f-v","",t.type==="count"?1:"any", t.type==="count"?1:""))}${time}${note}`;
+  } else {
+    title = T(LOGT[type].label);
+    if (type === "feed") body = `${pick("mode",QUICK.feedSide,"Sein gauche")}<div class="fgrid">${fld("f-ml",T("Quantité (ml)"),numIn("f-ml",T("biberon")))}${fld("f-min",T("Durée (min)"),numIn("f-min","",1))}</div>${time}<button type="button" class="btn ghost" data-act="startTimer" data-v="feed">${icon("bottle")}${T("Démarrer une minuterie de tétée")}</button>`;
+    if (type === "sleep") body = `${pick("kind",QUICK.sleepKind, new Date().getHours() >= 19 || new Date().getHours() < 6 ? "Nuit" : "Sieste")}<button type="button" class="btn kid" data-act="startTimer" data-v="sleep">${icon("moon")}${T("Démarrer maintenant (minuterie)")}</button><div class="sep"></div><p class="small muted">${T("Ou noter un sommeil terminé :")}</p><div class="fgrid">${fld("f-t",T("Début"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(Date.now()-(m>=36?9:1)*36e5)}">`)}${fld("f-end",T("Fin"),`<input class="inp" id="f-end" type="datetime-local" value="${localInput(Date.now())}">`)}</div>${fld("x",T("Où (facultatif)"),pick("where",QUICK.sleepWhere,""))}`;
+    if (type === "diaper") body = `${pick("kind",["Pipi","Selle","Pipi et selle"],"Pipi")}<div class="field"><label>${T("Couleur (facultatif)")}</label>${pick("color",QUICK.diaperColor,"")}</div><div class="field"><label>${T("Consistance (facultatif)")}</label>${pick("texture",QUICK.diaperTexture,"")}</div>${time}${note}`;
+    if (type === "solid"){ mealForm(); return; }
+    if (type === "temp") body = `${fld("f-temp",T("Température (°C)"),`<input class="inp" id="f-temp" type="number" inputmode="decimal" step="0.1" min="34" max="43" placeholder="38,2">`)}${pick("site",["Rectale","Buccale","Axillaire","Tympanique"],m<24?"Rectale":"Buccale")}${time}<p class="tiny muted">${T("Avant 2 ans, la mesure rectale est la plus fiable.")}</p>`;
+    if (type === "med") body = `${pick("name",QUICK.medCommon,"")}${fld("f-name",T("Ou un autre médicament"),`<input class="inp" id="f-name">`)}${fld("f-dose",T("Dose donnée (selon l'étiquette ou la prescription)"),`<input class="inp" id="f-dose" placeholder="${T("Ex. : 2,5 ml")}">`)}${time}<p class="tiny muted">${T("Pour la dose, suivez l'étiquette selon le poids de l'enfant, ou demandez au pharmacien.")}</p>`;
+    if (type === "mood") body = `${pick("mood",QUICK.mood,"Bien")}${note}${time}`;
+    if (type === "screen") body = `${pick("mins",["15","30","45","60","90","120"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","60"))}${time}`;
+    if (type === "tummy") body = `${pick("mins",["5","10","15","20","30"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","10"))}${time}`;
+    if (type === "read") body = `${pick("mins",["10","15","20","30","45"],"")}<div class="fgrid">${fld("f-min",T("Ou minutes exactes"),numIn("f-min","15"))}${fld("f-title",T("Livre (facultatif)"),`<input class="inp" id="f-title" list="books">`)}</div><datalist id="books">${[...new Set(c.logs.filter(l=>l.type==="read"&&l.data.title).map(l=>l.data.title))].map(t=>`<option value="${esc(t)}">`).join("")}</datalist>${time}`;
+    if (type === "activity") body = `${pick("what",[...new Set([...c.activities.map(a=>a.name), ...QUICK.activity])].slice(0,12),"")}${fld("f-what",T("Ou autre activité"),`<input class="inp" id="f-what">`)}${pick("mins",["15","30","45","60","90"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","30"))}${pick("intensity",["Légère","Modérée","Intense"],"Modérée")}${time}`;
+    if (type === "note") body = `${fld("f-text",T("Note"),`<textarea class="inp" id="f-text"></textarea>`)}${time}`;
+  }
+  sheet(`<form class="stack" data-form="log" data-type="${type}" style="gap:14px">${sheetHead(esc(title))}${body}<button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`);
+}
+function goalsForm(){
+  const c = child(), G = goals(c), g = G.rec;
+  sheet(`<form class="stack" data-form="goals" style="gap:14px">${sheetHead(T("Objectifs de {n}",{n:esc(c.nick||c.name)}))}
+    <p class="small muted">${T("Recommandations usuelles pour {b} entre parenthèses. Modifiez selon votre famille ; l'app vous rappellera de les revoir quand l'âge changera de tranche.",{b:g.band})}</p>
+    <div class="fgrid">${fld("g-sleep",`${T("Sommeil (h)")} <span class="muted">(${g.sleep[0]}-${g.sleep[1]})</span>`,numIn("g-sleep","",0.5,G.sleep))}${fld("g-act",`${T("Activité (min)")} <span class="muted">(${g.act})</span>`,numIn("g-act","",5,G.act))}${fld("g-screen",`${T("Écran max (min)")} <span class="muted">(${g.screen||0})</span>`,numIn("g-screen","",5,G.screen))}${fld("g-read",`${T("Lecture (min)")} <span class="muted">(${g.read})</span>`,numIn("g-read","",5,G.read))}</div>
+    <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button><button type="button" class="btn ghost" data-act="resetGoals">${T("Recommandations")}</button></div></form>`);
+}
+function trackerForm(id){
+  const c = child(), t = c.trackers.find(x => x.id === id) || {name:"", type:"count", unit:"", goal:"", goalKind:"min", color:"teal", icon:"target"};
+  const ics = ["target","drop","pill","heart","star","book","run","smile","tooth","spoon","bed","note"];
+  sheet(`<form class="stack" data-form="tracker" data-id="${id||""}" style="gap:14px">${sheetHead(id?T("Modifier le suivi"):T("Nouveau suivi personnalisé"))}
+    <p class="small muted">${T("Ex. : verres d'eau, crises d'asthme, pipi au pot, minutes de piano, devoirs.")}</p>
+    ${fld("t-name",T("Nom"),inp("t-name",t.name,"required"))}
+    <div class="field"><label>${T("Type")}</label>${radios("ttype",[["count",T("Compteur (+1)")],["number",T("Nombre ou minutes")],["yesno",T("Oui / non")],["scale",T("Échelle 1 à 5")]],t.type)}</div>
+    <div class="fgrid">${fld("t-unit",T("Unité (facultatif)"),inp("t-unit",t.unit))}${fld("t-goal",T("Objectif par jour (facultatif)"),numIn("t-goal","",1,t.goal||""))}</div>
+    <div class="field"><label>${T("L'objectif est")}</label>${radios("tkind",[["min",T("un minimum")],["max",T("un maximum")]],t.goalKind)}</div>
+    <div class="field"><label>${T("Couleur")}</label>${swatches("tcolor",t.color)}</div>
+    <div class="field"><label>${T("Icône")}</label><div class="radio-row">${ics.map(i=>`<label><input type="radio" name="ticon" value="${i}" ${t.icon===i?"checked":""}><span style="display:grid;place-items:center;width:42px;height:38px;padding:0">${icon(i).replace("<svg",'<svg style="width:20px;height:20px"')}</span></label>`).join("")}</div></div>
+    <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${id?`<button type="button" class="btn danger" data-act="delTracker" data-v="${id}">${T("Supprimer")}</button>`:""}</div></form>`);
+}
+function activityForm(){
+  sheet(`<form class="stack" data-form="activity" style="gap:14px">${sheetHead(T("Activité régulière"))}
+    ${fld("a-name",T("Activité"),`<input class="inp" id="a-name" required list="actlist"><datalist id="actlist">${QUICK.activity.map(a=>`<option value="${esc(T(a))}">`).join("")}</datalist>`)}
+    <div class="field"><label>${T("Jours")}</label>${checks("days",[1,2,3,4,5,6,0].map(d=>[String(d),WD()[d]]))}</div>
+    <div class="fgrid">${fld("a-time",T("Heure"),`<input class="inp" id="a-time" type="time">`)}${fld("a-place",T("Lieu"),`<input class="inp" id="a-place">`)}</div>
+    <button class="btn kid" type="submit">${T("Ajouter")}</button></form>`);
+}
+
+/* ======== REPAS ET BOIRES ======== */
+function repas(c){
+  const m = ageMonths(c);
+  let h = "";
+  if (mod(c,"feeding")){
+    const days = Array.from({length:7},(_,i)=>dayTotals(c, addDays(today(), i-6)));
+    h += `<div class="card"><div class="card-h"><h2>${T("Boires")}</h2><button class="btn sm kid" data-act="log" data-v="feed">${icon("plus")}${T("Boire")}</button></div>
+      <div class="stats"><div class="stat"><span class="muted tiny">${T("Aujourd'hui")}</span><div class="v">${days[6].feeds}<small>${days[6].ml?days[6].ml+" ml":""}</small></div></div><div class="stat"><span class="muted tiny">${T("Moyenne 7 jours")}</span><div class="v">${fmtNum(sum(days.map(d=>d.feeds))/7,1)}</div></div></div>
+      ${bars(days.map((d,i)=>({d:addDays(today(),i-6), v:d.feeds})), null, "peach")}</div>`;
+  }
+  if (!mod(c,"solids")) return h;
+  const fav = c.foodFav || [];
+  h += `<div class="card"><div class="card-h"><h2>${T("Noter un repas")}</h2><div class="row">${feat("ai")&&allow("ai")?`<button class="btn sm ghost" data-act="aiMealPhoto">${icon("camera")}${T("Photo du repas (IA)")}</button>`:""}<button class="btn sm kid" data-act="log" data-v="solid">${icon("plus")}${T("Repas")}</button></div></div>
+    ${fav.length ? `<span class="eyebrow">${T("Favoris : touchez pour noter")}</span><div class="pick">${fav.map(f => `<button data-act="quickFood" data-v="${esc(f.name)}" style="border-color:var(--${FOOD_GROUPS[f.group]?.color||"line"})">${esc(f.name)}</button>`).join("")}</div>` : `<p class="small muted">${T("Les aliments marqués d'une étoile apparaîtront ici pour les noter en un geste.")}</p>`}
+    <div class="banner soft">${icon("spoon")}<div class="small"><b>${T("Portions pour cet âge :")}</b> ${T(portionHint(m))}</div></div></div>`;
+  // répartition par groupe sur 7 jours
+  const G = {}; for (let i=0;i<7;i++){ const t = dayTotals(c, addDays(today(), -i)); for (const k in t.groups) G[k] = (G[k]||0) + t.groups[k]; }
+  const tot = sum(Object.values(G));
+  h += `<div class="card"><div class="card-h"><h2>${T("L'assiette de la semaine")}</h2><span class="tiny muted">${T("Guide alimentaire canadien")}</span></div>
+    ${tot ? `<div class="stack" style="gap:8px">${Object.entries(FOOD_GROUPS).map(([k,g]) => { const p = (G[k]||0)/tot; return `<div><div class="row between small"><b style="color:var(--${g.color}-ink)">${T(g.label)}</b><span class="muted num">${Math.round(p*100)} %${g.target?` · ${T("cible")} ${Math.round(g.target*100)} %`:""}</span></div><div class="dombar" style="position:relative"><i style="width:${(p*100).toFixed(0)}%;background:var(--${g.color})"></i>${g.target?`<span style="position:absolute;top:-2px;bottom:-2px;left:${g.target*100}%;width:2px;background:var(--ink)"></span>`:""}</div></div>`; }).join("")}</div>` : `<p class="small muted">${T("Notez quelques repas pour voir l'équilibre de la semaine.")}</p>`}
+    ${tot ? (() => { const low = Object.entries(FOOD_GROUPS).filter(([k,g]) => g.target && (G[k]||0)/tot < g.target*0.7).map(([k]) => k); return low.length ? `<div class="banner ok">${icon("bulb")}<div class="small"><b>${T("Idées pour équilibrer :")}</b> ${low.map(k => `${T(FOOD_GROUPS[k].label)} : ${FOOD_SUGG[k].slice(0,4).map(T).join(", ")}`).join(" · ")}</div></div>` : `<div class="banner ok">${icon("check")}<div class="small">${T("Belle variété cette semaine.")}</div></div>`; })() : ""}</div>`;
+  if (m < 36) h += allergenCard(c);
+  const meals = c.logs.filter(l => l.type === "solid").sort((a,b)=>b.t-a.t).slice(0,12);
+  h += `<div class="card"><div class="card-h"><h2>${T("Derniers repas")}</h2></div>${meals.length?`<div class="list">${meals.map(l=>logLine(c,l)).join("")}</div>`:empty("spoon",T("Aucun repas noté."))}</div>`;
+  return h;
+}
+function mealForm(prefill){
+  const c = child(); UI.meal = prefill || {items:[{name:"", group:"legfruits", qty:""}]};
+  const favNames = (c.foodFav||[]).map(f => f.name);
+  const rows = UI.meal.items.map((it,i) => `<div class="stack" style="gap:6px;padding:10px;border-radius:14px;background:var(--surface2)"><div class="row"><input class="inp grow" data-meal="${i}" data-k="name" value="${esc(it.name)}" placeholder="${T("Aliment")}" list="foodlist"><input class="inp" style="width:110px" data-meal="${i}" data-k="qty" value="${esc(it.qty)}" placeholder="${T("Quantité")}"><button type="button" class="icon-btn flat" data-act="favFood" data-v="${i}" aria-label="${T("Favori")}" style="color:var(--butter-ink)">${icon("star").replace('fill="none"', favNames.includes(it.name)?'fill="currentColor"':'fill="none"')}</button>${UI.meal.items.length>1?`<button type="button" class="icon-btn flat" data-act="rmMealItem" data-v="${i}" aria-label="${T("Retirer")}">${icon("x")}</button>`:""}</div>
+    <div class="pick">${Object.entries(FOOD_GROUPS).map(([k,g]) => `<button type="button" data-act="mealGroup" data-v="${i}:${k}" aria-pressed="${it.group===k}" style="font-size:.78rem;padding:5px 9px">${T(g.label)}</button>`).join("")}</div></div>`).join("");
+  sheet(`<form class="stack" data-form="meal" style="gap:12px">${sheetHead(T("Repas"))}
+    ${UI.meal.photo?`<img src="${UI.meal.photo}" alt="" style="border-radius:16px;max-height:200px;object-fit:cover">`:""}
+    ${UI.meal.comment?`<div class="banner soft">${icon("spark")}<div class="small">${esc(UI.meal.comment)}</div></div>`:""}
+    <div id="mealItems" class="stack" style="gap:8px">${rows}</div><datalist id="foodlist">${[...new Set([...favNames, ...Object.values(FOOD_SUGG).flat().map(T)])].map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+    <button type="button" class="btn ghost" data-act="addMealItem">${icon("plus")}${T("Ajouter un aliment")}</button>
+    ${ageMonths(c) < 36 ? fld("f-al",T("Contient un allergène ?"),`<select class="inp" id="f-al"><option value="">${T("Non")}</option>${ALLERGENS.map(a=>`<option value="${a}">${T(a)}</option>`).join("")}</select>`) : ""}
+    ${fld("f-re",T("Réaction ou commentaire (facultatif)"),`<input class="inp" id="f-re">`)}
+    ${fld("f-t",T("Heure"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(Date.now())}">`)}
+    <button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`);
+}
+function allergenCard(c){
+  const log = c.allergensLog || {};
+  return `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Introduction des allergènes")}</span><h2>${T("Exposition régulière")}</h2></div><span class="chip mint num">${ALLERGENS.filter(a=>(log[a]||[]).length).length}/${ALLERGENS.length}</span></div>
+  <p class="small muted">${T("Une fois introduit sans réaction, gardez l'aliment au menu quelques fois par semaine. Urticaire étendue, vomissements répétés ou difficulté à respirer : 911.")}</p>
+  <div class="tbl"><table><thead><tr><th>${T("Aliment")}</th><th>${T("Fois")}</th><th>${T("Dernière")}</th><th></th></tr></thead><tbody>
+  ${ALLERGENS.map(a => { const L = (log[a]||[]).slice().sort(); const last = L[L.length-1]; const stale = last && (today()-parseD(last))/DAY > 10;
+    return `<tr><td style="font-weight:600">${T(a)}</td><td><span class="kbd-num">${L.length}</span></td><td class="small" style="color:var(--${stale?"butter-ink":"muted"})">${last?fmtD(last,{day:"numeric",month:"short"})+(stale?" · "+T("à redonner"):""):"—"}</td><td><button class="btn sm ghost" data-act="allergen" data-v="${esc(a)}">+ ${T("Aujourd'hui")}</button></td></tr>`; }).join("")}
+  </tbody></table></div></div>`;
+}
+
+/* ======== CROISSANCE ======== */
+function croissance(c){
+  const m = ageMonths(c);
+  const avail = Object.keys(MEAS).filter(k => k !== "ofc" || (mod(c,"ofc") && m < 66)).filter(k => k !== "weight" || m < 126);
+  if (!avail.includes(UI.sub.courbes)) UI.sub.courbes = avail.includes("weight") ? "weight" : "height";
+  const k = UI.sub.courbes, alerts = growthAlerts(c).filter(a => a.meas === k), vel = heightVelocity(c), mp = midParental(c);
+  let h = `<div class="card"><div class="card-h"><h2>${T("Courbes de croissance OMS")}</h2>${isKidUser()?"":`<button class="btn kid sm" data-act="growthForm">${icon("plus")}${T("Nouvelle mesure")}</button>`}</div>
+    <div class="row between"><div class="seg">${avail.map(x=>`<button data-act="meas" data-v="${x}" aria-pressed="${x===k}">${T(MEAS[x].label)}</button>`).join("")}</div>
+    ${correction(c)>0?`<div class="seg"><button data-act="chrono" data-v="0" aria-pressed="${!UI.chrono}">${T("Âge corrigé")}</button><button data-act="chrono" data-v="1" aria-pressed="${UI.chrono}">${T("Chronologique")}</button></div>`:""}</div>
+    <div class="row between"><div class="seg" id="rangeSeg"></div><div class="chart-tools"><button class="icon-btn" data-act="zoom" data-v="in" aria-label="${T("Zoom avant")}">${icon("zoomin")}</button><button class="icon-btn" data-act="zoom" data-v="out" aria-label="${T("Zoom arrière")}">${icon("zoomout")}</button><button class="icon-btn" data-act="zoom" data-v="left" aria-label="${T("Plus tôt")}">${icon("left")}</button><button class="icon-btn" data-act="zoom" data-v="right" aria-label="${T("Plus tard")}">${icon("right")}</button><button class="icon-btn" data-act="chartFull" aria-label="${T("Agrandir")}">${icon("expand")}</button></div></div>
+    <div class="chart-wrap" id="chart"></div>
+    <div class="legend"><span><i style="background:var(--soft)"></i>3e · 97e</span><span><i style="background:var(--soft);opacity:.6"></i>15e · 85e</span><span><i style="background:var(--muted)"></i>50e</span><span><i style="background:var(--kid);height:8px;width:8px;border-radius:50%"></i>${esc(c.nick||c.name)}</span><span>${T("Glissez le graphique pour le déplacer")}</span></div>
+    ${alerts.map(a => a.out ? `<div class="banner warn">${icon("info")}<div>${a.last.z<0?T("La dernière mesure est sous le 3e percentile."):T("La dernière mesure est au-dessus du 97e percentile.")} ${T("Ce n'est pas forcément anormal ; montrez la courbe au médecin.")}</div></div>`
+      : `<div class="banner warn">${icon("info")}<div><b>${T("Changement de couloir.")}</b> ${T("Depuis le {d}, la courbe a franchi {n} lignes de percentiles. À montrer au médecin à la prochaine visite.",{d:fmtD(a.from.date), n:a.n})}</div></div>`).join("")}
+  </div>`;
+  AFTER.push(() => { drawChart(c, "#chart"); bindChartPan("#chart", c); });
+  h += `<div class="grid">`;
+  if (vel) { const slow = m > 36 && m < 120 && vel.v < 4; h += `<div class="card c6"><span class="eyebrow">${T("Vitesse de croissance")}</span><div class="stat"><div class="v num">${fmtNum(vel.v,1)}<small>${T("cm / an")}</small></div><span class="small muted">${fmtD(vel.from.date)} → ${fmtD(vel.to.date)}</span></div>${slow?`<div class="banner warn">${icon("info")}<div>${T("Moins de 4 cm par an entre 3 ans et la puberté : à vérifier avec le médecin.")}</div></div>`:`<p class="small muted">${T("Repère : environ 25 cm la 1re année, 12 cm la 2e, puis 5 à 7 cm par an jusqu'à la puberté.")}</p>`}</div>`; }
+  if (mp) h += `<div class="card c6"><span class="eyebrow">${T("Taille cible parentale")}</span><div class="stat"><div class="v num">${fmtNum(mp.t,0)}<small>cm</small></div><span class="small muted">${T("Intervalle habituel {a} à {b} cm",{a:fmtNum(mp.lo,0), b:fmtNum(mp.hi,0)})}</span></div></div>`;
+  h += `</div>`;
+  if (mod(c,"projection")){ h += `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Modèle prédictif")}</span><h2>${T("Projection de la taille adulte")}</h2></div></div><div id="proj"></div></div>`; AFTER.push(() => drawProjection(c)); }
+  h += `<div class="card"><div class="card-h"><h2>${T("Historique")}</h2></div>`;
+  if (!c.growth.length) h += empty("chart", T("Ajoutez une première mesure."));
+  else h += `<div class="tbl"><table><thead><tr><th>${T("Date")}</th><th>${T("Âge")}</th><th>${T("Poids")}</th><th>${T("Taille")}</th>${mod(c,"ofc")?`<th>${T("PC")}</th>`:""}<th>${T("IMC")}</th><th></th></tr></thead><tbody>${[...c.growth].sort((a,b)=>a.date<b.date?1:-1).map(g => {
+    const am = effAge(c, parseD(g.date));
+    const cell = (key, v, dp) => { if (!v) return `<td class="muted">—</td>`; const z = zScore(key, c.sex, am, v); return `<td><b>${fmtNum(v,dp)}</b>${z!=null?`<div class="tiny muted">P${pctLabel(z)} · z ${z>=0?"+":""}${fmtNum(z,2)}</div>`:""}</td>`; };
+    const bmi = g.weight && g.height ? g.weight/Math.pow(g.height/100,2) : null;
+    return `<tr><td>${fmtD(g.date)}</td><td class="small">${ageLabel(ageMonths(c, parseD(g.date)))}</td>${cell("weight",Number(g.weight),2)}${cell("height",Number(g.height),1)}${mod(c,"ofc")?cell("ofc",Number(g.ofc),1):""}${cell("bmi",bmi,1)}<td>${isKidUser()?"":`<button class="icon-btn flat" data-act="delGrowth" data-v="${g.id}" aria-label="${T("Supprimer")}">${icon("trash")}</button>`}</td></tr>`; }).join("")}</tbody></table></div>`;
+  return h + `<p class="tiny muted">${T("Normes OMS de croissance (0-5 ans) et référence OMS 2007 (5-19 ans), recommandées au Canada.")}</p></div>`;
+}
+function ranges(k){
+  const r = [{id:"0-2", a:0, b:24, l:T("0-2 ans")}, {id:"2-5", a:24, b:60, l:T("2-5 ans")}];
+  if (k === "weight") r.push({id:"5-10", a:60, b:120, l:T("5-10 ans")});
+  if (k === "height" || k === "bmi") r.push({id:"5-19", a:60, b:228, l:T("5-19 ans")});
+  return r;
+}
+const niceStep = v => { const e = Math.pow(10, Math.floor(Math.log10(v))); const f = v/e; return (f<1.5?1:f<3.5?2:f<7.5?5:10)*e; };
+function chartRange(c){
+  const k = UI.sub.courbes, rs = ranges(k), am = effAge(c, today(), UI.chrono);
+  const R0 = rs.find(r => r.id === UI.range) || rs.find(r => am < r.b) || rs[rs.length-1];
+  const max = LMS[k][c.sex==="M"?"M":"F"].slice(-1)[0][0];
+  return { rs, R0, R: UI.zoom ? {a:clamp(UI.zoom.a,0,max-1), b:clamp(UI.zoom.b,1,max)} : {a:R0.a, b:R0.b}, max };
+}
+function drawChart(c, sel, big=false){
+  const el = $(sel); if (!el) return;
+  const k = UI.sub.courbes, {rs, R0, R} = chartRange(c);
+  if ($("#rangeSeg")) $("#rangeSeg").innerHTML = rs.map(r => `<button data-act="range" data-v="${r.id}" aria-pressed="${!UI.zoom && r.id===R0.id}">${r.l}</button>`).join("");
+  const pts = growthPoints(c, k, UI.chrono).filter(p => p.m >= R.a - 0.01 && p.m <= R.b + 0.01);
+  const W = 720, H = big ? 460 : 380, P = {l:46, r:44, t:18, b:34}, span = R.b - R.a, step = span <= 12 ? 0.25 : span <= 30 ? 0.5 : 1;
+  const curves = PCT_LINES.map(L => { const arr=[]; for (let m=R.a; m<=R.b+1e-9; m+=step){ const p = lmsAt(k, c.sex, m); if (p) arr.push([m, xAtZ(p, L.z)]); } return {...L, arr}; });
+  let lo = Infinity, hi = -Infinity;
+  curves.forEach(cv => cv.arr.forEach(([,y]) => { lo = Math.min(lo,y); hi = Math.max(hi,y); }));
+  pts.forEach(p => { lo = Math.min(lo,p.x); hi = Math.max(hi,p.x); });
+  if (!isFinite(lo)) { el.innerHTML = ""; return; }
+  const ys = niceStep((hi-lo)*1.12/6); lo = Math.max(0, Math.floor((lo-(hi-lo)*.06)/ys)*ys); hi = Math.ceil((hi+(hi-lo)*.06)/ys)*ys;
+  const X = m => P.l + (m-R.a)/span*(W-P.l-P.r), Y = v => H-P.b - (v-lo)/(hi-lo)*(H-P.t-P.b);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${T(MEAS[k].label)}" style="font-family:var(--body)">`;
+  for (let v=lo; v<=hi+1e-9; v+=ys) s += `<line x1="${P.l}" x2="${W-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P.l-8}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmtNum(v, ys<1?1:0)}</text>`;
+  const xs = span <= 6 ? 1 : span <= 24 ? 3 : span <= 36 ? 6 : 12;
+  for (let m=Math.ceil(R.a/xs)*xs; m<=R.b; m+=xs) s += `<line x1="${X(m)}" x2="${X(m)}" y1="${P.t}" y2="${H-P.b}" stroke="var(--line)" stroke-dasharray="2 4"/><text x="${X(m)}" y="${H-P.b+18}" text-anchor="middle" font-size="11" fill="var(--muted)">${R.b<=30?m+" "+T("m"):fmtNum(m/12, m%12?1:0)+" "+T("a")}</text>`;
+  const c15 = curves[1].arr, c85 = curves[3].arr;
+  s += `<path d="M${c15.map(([m,v])=>`${X(m)},${Y(v)}`).join("L")}L${c85.slice().reverse().map(([m,v])=>`${X(m)},${Y(v)}`).join("L")}Z" fill="var(--kid-bg)"/>`;
+  curves.forEach(cv => { const main = cv.p === 50, outer = cv.p === 3 || cv.p === 97;
+    s += `<path d="M${cv.arr.map(([m,v])=>`${X(m).toFixed(1)},${Y(v).toFixed(1)}`).join("L")}" fill="none" stroke="${main?"var(--muted)":"var(--soft)"}" stroke-width="${main?2:outer?1.5:1.2}" ${outer||main?"":'stroke-dasharray="5 4"'}/>`;
+    const last = cv.arr[cv.arr.length-1]; s += `<text x="${W-P.r+6}" y="${Y(last[1])+4}" font-size="11" fill="var(--muted)" font-weight="${main?700:500}">${cv.p}e</text>`; });
+  if (pts.length){
+    s += `<path d="M${pts.map(p=>`${X(p.m).toFixed(1)},${Y(p.x).toFixed(1)}`).join("L")}" fill="none" stroke="var(--kid-ink)" stroke-width="2.5" stroke-linejoin="round"/>`;
+    pts.forEach((p,i) => { const last = i === pts.length-1;
+      s += `<circle cx="${X(p.m)}" cy="${Y(p.x)}" r="${last?7:5}" fill="var(--kid)" stroke="var(--surface)" stroke-width="2.5"><title>${fmtD(p.date)} · ${fmtNum(p.x, MEAS[k].dp)} ${MEAS[k].unit}${p.z!=null?` · P${pctLabel(p.z)}`:""}</title></circle>`;
+      if (last || big) s += `<text x="${Math.min(X(p.m)+10, W-P.r-70)}" y="${Y(p.x)-12}" font-size="${big?11:12}" font-weight="700" fill="var(--kid-ink)">${fmtNum(p.x, MEAS[k].dp)}${p.z!=null?` · P${pctLabel(p.z)}`:""}</text>`; });
+  } else s += `<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="var(--muted)">${T("Aucune mesure dans cette période")}</text>`;
+  el.innerHTML = s + `<text x="${P.l}" y="${P.t-6}" font-size="11" fill="var(--muted)">${MEAS[k].unit}</text></svg>`;
+}
+/* glisser pour déplacer, pincer (ou molette) pour zoomer */
+function bindChartPan(sel, c){
+  const el = $(sel); if (!el) return;
+  let start = null, pinch = null;
+  const cur = () => { const {R} = chartRange(c); return {...R}; };
+  const apply = z => { const {max} = chartRange(c); const w = Math.max(2, Math.min(max, z.b - z.a)); let a = clamp(z.a, 0, max - w); UI.zoom = {a, b:a + w}; drawChart(c, sel, sel !== "#chart"); };
+  el.addEventListener("pointerdown", e => { start = {x:e.clientX, z:cur(), w:el.clientWidth}; el.setPointerCapture?.(e.pointerId); });
+  el.addEventListener("pointermove", e => { if (!start || pinch) return; const dx = e.clientX - start.x; if (Math.abs(dx) < 6) return; const span = start.z.b - start.z.a; apply({a:start.z.a - dx/start.w*span, b:start.z.b - dx/start.w*span}); });
+  el.addEventListener("pointerup", () => start = null); el.addEventListener("pointercancel", () => start = null);
+  el.addEventListener("wheel", e => { e.preventDefault(); const z = cur(), mid = (z.a+z.b)/2, half = (z.b-z.a)/2 * (e.deltaY > 0 ? 1.2 : 0.83); apply({a:mid-half, b:mid+half}); }, {passive:false});
+  el.addEventListener("touchstart", e => { if (e.touches.length === 2){ pinch = {d:Math.abs(e.touches[0].clientX - e.touches[1].clientX), z:cur()}; } }, {passive:true});
+  el.addEventListener("touchmove", e => { if (pinch && e.touches.length === 2){ const d = Math.abs(e.touches[0].clientX - e.touches[1].clientX) || 1, k = pinch.d / d, mid = (pinch.z.a+pinch.z.b)/2, half = (pinch.z.b-pinch.z.a)/2*k; apply({a:mid-half, b:mid+half}); } }, {passive:true});
+  el.addEventListener("touchend", () => { pinch = null; });
+}
+function drawProjection(c){
+  const el = $("#proj"); if (!el) return;
+  const pj = heightProjection(c);
+  if (!pj){ el.innerHTML = `<p class="small muted">${T("Ajoutez au moins une mesure de taille pour voir la projection.")}</p>`; return; }
+  const W = 720, H = 360, P = {l:46, r:64, t:18, b:34};
+  const ref = [-1.8808, 0, 1.8808].map(z => { const arr=[]; for (let m=0; m<=228; m+=2){ const p = lmsAt("height", c.sex, m); if (p) arr.push([m, xAtZ(p, z)]); } return arr; });
+  const lo = 40, hi = Math.ceil(Math.max(ref[2][ref[2].length-1][1], pj.hi, pj.mp?pj.mp.hi:0)/10)*10 + 5;
+  const X = m => P.l + m/228*(W-P.l-P.r), Y = v => H-P.b - (v-lo)/(hi-lo)*(H-P.t-P.b);
+  const pts = growthPoints(c, "height");
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${T("Projection de la taille adulte")}" style="font-family:var(--body)">`;
+  for (let v=50; v<=hi; v+=20) s += `<line x1="${P.l}" x2="${W-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P.l-8}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}</text>`;
+  for (let m=0; m<=228; m+=24) s += `<text x="${X(m)}" y="${H-P.b+18}" text-anchor="middle" font-size="11" fill="var(--muted)">${m/12} ${T("a")}</text>`;
+  ref.forEach((arr,i) => s += `<path d="M${arr.map(([m,v])=>`${X(m).toFixed(1)},${Y(v).toFixed(1)}`).join("L")}" fill="none" stroke="${i===1?"var(--muted)":"var(--soft)"}" stroke-width="${i===1?1.6:1.2}"/>`);
+  s += `<path d="M${pj.curve.map(p=>`${X(p.m).toFixed(1)},${Y(p.lo).toFixed(1)}`).join("L")}L${pj.curve.slice().reverse().map(p=>`${X(p.m).toFixed(1)},${Y(p.hi).toFixed(1)}`).join("L")}Z" fill="var(--kid)" opacity=".22"/>`;
+  s += `<path d="M${X(pj.last.m)},${Y(pj.last.x)}L${pj.curve.map(p=>`${X(p.m).toFixed(1)},${Y(p.x).toFixed(1)}`).join("L")}" fill="none" stroke="var(--kid-ink)" stroke-width="2" stroke-dasharray="6 5"/>`;
+  if (pj.comb != null) s += `<path d="M${X(pj.last.m)},${Y(pj.last.x)}L${pj.curve.map(p=>`${X(p.m).toFixed(1)},${Y(p.comb).toFixed(1)}`).join("L")}" fill="none" stroke="var(--lilac-ink)" stroke-width="2" stroke-dasharray="2 4"/>`;
+  if (pj.mp) s += `<rect x="${W-P.r+8}" y="${Y(pj.mp.hi)}" width="10" height="${Y(pj.mp.lo)-Y(pj.mp.hi)}" rx="5" fill="var(--lilac)" opacity=".7"/><circle cx="${W-P.r+13}" cy="${Y(pj.mp.t)}" r="5" fill="var(--lilac-ink)"/><text x="${W-P.r+24}" y="${Y(pj.mp.t)+4}" font-size="11" fill="var(--lilac-ink)" font-weight="700">${T("cible")}</text>`;
+  s += `<path d="M${pts.map(p=>`${X(p.m).toFixed(1)},${Y(p.x).toFixed(1)}`).join("L")}" fill="none" stroke="var(--kid-ink)" stroke-width="2.5"/>`;
+  pts.forEach(p => s += `<circle cx="${X(p.m)}" cy="${Y(p.x)}" r="4.5" fill="var(--kid)" stroke="var(--surface)" stroke-width="2"/>`);
+  s += `<circle cx="${X(228)}" cy="${Y(pj.adult)}" r="6" fill="var(--kid-ink)"/><text x="${X(228)-8}" y="${Y(pj.adult)-10}" text-anchor="end" font-size="12" font-weight="700" fill="var(--kid-ink)">${fmtNum(pj.adult,0)} cm</text></svg>`;
+  el.innerHTML = `<div class="stats"><div class="stat"><span class="muted tiny">${T("S'il garde son couloir (P{p})",{p:pctLabel(pj.last.z)})}</span><div class="v num">${fmtNum(pj.adult,0)}<small>cm</small></div><span class="small muted">${T("80 % de chances entre {a} et {b} cm",{a:fmtNum(pj.lo,0), b:fmtNum(pj.hi,0)})}</span></div>
+    ${pj.mp?`<div class="stat"><span class="muted tiny">${T("Taille cible parentale")}</span><div class="v num">${fmtNum(pj.mp.t,0)}<small>cm</small></div><span class="small muted">± 8,5 cm</span></div>`:`<div class="stat"><span class="muted tiny">${T("Taille des parents")}</span><button class="btn sm ghost" data-act="kidForm" data-v="${c.id}">${T("Ajouter pour affiner")}</button></div>`}
+    ${pj.comb!=null?`<div class="stat"><span class="muted tiny">${T("Estimation combinée")}</span><div class="v num" style="color:var(--lilac-ink)">${fmtNum(pj.comb,0)}<small>cm</small></div></div>`:""}</div>
+    <div class="chart-wrap">${s}</div>
+    <p class="tiny muted">${pj.last.m < 24 ? T("Avant 2 ans, la projection est peu fiable : les bébés changent souvent de couloir.")+" " : ""}${T("Modèle statistique simple fondé sur les courbes OMS et la taille des parents. La puberté peut modifier la trajectoire. Ce n'est pas une prédiction médicale.")}</p>`;
+}
+function growthForm(){
+  const c = child();
+  sheet(`<form class="stack" data-form="growth" style="gap:14px">${sheetHead(T("Nouvelle mesure"))}
+    ${fld("g-date",T("Date"),`<input class="inp" id="g-date" type="date" value="${iso(today())}" required>`)}
+    <div class="fgrid">${fld("g-w",T("Poids (kg)"),`<input class="inp" id="g-w" type="number" inputmode="decimal" step="0.005" min="0.3" max="200">`)}${fld("g-h",T("Taille (cm)"),`<input class="inp" id="g-h" type="number" inputmode="decimal" step="0.1" min="25" max="230">`)}${mod(c,"ofc")?fld("g-c",T("Périmètre crânien (cm)"),`<input class="inp" id="g-c" type="number" inputmode="decimal" step="0.1" min="20" max="65">`):""}</div>
+    <button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`);
+}
+
+/* ======== SANTÉ ======== */
+function sante(c){
+  const tabs = [];
+  if (mod(c,"vaccines") && (!vaccinesDone(c) || c.modules?.vaccines === true)) tabs.push(["vaccins",T("Vaccins")]);
+  tabs.push(["dossier",T("Dossier")]);
+  if (mod(c,"teeth")) tabs.push(["dents",T("Dents")]);
+  if (!tabs.some(t => t[0] === UI.sub.sante)) UI.sub.sante = tabs[0][0];
+  let h = tabs.length > 1 ? `<div class="seg">${tabs.map(([id,l])=>`<button data-act="sub" data-v="${id}" aria-pressed="${UI.sub.sante===id}">${l}</button>`).join("")}</div>` : "";
+  return h + ({vaccins, dossier, dents}[UI.sub.sante])(c);
+}
+function vaccins(c){
+  const all = PIQ.flatMap(g => vaxStatus(c, g)), done = all.filter(d => d.st === "fait").length, total = all.filter(d => d.st !== "na").length;
+  let h = `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Programme québécois d'immunisation")}</span><h2>${T("Carnet de vaccination")}</h2></div><span class="chip mint num">${done}/${total}</span></div>
+  <div class="row"><a class="btn sm kid" href="https://portal3.clicsante.ca/" target="_blank" rel="noopener">${T("Rendez-vous · Clic Santé")}</a><a class="btn sm ghost" href="https://www.quebec.ca/sante/conseils-et-prevention/vaccination/programme-quebecois-d-immunisation" target="_blank" rel="noopener">${T("Calendrier officiel")}</a></div><div>`;
+  PIQ.forEach(g => { const ds = vaxStatus(c, g);
+    h += `<div class="vgroup"><div><div class="vage">${T(g.label)}</div><div class="tiny muted">${fmtD(ds[0].due,{month:"short",year:"numeric"})}</div></div><div>${g.note?`<p class="small muted" style="margin-bottom:6px">${T(g.note)}</p>`:""}
+      ${ds.map(d => `<div class="vdose"><div class="grow"><div style="font-weight:700">${esc(d.name)}</div><div class="tiny muted">${esc(T(d.short))}${d.rec?` · ${fmtD(d.rec.date)}${d.rec.lot?` · ${T("lot")} ${esc(d.rec.lot)}`:""}${d.rec.site?` · ${esc(T(d.rec.site))}`:""}`:""}</div>${d.rec?.reactions?`<div class="tiny" style="color:var(--rose-ink)">${T("Réaction :")} ${esc(d.rec.reactions)}</div>`:""}</div>
+        <span class="chip ${VSTAT[d.st][0]}">${T(VSTAT[d.st][1])}</span>${isKidUser()?"":`<button class="btn sm ${d.rec?"ghost":"line"}" data-act="vaxForm" data-v="${d.id}">${d.rec?T("Modifier"):T("Noter")}</button>`}</div>`).join("")}</div></div>`; });
+  return h + `</div><p class="tiny muted">${T("Dates approximatives selon la date de naissance. En cas de retard, le CLSC établit le rattrapage selon les intervalles minimaux du PIQ.")}</p></div>`;
+}
+function vaxForm(doseId){
+  const c = child(), g = PIQ.find(g => g.doses.some(d=>d.id===doseId)), d = g.doses.find(d=>d.id===doseId);
+  const r = c.vaccines[doseId] || {date:iso(today()), lot:"", site:"", reactions:""};
+  sheet(`<form class="stack" data-form="vax" data-id="${doseId}" style="gap:14px">${sheetHead(esc(d.name))}<p class="small muted">${T(g.label)} · ${esc(T(d.short))}</p>
+    <div class="fgrid">${fld("v-date",T("Date"),`<input class="inp" id="v-date" type="date" value="${r.date}" required>`)}${fld("v-lot",T("Numéro de lot"),inp("v-lot",r.lot))}</div>
+    <div class="field"><label>${T("Site")}</label>${pick("site",["Cuisse gauche","Cuisse droite","Bras gauche","Bras droit","Oral"],r.site||"")}</div>
+    ${fld("v-re",T("Réactions observées"),inp("v-re",r.reactions,`placeholder="${T("Fièvre, rougeur…")}"`))}
+    <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${c.vaccines[doseId]?`<button type="button" class="btn danger" data-act="delVax" data-v="${doseId}">${T("Retirer")}</button>`:""}</div></form>`);
+}
+function dossier(c){
+  const f = (l,v) => `<div class="li"><div class="grow"><div class="tiny muted" style="font-weight:700">${l}</div><div class="li-title">${v?esc(v):'<span class="muted">—</span>'}</div></div></div>`;
+  return `<div class="grid"><div class="card c6"><div class="card-h"><h2>${T("Dossier santé")}</h2>${isKidUser()?"":`<button class="btn sm ghost" data-act="kidForm" data-v="${c.id}">${icon("edit")}${T("Modifier")}</button>`}</div>
+    ${c.allergies?`<div class="banner alert">${icon("alert")}<div><b>${T("Allergies :")}</b> ${esc(c.allergies)}</div></div>`:""}
+    <div class="list">${f(T("Allergies"),c.allergies)}${f(T("Problèmes de santé"),c.conditions)}${f(T("Médicaments réguliers"),c.meds)}${f(T("Médecin ou IPS"),c.doctor)}${f(T("Pharmacie"),c.pharmacy)}${f(T("Naissance"),`${fmtD(c.dob)} · ${c.gaW} ${T("SA")} ${c.gaD||0} ${T("j")}`)}</div></div>
+    <div class="card c6"><div class="card-h"><h2>${T("Rapport pour la visite")}</h2>${icon("doc")}</div><p class="small muted">${T("Un résumé clair pour le médecin ou l'IPS : croissance et percentiles, vaccins, développement, habitudes, fièvre et médicaments récents. En PDF, à partager ou à envoyer par courriel.")}</p><button class="btn kid" data-act="report">${T("Préparer le rapport")}</button></div></div>`;
+}
+/* dents : schéma cliquable des deux arcades */
+function dents(c){
+  const has = (id, sd) => !!(c.teeth[id] || c.teeth[id+sd]);
+  const n = TEETH.reduce((s,t)=>s+(has(t.id,"L")?1:0)+(has(t.id,"R")?1:0),0);
+  const jaw = upper => {
+    const list = TEETH.filter(t => t.jaw === (upper?"u":"l")); let g = "";
+    const cx = 180, cy = upper ? 150 : 20, rx = 135, ry = 115;
+    list.forEach(t => [-1,1].forEach(side => {
+      const i = t.pos[0], ang = (upper ? -1 : 1) * (Math.PI/2) + side * (0.17 + i*0.29) * (upper?-1:1);
+      const x = cx + Math.cos(ang)*rx*(upper?1:1)*(side), y = cy + (upper?-1:1)*Math.abs(Math.sin(ang))*ry;
+      const px = cx + side*Math.sin(0.17 + i*0.29)*rx, py = upper ? cy - Math.cos(0.17 + i*0.29)*ry : cy + Math.cos(0.17 + i*0.29)*ry;
+      const sd = side < 0 ? "R" : "L", on = has(t.id, sd), w = i >= 3 ? 30 : i === 2 ? 22 : 20, hh = i >= 3 ? 30 : 26;
+      g += `<g class="t" tabindex="0" role="button" aria-pressed="${on}" aria-label="${esc(T(t.n))} ${sd==="L"?T("gauche"):T("droite")}" data-act="tooth" data-v="${t.id+sd}"><path d="M${px-w/2} ${py-hh/2+6}q0-6 6-6h${w-12}q6 0 6 6v${hh-12}q0 6-${w/2} 8q-${w/2}-2-${w/2}-8z" fill="${on?"var(--mint)":"var(--surface)"}" stroke="${on?"var(--mint-ink)":"var(--soft)"}" stroke-width="2"/></g>`;
+    }));
+    return g;
+  };
+  return `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Dents de lait")}</span><h2>${T("{n} dents sur 20",{n})}</h2></div>${icon("tooth")}</div>
+    <p class="small muted">${T("Touchez une dent sur le schéma quand elle perce (vue de face : la gauche de l'enfant est à droite de l'écran).")}</p>
+    <div class="jaw"><svg viewBox="0 0 360 330" aria-label="${T("Schéma des dents")}"><text x="180" y="18" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="700">${T("Haut")}</text><g transform="translate(0,30)">${jaw(true)}</g><text x="180" y="182" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="700">${T("Bas")}</text><g transform="translate(0,160)">${jaw(false)}</g></svg></div>
+    <div class="tbl"><table><thead><tr><th>${T("Dent")}</th><th>${T("Âge habituel")}</th><th>${T("Sortie")}</th></tr></thead><tbody>${[...TEETH].sort((a,b)=>parseInt(a.age)-parseInt(b.age)).map(t => `<tr><td>${T(t.n)}</td><td class="small">${T(t.age)}</td><td>${["R","L"].map(sd => has(t.id,sd)?`<span class="chip mint">${sd==="L"?T("G"):T("D")}</span>`:"").join(" ")||"—"}</td></tr>`).join("")}</tbody></table></div></div>
+    <div class="card"><h3>${T("Conseils pour les dents")}</h3><ul class="small" style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px">${TEETH_TIPS.map(t=>`<li>${T(t)}</li>`).join("")}</ul></div>`;
+}
+
+/* ======== DÉVELOPPEMENT ======== */
+const AGIR_TOT = "https://www.quebec.ca/famille-et-soutien-aux-personnes/enfance/developpement-des-enfants/outils-ressources-developpement-enfants/programme-agir-tot-depister-tot-pour-mieux-repondre-aux-besoins-des-enfants";
+function dev(c){
+  const m = ageMonths(c), em = effAge(c);
+  let h = "";
+  if (mod(c,"older") && m >= 60){ const k = m >= 144 ? "ado" : "scol";
+    h += `<div class="card"><div class="card-h"><h2>${k==="ado"?T("Adolescence : repères"):T("Âge scolaire : repères")}</h2></div><div class="list">${OLDER[k].map(o=>`<div class="li"><div class="grow"><div class="li-title">${T(o.t)}</div><p class="small muted">${T(o.d)}</p></div></div>`).join("")}</div></div>`; }
+  if (!mod(c,"milestones")) return h;
+  h += `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Jalons 0-6 ans")}</span><h2>${T("Développement")}</h2></div>
+    <div class="seg"><button data-act="msMode" data-v="concis" aria-pressed="${UI.msMode==="concis"}">${T("Concis")}</button><button data-act="msMode" data-v="detail" aria-pressed="${UI.msMode==="detail"}">${T("Détaillé")}</button></div></div>
+    <div class="banner ok">${icon("heart")}<div class="small">${T("Chaque enfant a son rythme. Les plages montrent l'âge où la plupart des enfants acquièrent une habileté : un enfant en fin de plage est tout à fait normal.")} ${usesCorrected(c)?`<b>${T("Âge corrigé utilisé : {a}",{a:ageLabel(em)})}</b>`:""}</div></div>
+    ${domainSummary(c, em)}</div>`;
+  const talk = MS.filter(it => msLevel(c, it, em).id === "parler");
+  if (talk.length) h += `<div class="banner soft">${icon("info")}<div><b>${T("À mentionner calmement à la prochaine visite")}</b> ${T("(rien d'urgent ; souvent l'enfant y arrive peu après) :")}<ul>${talk.map(it=>`<li>${esc(T(it.t))}</li>`).join("")}</ul></div></div>`;
+  h += UI.msMode === "detail" ? msDetail(c, em) : msConcise(c, em);
+  h += `<div class="card"><h3>${T("Signes à surveiller à tout âge")}</h3><ul class="small" style="margin:0;padding-left:18px">${GENERAL_FLAGS.map(f=>`<li>${T(f)}</li>`).join("")}</ul></div>`;
+  h += `<div class="card tint"><h3>${T("Une inquiétude ?")}</h3><p class="small">${T("Le programme Agir tôt offre dépistage et services aux 0-5 ans, sans attendre un diagnostic. Communiquez avec votre CLSC, ou demandez au médecin ou à l'éducatrice de vous y diriger.")}</p><a class="btn sm kid" style="align-self:flex-start" href="${AGIR_TOT}" target="_blank" rel="noopener">${T("Programme Agir tôt")}</a></div>`;
+  return h;
+}
+function domainSummary(c, em){
+  return `<div class="stack" style="gap:8px">${Object.entries(DOMAINS).map(([d,D]) => {
+    const exp = MS.filter(it => it.d === d && it.b <= em), ok = exp.filter(it => c.milestones[it.k]).length, cur = MS.filter(it => it.d === d && it.a <= em && it.b > em).length;
+    return `<div><div class="row between small"><b style="color:var(--${D.color}-ink)">${T(D.label)}</b><span class="muted num">${exp.length?T("{a}/{b} habituellement acquis",{a:ok,b:exp.length}):T("rien d'attendu encore")}${cur?` · ${T("{n} en cours",{n:cur})}`:""}</span></div><div class="dombar"><i style="width:${exp.length?(ok/exp.length*100).toFixed(0):100}%;background:var(--${D.color})"></i></div></div>`; }).join("")}</div>`;
+}
+function msRow(c, it, em){
+  const on = !!c.milestones[it.k], L = msLevel(c, it, em);
+  return `<div class="ms"><button class="check" role="checkbox" aria-checked="${on}" aria-label="${esc(T(it.t))}" data-act="ms" data-v="${esc(it.k)}">${on?icon("check"):""}</button><div class="grow"><div class="row between" style="gap:6px"><span class="dom" style="color:var(--${DOMAINS[it.d].color}-ink)">${T(DOMAINS[it.d].label)}</span>${L.id!=="tot"?`<span class="chip ${L.c}">${L.l}</span>`:""}</div><div>${esc(T(it.t))}</div>
+    <div class="tiny muted">${on ? T("Observé le {d}",{d:fmtD(c.milestones[it.k])}) : `${T("Habituellement")} ${rangeTxt(it)} · ${T("médiane")} ${mLabel(it.m50)}`}</div>${!on && (L.id==="obs"||L.id==="parler") ? `<div class="tiny" style="color:var(--${L.c}-ink)">${L.tip}</div>`:""}</div></div>`;
+}
+function msConcise(c, em){
+  const cur = BANDS.find(b => b >= em) || 72, idx = BANDS.indexOf(cur);
+  const show = UI.msAll ? BANDS : BANDS.slice(Math.max(0, idx-1), idx+2);
+  return show.map(b => { const items = MS.filter(it => bandOf(it) === b); if (!items.length) return "";
+    const done = items.filter(it => c.milestones[it.k]).length;
+    return `<div class="card" ${b===cur?'style="outline:2px solid var(--kid)"':""}><div class="card-h"><h2>${T("D'ici {a}",{a:bandLabel(b)})}</h2><div class="row">${b===cur?`<span class="chip peach">${T("Maintenant")}</span>`:""}<span class="chip mint num">${done}/${items.length}</span></div></div><div>${items.map(it => msRow(c,it,em)).join("")}</div></div>`; }).join("")
+    + `<button class="btn ghost" data-act="msAll">${UI.msAll?T("Voir seulement autour de l'âge actuel"):T("Voir tous les âges (2 mois à 6 ans)")}</button>`;
+}
+function msDetail(c, em){
+  let items = UI.msAll ? MS : MS.filter(it => it.a <= em + 12 && it.b >= em - 10); if (!items.length) items = MS;
+  const a0 = UI.msAll ? 0 : Math.max(0, Math.floor(Math.min(...items.map(i=>i.a)))), b0 = UI.msAll ? 72 : Math.ceil(Math.max(...items.map(i=>i.al||i.b), em + 2));
+  const X = m => clamp((m - a0)/(b0 - a0)*100, 0, 100), step = (b0-a0) <= 18 ? 3 : (b0-a0) <= 36 ? 6 : 12;
+  const ticks = []; for (let t = Math.ceil(a0/step)*step; t <= b0; t += step) ticks.push(t);
+  const axis = `<div class="axis">${ticks.map(t=>`<span style="left:${X(t)}%">${t<24?t+" "+T("m"):t/12+" "+T("a")}</span>`).join("")}</div>`;
+  return `<div class="legend"><span><i style="background:var(--ink);width:3px;height:14px"></i>${T("Âge actuel")}</span><span><i style="background:var(--mint)"></i>${T("Acquis")}</span><span><i style="background:var(--soft)"></i>${T("Plage habituelle (25e → 90e percentile)")}</span><span><i style="background:var(--surface);border:1px solid var(--soft);width:4px;height:12px"></i>${T("Médiane")}</span><span><i style="background:var(--rose);width:3px;height:14px"></i>${T("À mentionner si pas acquis")}</span></div>`
+    + Object.entries(DOMAINS).map(([d,D]) => { const rows = items.filter(it => it.d === d).sort((a,b)=>a.a-b.a); if (!rows.length) return "";
+      return `<div class="card"><div class="card-h"><h2 style="color:var(--${D.color}-ink)">${T(D.label)}</h2></div>${axis}
+        ${rows.map(it => { const on = !!c.milestones[it.k], L = msLevel(c, it, em), col = on ? "var(--mint)" : L.id === "parler" ? "var(--rose)" : em >= it.a ? `var(--${D.color})` : "var(--soft)";
+          return `<div class="tl-row"><button class="check" role="checkbox" aria-checked="${on}" aria-label="${esc(T(it.t))}" data-act="ms" data-v="${esc(it.k)}">${on?icon("check"):""}</button>
+            <div style="min-width:0"><div class="row between" style="gap:6px"><span style="font-weight:600">${esc(T(it.t))}</span><span class="tiny muted num">${rangeTxt(it)}</span></div>
+            <div class="track"><div class="bar" style="left:${X(it.a)}%;width:${Math.max(1.5, X(it.b)-X(it.a))}%;background:${col};opacity:${on?1:.75}"></div><div class="med" style="left:calc(${X(it.m50)}% - 1px)"></div>${it.al && it.al<=b0?`<div class="flag" style="left:calc(${X(it.al)}% - 1px)"></div>`:""}<div class="now" style="left:calc(${X(em)}% - 1px)"></div></div>
+            ${on?`<div class="tiny muted">${T("Observé le {d}",{d:fmtD(c.milestones[it.k])})}</div>`:L.tip&&L.id!=="tot"?`<div class="tiny muted">${L.tip}</div>`:""}</div></div>`; }).join("")}</div>`; }).join("")
+    + `<button class="btn ghost" data-act="msAll">${UI.msAll?T("Voir seulement autour de l'âge actuel"):T("Voir toute la période 0-6 ans")}</button>
+    <p class="tiny muted">${T("Motricité globale : fenêtres d'acquisition de l'OMS (2006). Autres sphères : plages inspirées du Denver II, du CDC et de la grille Rourke. Indicatif, ne remplace pas une évaluation.")}</p>`;
+}
+function msDateSheet(k){
+  const c = child(), it = MS.find(x => x.k === k);
+  sheet(`<form class="stack" data-form="msDate" data-k="${esc(k)}" style="gap:14px">${sheetHead(T("Jalon observé"))}<p><b>${esc(T(it.t))}</b></p>
+    ${fld("ms-date",T("Observé le (vous pouvez choisir une date passée)"),`<input class="inp" id="ms-date" type="date" value="${iso(today())}" max="${iso(today())}" min="${c.dob}">`)}
+    <button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`);
+}
+
+/* ======== CONSEILS ======== */
+function conseils(c){
+  const m = isPrenatal(c) ? -1 : ageMonths(c), hidden = c.hideTips || [];
+  const inAge = t => m >= t[1] && m < t[2];
+  const order = m >= 144 ? ["parler","social","sport","emotions","puberte","sommeil","sante","ecrans","alim","ecole","secu","parents"] : Object.keys(TIPCAT);
+  const cats = order.filter(k => TIPS.some(t => t[0]===k && inAge(t)));
+  let h = `<div class="card"><div class="card-h"><div><span class="eyebrow">${isPrenatal(c)?T("Grossesse"):T("Pour {a}",{a:ageLabel(m)})}</span><h2>${T("Conseils")}</h2></div></div><p class="small muted">${T("Touchez une catégorie pour la masquer ou l'afficher.")}</p>
+    <div class="row">${cats.map(k=>`<button class="chip ${TIPCAT[k][1]}" data-act="tipCat" data-v="${k}" aria-pressed="${!hidden.includes(k)}">${T(TIPCAT[k][0])}</button>`).join("")}</div></div>`;
+  h += cats.filter(k => !hidden.includes(k)).map(k => `<div class="card"><h3 style="color:var(--${TIPCAT[k][1]}-ink)">${T(TIPCAT[k][0])}</h3><div class="stack">${TIPS.filter(t=>t[0]===k && inAge(t)).map(t=>`<div><b>${T(t[3])}</b><p class="small">${T(t[4])}</p></div>`).join('<div class="sep"></div>')}</div></div>`).join("");
+  const futur = TIPS.filter(t => t[1] > m && t[1] <= m + 12 && !hidden.includes(t[0]));
+  if (futur.length) h += `<div class="card tint"><h3>${T("Pour les prochains mois")}</h3><div class="stack">${futur.slice(0,4).map(t=>`<div><span class="dom" style="color:var(--${TIPCAT[t[0]][1]}-ink)">${T(TIPCAT[t[0]][0])} · ${t[1] < 0 ? "" : T("dès {a}",{a:mLabel(t[1])})}</span><div><b>${T(t[3])}</b></div><p class="small">${T(t[4])}</p></div>`).join("")}</div></div>`;
+  if (feat("ai") && allow("ai")) h += `<button class="btn ghost" data-act="ai" style="align-self:flex-start">${icon("spark")}${T("Poser une question à l'assistant")}</button>`;
+  return h;
+}
+
+/* ======== GROSSESSE ======== */
+function grossesse(c){
+  const p = pregWeek(c), left = Math.max(0, Math.round((parseD(c.dueDate) - today())/DAY)), size = PREG_SIZE.filter(s => s[0] <= p.w).pop();
+  const ck = c.prenatal.checks || {};
+  let h = `<div class="card"><div class="stats"><div class="stat"><span class="muted tiny">${T("Semaine de grossesse")}</span><div class="v">${p.w}<small>+${p.d} ${T("j")}</small></div></div><div class="stat"><span class="muted tiny">${T("Jours avant la date prévue")}</span><div class="v">${left}</div></div><div class="stat"><span class="muted tiny">${T("Trimestre")}</span><div class="v">${p.w < 14 ? 1 : p.w < 28 ? 2 : 3}</div></div></div>
+    <div class="dombar" style="height:12px"><i style="width:${clamp(p.days/280*100,0,100).toFixed(0)}%;background:var(--rose)"></i></div>
+    ${size?`<p class="small">${T("Bébé a environ la taille d'{s}.",{s:T(size[1])})}</p>`:""}
+    ${isKidUser()?"":`<button class="btn kid" data-act="bornForm">${icon("baby")}${T("Bébé est né !")}</button>`}</div>`;
+  h += `<div class="card"><div class="card-h"><h2>${T("À prévoir")}</h2><span class="tiny muted">${T("selon les semaines")}</span></div>${PREG_CHECK.map((x,i) => { const on = !!ck[i], late = !on && p.w > x.w + 2;
+    return `<div class="ms"><button class="check" role="checkbox" aria-checked="${on}" data-act="pregCheck" data-v="${i}" aria-label="${esc(T(x.t))}">${on?icon("check"):""}</button><div class="grow"><div>${T(x.t)}</div><div class="tiny muted">${T("vers {w} semaines",{w:x.w})}${on?` · ${T("fait le {d}",{d:fmtD(ck[i])})}`:""}</div></div>${late?`<span class="chip butter">${T("à vérifier")}</span>`:p.w >= x.w - 2 && !on?`<span class="chip sky">${T("bientôt")}</span>`:""}</div>`; }).join("")}</div>`;
+  h += `<div class="card"><div class="card-h"><h2>${T("Idées de prénoms")}</h2></div><form class="row" data-form="babyName">${inp("bn","", `placeholder="${T("Ajouter un prénom")}"`)}<button class="btn ghost" type="submit">${icon("plus")}</button></form>
+    <div class="row">${(c.prenatal.names||[]).map((n,i)=>`<span class="chip rose">${esc(n)} <button class="icon-btn flat" style="width:20px;height:20px" data-act="rmName" data-v="${i}" aria-label="${T("Retirer")}">${icon("x")}</button></span>`).join("") || `<span class="small muted">${T("Aucune idée pour l'instant.")}</span>`}</div></div>`;
+  return h;
+}
+function bornForm(){
+  const c = child();
+  sheet(`<form class="stack" data-form="born" style="gap:14px">${sheetHead(T("Bienvenue, bébé !"))}
+    ${fld("b-name",T("Prénom"),inp("b-name",c.name,"required"))}
+    ${fld("b-dob",T("Date de naissance"),`<input class="inp" id="b-dob" type="date" value="${iso(today())}" max="${iso(today())}" required>`)}
+    <div class="field"><label>${T("Sexe biologique")}</label>${radios("bsex",[["F",T("Fille")],["M",T("Garçon")]],c.sex||"F")}</div>
+    <div class="fgrid">${fld("b-w",T("Poids (kg)"),`<input class="inp" id="b-w" type="number" inputmode="decimal" step="0.005">`)}${fld("b-h",T("Taille (cm)"),`<input class="inp" id="b-h" type="number" inputmode="decimal" step="0.1">`)}${fld("b-c",T("Périmètre crânien (cm)"),`<input class="inp" id="b-c" type="number" inputmode="decimal" step="0.1">`)}</div>
+    <p class="tiny muted">${T("L'âge gestationnel est calculé à partir de la date prévue ; vous pourrez le corriger dans le profil.")}</p>
+    <button class="btn kid" type="submit">${T("Enregistrer la naissance")}</button></form>`);
+}

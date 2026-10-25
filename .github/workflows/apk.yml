@@ -1,4 +1,4 @@
-# Compile l'APK Android à chaque modification et le publie dans « Releases ».
+# Compile l'APK Android de Tribe à chaque modification et le publie dans « Releases ».
 name: APK Android
 on:
   push:
@@ -18,30 +18,63 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - name: SDK Android (préinstallé sur le serveur GitHub)
-        run: echo "sdk.dir=$ANDROID_HOME" && ls "$ANDROID_HOME/platforms"
       - name: Dépendances
-        run: npm install
+        run: |
+          npm install
+          # Connexion Google native : seulement si google-services.json est fourni
+          if [ -f android-config/google-services.json ]; then npm install @capacitor-firebase/authentication@7.5.0 firebase@11.10.0; fi
+      - name: Clé de signature (secret GitHub, jamais dans le code)
+        env:
+          KS: ${{ secrets.TRIBE_KEYSTORE }}
+        run: |
+          if [ -n "$KS" ]; then echo "$KS" | base64 -d > android-config/tribu.keystore; echo "Clé de signature trouvée"; else echo "Aucune clé : APK de test signé avec une clé temporaire"; fi
       - name: Projet Android
         run: |
           npx cap add android
-          npx capacitor-assets generate --android
+          npx capacitor-assets generate --android --iconBackgroundColor '#FFEDE5' --splashBackgroundColor '#F6F4FB'
+          if [ -f android-config/google-services.json ]; then
+            cp android-config/google-services.json android/app/
+            printf '\next {\n    rgcfaIncludeGoogle = true\n}\n' >> android/variables.gradle
+          fi
+          # Version qui augmente à chaque compilation (les mises à jour s'installent par-dessus)
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"3.0.${{ github.run_number }}\"/" android/app/build.gradle
+          # Signature fixe (même clé à chaque compilation), seulement si la clé secrète est fournie
+          if [ -f android-config/tribu.keystore ]; then
+          cat >> android/app/build.gradle <<'GRADLE'
+
+          android {
+              signingConfigs {
+                  tribe {
+                      storeFile file("${rootDir}/../android-config/tribu.keystore")
+                      storePassword System.getenv("TRIBE_KEY_PASS")
+                      keyAlias "tribu"
+                      keyPassword System.getenv("TRIBE_KEY_PASS")
+                  }
+              }
+              buildTypes {
+                  release { signingConfig signingConfigs.tribe }
+                  debug { signingConfig signingConfigs.tribe }
+              }
+          }
+          GRADLE
+          fi
           npx cap sync android
       - name: Compiler l'APK
         working-directory: android
+        env:
+          TRIBE_KEY_PASS: ${{ secrets.TRIBE_KEY_PASS }}
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-      - name: Renommer
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk Care.apk
+          if [ -f ../android-config/tribu.keystore ]; then ./gradlew assembleRelease --no-daemon; cp app/build/outputs/apk/release/app-release.apk ../Tribe.apk;
+          else ./gradlew assembleDebug --no-daemon; cp app/build/outputs/apk/debug/app-debug.apk ../Tribe.apk; fi
       - uses: actions/upload-artifact@v4
         with:
-          name: Care-apk
-          path: Care.apk
+          name: Tribe-apk
+          path: Tribe.apk
       - name: Publier dans Releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest Care.apk --title "Care (dernière version)" --notes "APK Android compilé automatiquement à partir de la branche main. Installez-le sur votre téléphone (autoriser les sources inconnues)."
+          gh release create latest Tribe.apk --title "Tribe (dernière version)" --notes "APK Android compilé automatiquement. Installez-le sur votre téléphone (autoriser les sources inconnues). Les mises à jour s'installent par-dessus la version précédente."

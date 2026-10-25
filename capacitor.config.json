@@ -1,8 +1,14 @@
 {
-  "appId": "ca.care.enfant",
-  "appName": "Care",
+  "appId": "ca.tribu.app",
+  "appName": "Tribe",
   "webDir": "www",
   "android": {
-    "backgroundColor": "#F6F4FB"
+    "backgroundColor": "#F6F4FB",
+    "adjustMarginsForEdgeToEdge": "force"
+  },
+  "plugins": {
+    "Keyboard": { "resize": "native", "resizeOnFullScreen": true },
+    "FirebaseAuthentication": { "skipNativeAuth": true, "providers": ["google.com"] },
+    "LocalNotifications": { "iconColor": "#FF9E7A" }
   }
 }

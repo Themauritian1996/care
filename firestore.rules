@@ -1,0 +1,66 @@
+rules_version = '2';
+// Règles de sécurité Firestore pour Tribe.
+// À coller dans la console Firebase : Firestore Database > Règles > Publier.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function fam(fid) { return get(/databases/$(database)/documents/families/$(fid)).data; }
+    function isMember(fid) { return signedIn() && request.auth.uid in fam(fid).memberIds; }
+    function isParent(fid) { return isMember(fid) && fam(fid).roles[request.auth.uid] == 'parent'; }
+
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Codes d'invitation : lisibles un par un (pas de liste) par toute personne connectée
+    match /codes/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn() && request.resource.data.by == request.auth.uid;
+      allow delete: if signedIn() && resource.data.by == request.auth.uid;
+    }
+
+    match /families/{fid} {
+      allow create: if signedIn() && request.resource.data.memberIds == [request.auth.uid];
+      allow read: if isMember(fid);
+      allow update: if isParent(fid)
+        // une personne qui a reçu un code peut s'ajouter elle-même, avec le rôle prévu par le code
+        || (signedIn()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds','roles','members','joinCode'])
+            && request.resource.data.memberIds.toSet().difference(resource.data.memberIds.toSet()) == [request.auth.uid].toSet()
+            && get(/databases/$(database)/documents/codes/$(request.resource.data.joinCode)).data.id == fid
+            && request.resource.data.roles[request.auth.uid] == (get(/databases/$(database)/documents/codes/$(request.resource.data.joinCode)).data.role == 'enfant' ? 'enfant' : 'parent'));
+      allow delete: if isParent(fid);
+
+      // santé, profils, agenda, défis, récompenses : écriture réservée aux parents
+      match /{col}/{id} {
+        allow read: if isMember(fid);
+        allow write: if isParent(fid);
+      }
+      // tous les membres : journal, discussion, disponibilités, défis accomplis, échanges, photos
+      match /logs/{id} { allow read, write: if isMember(fid); }
+      match /messages/{id} {
+        allow read: if isMember(fid);
+        allow create: if isMember(fid) && request.resource.data.uid == request.auth.uid;
+        allow delete: if isParent(fid);
+      }
+      match /avail/{id} { allow read, write: if isMember(fid); }
+      match /completions/{id} { allow read, write: if isMember(fid); }
+      match /redemptions/{id} { allow read, write: if isMember(fid); }
+      match /photos/{id} { allow read, write: if isMember(fid); }
+    }
+
+    match /groups/{gid} {
+      function gm() { return signedIn() && request.auth.uid in resource.data.memberIds; }
+      allow create: if signedIn() && request.resource.data.memberIds == [request.auth.uid];
+      allow read: if gm();
+      allow update: if gm()
+        || (signedIn()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds','members','joinCode'])
+            && request.resource.data.memberIds.toSet().difference(resource.data.memberIds.toSet()) == [request.auth.uid].toSet()
+            && get(/databases/$(database)/documents/codes/$(request.resource.data.joinCode)).data.id == gid);
+      match /{sub}/{id} {
+        allow read, write: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groups/$(gid)).data.memberIds;
+      }
+    }
+  }
+}
