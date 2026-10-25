@@ -67,6 +67,7 @@ jobs:
         env:
           TRIBE_KEY_PASS: ${{ secrets.TRIBE_KEY_PASS }}
         run: |
+          set +e +o pipefail
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
           report(){ { grep -A8 "What went wrong" build.log || tail -30 build.log; } | head -20 | while IFS= read -r l; do echo "::error::$l"; done; }
