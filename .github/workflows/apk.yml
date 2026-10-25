@@ -69,7 +69,7 @@ jobs:
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          report(){ grep -A6 "What went wrong" build.log | head -12 | while IFS= read -r l; do echo "::error::$l"; done; }
+          report(){ { grep -A8 "What went wrong" build.log || tail -30 build.log; } | head -20 | while IFS= read -r l; do echo "::error::$l"; done; }
           if [ -f ../android-config/tribu.keystore ]; then
             export TRIBE_KEY_PASS="$(printf '%s' "$TRIBE_KEY_PASS" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             if ! keytool -list -keystore ../android-config/tribu.keystore -storepass "$TRIBE_KEY_PASS" -alias tribu >/dev/null 2>&1; then
@@ -80,7 +80,8 @@ jobs:
           fi
           if [ -f ../android-config/tribu.keystore ]; then
             ./gradlew assembleRelease --no-daemon -x lintVitalAnalyzeRelease -x lintVitalReportRelease 2>&1 | tee build.log; [ ${PIPESTATUS[0]} -eq 0 ] || { report; exit 1; }
-            cp app/build/outputs/apk/release/app-release.apk ../Tribe.apk
+            A=$(find app/build/outputs/apk/release -name '*.apk' | head -1); echo "APK : $A"; [ -n "$A" ] || { echo "::error::Aucun APK release produit : $(ls -R app/build/outputs/apk | tr '\n' ' ')"; exit 1; }
+            cp "$A" ../Tribe.apk
           else
             ./gradlew assembleDebug --no-daemon 2>&1 | tee build.log; [ ${PIPESTATUS[0]} -eq 0 ] || { report; exit 1; }
             cp app/build/outputs/apk/debug/app-debug.apk ../Tribe.apk
