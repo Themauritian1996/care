@@ -61,13 +61,22 @@ jobs:
           npx cap sync android
       - name: Compiler l'APK
         working-directory: android
+        shell: bash
         env:
           TRIBE_KEY_PASS: ${{ secrets.TRIBE_KEY_PASS }}
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          if [ -f ../android-config/tribu.keystore ]; then ./gradlew assembleRelease --no-daemon; cp app/build/outputs/apk/release/app-release.apk ../Tribe.apk;
-          else ./gradlew assembleDebug --no-daemon; cp app/build/outputs/apk/debug/app-debug.apk ../Tribe.apk; fi
+          report(){ grep -A6 "What went wrong" build.log | head -12 | while IFS= read -r l; do echo "::error::$l"; done; }
+          if [ -f ../android-config/tribu.keystore ]; then
+            if ! keytool -list -keystore ../android-config/tribu.keystore -storepass "$TRIBE_KEY_PASS" -alias tribu >/dev/null 2>&1; then
+              echo "::error::Clé de signature illisible : vérifiez TRIBE_KEYSTORE (texte base64 complet, sans espace) et TRIBE_KEY_PASS (mot de passe exact)"; exit 1; fi
+            ./gradlew assembleRelease --no-daemon -x lintVitalAnalyzeRelease -x lintVitalReportRelease 2>&1 | tee build.log; [ ${PIPESTATUS[0]} -eq 0 ] || { report; exit 1; }
+            cp app/build/outputs/apk/release/app-release.apk ../Tribe.apk
+          else
+            ./gradlew assembleDebug --no-daemon 2>&1 | tee build.log; [ ${PIPESTATUS[0]} -eq 0 ] || { report; exit 1; }
+            cp app/build/outputs/apk/debug/app-debug.apk ../Tribe.apk
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: Tribe-apk
