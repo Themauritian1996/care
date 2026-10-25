@@ -1,0 +1,38 @@
+{
+  "project_info": {
+    "project_number": "736810177",
+    "project_id": "tribe-26d85",
+    "storage_bucket": "tribe-26d85.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:736810177:android:81f97534e424753d0db040",
+        "android_client_info": { "package_name": "ca.tribu.app" }
+      },
+      "oauth_client": [
+        {
+          "client_id": "736810177-sf09n6ha3ttfopmgs6end0a29b8pq811.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "ca.tribu.app",
+            "certificate_hash": "5fcdc162e46d4ce2b46b7e23c852a1d285a78ab1"
+          }
+        },
+        {
+          "client_id": "736810177-ggiatsuhk00j01qk890hjp324skqnr54.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [ { "current_key": "AIzaSyC4yf11bD6uZYIpD8dB6ImUzf6q-HB0jGg" } ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            { "client_id": "736810177-ggiatsuhk00j01qk890hjp324skqnr54.apps.googleusercontent.com", "client_type": 3 }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,14 +1,10 @@
-/* Configuration Firebase de Tribe.
-   Collez ici le bloc firebaseConfig de la console Firebase (Paramètres du projet > Vos applications > Web).
-   Ces valeurs ne sont pas secrètes : la sécurité vient des règles Firestore (firestore.rules). */
-window.TRIBE_FIREBASE = null;
-/* Exemple :
+// Configuration publique Firebase (projet tribe-26d85). Ces valeurs ne sont pas secrètes :
+// la sécurité repose sur les règles Firestore et les domaines autorisés.
 window.TRIBE_FIREBASE = {
-  apiKey: "AIza...",
-  authDomain: "tribe-xxxx.firebaseapp.com",
-  projectId: "tribe-xxxx",
-  storageBucket: "tribe-xxxx.firebasestorage.app",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:xxxxxxxx"
+  apiKey: "AIzaSyBjlqxUGtWBO4_NL7fW6bsaoNknrtxlef0",
+  authDomain: "tribe-26d85.firebaseapp.com",
+  projectId: "tribe-26d85",
+  storageBucket: "tribe-26d85.firebasestorage.app",
+  messagingSenderId: "736810177",
+  appId: "1:736810177:web:b483080d030dc25c0db040"
 };
-*/
