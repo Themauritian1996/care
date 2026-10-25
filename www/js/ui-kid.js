@@ -153,7 +153,7 @@ function logLine(c, l){
   if (l.type === "feed") { txt = T(d.mode || "Boire"); sub = [d.ml?`${d.ml} ml`:"", l.end?fmtDur(l.end-l.t-(d.pausedMin||0)*6e4):""].filter(Boolean).join(" · "); }
   if (l.type === "sleep") { txt = T(d.kind || "Dodo"); sub = l.end ? `${fmtT(l.t)} → ${fmtT(l.end)} · ${fmtDur(l.end-l.t-(d.pausedMin||0)*6e4)}${d.where?` · ${T(d.where)}`:""}` : T("en cours"); }
   if (l.type === "diaper") { txt = `${T("Couche")} · ${T(d.kind)}`; sub = [d.color, d.texture].filter(Boolean).map(T).join(", "); }
-  if (l.type === "solid") { txt = (d.items||[]).map(i => i.name).join(", ") || d.food || T("Repas"); sub = [d.allergen?T("Allergène : {a}",{a:T(d.allergen)}):"", d.reaction?T("réaction : {r}",{r:d.reaction}):"", d.ai?T("analysé par photo"):""].filter(Boolean).join(" · "); }
+  if (l.type === "solid") { txt = (d.items||[]).map(i => i.name).join(", ") || d.food || T("Repas"); const kc = sum((d.items||[]).map(i => Number(i.nut?.kcal)||0)), pr = sum((d.items||[]).map(i => Number(i.nut?.prot)||0)); sub = [d.meal?T(d.meal):"", kc?`${Math.round(kc)} kcal · ${Math.round(pr)} g ${T("prot.")}`:"", d.allergen?T("Allergène : {a}",{a:T(d.allergen)}):"", d.reaction?T("réaction : {r}",{r:d.reaction}):""].filter(Boolean).join(" · "); }
   if (l.type === "temp") { txt = `${fmtNum(d.temp)} °C`; sub = T(d.site); }
   if (l.type === "med") { txt = d.name || T("Médicament"); sub = d.dose || ""; }
   if (l.type === "mood") txt = `${T("Humeur")} · ${T(d.mood)}`;
@@ -238,7 +238,7 @@ function repas(c){
   if (!mod(c,"solids")) return h;
   const fav = c.foodFav || [];
   h += `<div class="card"><div class="card-h"><h2>${T("Noter un repas")}</h2><button class="btn sm kid" data-act="log" data-v="solid">${icon("plus")}${T("Repas")}</button></div>
-    ${aiReady() && !isKidUser() ? `<span class="eyebrow">${icon("spark").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("Avec Gemini")}</span><div class="row" style="flex-wrap:wrap;gap:6px">${aiBtn("aiMealPhoto",null,T("Photo du repas"),"camera")}${aiBtn("aiScan","label",T("Lire une étiquette"),"tag")}${aiBtn("aiScan","menu",T("Menu de la garderie"),"dish")}</div>` : ""}
+    ${aiReady() && !isKidUser() ? `<span class="eyebrow">${icon("spark").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("Avec Gemini")}</span><div class="row" style="flex-wrap:wrap;gap:6px">${aiBtn("aiMealPhoto",null,T("Photo du repas"),"camera")}${aiBtn("aiScan","label",T("Lire une étiquette"),"tag")}${m < 144 ? aiBtn("aiScan","menu",m < 60 ? T("Menu de la garderie") : T("Menu de l'école"),"dish") : ""}</div>` : ""}
     ${fav.length ? `<span class="eyebrow">${T("Favoris : touchez pour noter")}</span><div class="pick">${fav.map(f => `<button data-act="quickFood" data-v="${esc(f.name)}" style="border-color:var(--${FOOD_GROUPS[f.group]?.color||"line"})">${esc(f.name)}</button>`).join("")}</div>` : `<p class="small muted">${T("Les aliments marqués d'une étoile apparaîtront ici pour les noter en un geste.")}</p>`}
     <div class="banner soft">${icon("spoon")}<div class="small"><b>${T("Portions pour cet âge :")}</b> ${T(portionHint(m))}</div></div></div>`;
   // répartition par groupe sur 7 jours
@@ -247,6 +247,7 @@ function repas(c){
   h += `<div class="card"><div class="card-h"><h2>${T("L'assiette de la semaine")}</h2><span class="tiny muted">${T("Guide alimentaire canadien")}</span></div>
     ${tot ? `<div class="stack" style="gap:8px">${Object.entries(FOOD_GROUPS).map(([k,g]) => { const p = (G[k]||0)/tot; return `<div><div class="row between small"><b style="color:var(--${g.color}-ink)">${T(g.label)}</b><span class="muted num">${Math.round(p*100)} %${g.target?` · ${T("cible")} ${Math.round(g.target*100)} %`:""}</span></div><div class="dombar" style="position:relative"><i style="width:${(p*100).toFixed(0)}%;background:var(--${g.color})"></i>${g.target?`<span style="position:absolute;top:-2px;bottom:-2px;left:${g.target*100}%;width:2px;background:var(--ink)"></span>`:""}</div></div>`; }).join("")}</div>` : `<p class="small muted">${T("Notez quelques repas pour voir l'équilibre de la semaine.")}</p>`}
     ${tot ? (() => { const low = Object.entries(FOOD_GROUPS).filter(([k,g]) => g.target && (G[k]||0)/tot < g.target*0.7).map(([k]) => k); return low.length ? `<div class="banner ok">${icon("bulb")}<div class="small"><b>${T("Idées pour équilibrer :")}</b> ${low.map(k => `${T(FOOD_GROUPS[k].label)} : ${FOOD_SUGG[k].slice(0,4).map(T).join(", ")}`).join(" · ")}</div></div>` : `<div class="banner ok">${icon("check")}<div class="small">${T("Belle variété cette semaine.")}</div></div>`; })() : ""}</div>`;
+  h += nutritionCard(c);
   if (m < 36) h += allergenCard(c);
   const meals = c.logs.filter(l => l.type === "solid").sort((a,b)=>b.t-a.t).slice(0,12);
   h += `<div class="card"><div class="card-h"><h2>${T("Derniers repas")}</h2></div>${meals.length?`<div class="list">${meals.map(l=>logLine(c,l)).join("")}</div>`:empty("spoon",T("Aucun repas noté."))}</div>`;
@@ -263,6 +264,7 @@ function mealForm(prefill){
     <div id="mealItems" class="stack" style="gap:8px">${rows}</div><datalist id="foodlist">${[...new Set([...favNames, ...Object.values(FOOD_SUGG).flat().map(T)])].map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
     <button type="button" class="btn ghost" data-act="addMealItem">${icon("plus")}${T("Ajouter un aliment")}</button>
     ${ageMonths(c) < 36 ? fld("f-al",T("Contient un allergène ?"),`<select class="inp" id="f-al"><option value="">${T("Non")}</option>${ALLERGENS.map(a=>`<option value="${a}">${T(a)}</option>`).join("")}</select>`) : ""}
+    <div class="field"><label>${T("Moment")}</label>${pick("mealk",["Déjeuner","Dîner","Souper","Collation"],mealKindAt(Date.now()))}</div>
     ${fld("f-re",T("Réaction ou commentaire (facultatif)"),`<input class="inp" id="f-re">`)}
     ${fld("f-t",T("Heure"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(Date.now())}">`)}
     <button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`);
@@ -325,7 +327,7 @@ function drawChart(c, sel, big=false){
   const k = UI.sub.courbes, {rs, R0, R} = chartRange(c);
   if ($("#rangeSeg")) $("#rangeSeg").innerHTML = rs.map(r => `<button data-act="range" data-v="${r.id}" aria-pressed="${!UI.zoom && r.id===R0.id}">${r.l}</button>`).join("");
   const pts = growthPoints(c, k, UI.chrono).filter(p => p.m >= R.a - 0.01 && p.m <= R.b + 0.01);
-  const W = 720, H = big ? 460 : 380, P = {l:46, r:44, t:18, b:34}, span = R.b - R.a, step = span <= 12 ? 0.25 : span <= 30 ? 0.5 : 1;
+  const narrow = window.innerWidth < 600, W = narrow ? 470 : 720, H = big ? (narrow && window.innerHeight > window.innerWidth ? 600 : 460) : (narrow ? 340 : 380), P = {l:46, r:44, t:18, b:34}, span = R.b - R.a, step = span <= 12 ? 0.25 : span <= 30 ? 0.5 : 1;
   const curves = PCT_LINES.map(L => { const arr=[]; for (let m=R.a; m<=R.b+1e-9; m+=step){ const p = lmsAt(k, c.sex, m); if (p) arr.push([m, xAtZ(p, L.z)]); } return {...L, arr}; });
   let lo = Infinity, hi = -Infinity;
   curves.forEach(cv => cv.arr.forEach(([,y]) => { lo = Math.min(lo,y); hi = Math.max(hi,y); }));

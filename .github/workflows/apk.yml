@@ -31,7 +31,11 @@ jobs:
       - name: Projet Android
         run: |
           npx cap add android
-          npx capacitor-assets generate --android --iconBackgroundColor '#FFEDE5' --splashBackgroundColor '#F6F4FB'
+          # Synthèse vocale (Android 11+) et rappels à l'heure exacte
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#</manifest>#    <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>\n</manifest>#' $M
+          grep -q SCHEDULE_EXACT_ALARM $M || sed -i 's#<application#<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />\n    <application#' $M
+          npx capacitor-assets generate --android --iconBackgroundColor '#F0789C' --splashBackgroundColor '#F6F4FB'
           if [ -f android-config/google-services.json ]; then
             cp android-config/google-services.json android/app/
             printf '\next {\n    rgcfaIncludeGoogle = true\n}\n' >> android/variables.gradle

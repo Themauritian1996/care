@@ -54,9 +54,13 @@ const Native = (() => {
 
   /* Notifications locales (APK) ; dans le navigateur, seulement quand la page est ouverte */
   const webTimers = [];
+  let channelOk = false;
+  async function channel(ln){ if (channelOk) return; channelOk = true; try { await ln.createChannel({id:"tribe", name:"Tribe", description:T("Rappels et messages"), importance:4, visibility:1, vibration:true}); } catch(e){} }
   async function notifPermission(){
     const ln = P("LocalNotifications");
-    if (ln){ try { const r = await ln.requestPermissions(); return r.display === "granted"; } catch(e){ return false; } }
+    if (ln){ try { let r = await ln.checkPermissions(); if (r.display !== "granted") r = await ln.requestPermissions(); await channel(ln);
+      try { const ex = await ln.checkExactNotificationSetting?.(); if (ex && ex.exact_alarm && ex.exact_alarm !== "granted") toast(T("Pour des rappels à l'heure exacte, autorisez « Alarmes et rappels » (Réglages → Notifications).")); } catch(e){}
+      return r.display === "granted"; } catch(e){ return false; } }
     if (!("Notification" in window)) return false;
     if (Notification.permission === "granted") return true;
     try { return (await Notification.requestPermission()) === "granted"; } catch(e){ return false; }
@@ -65,8 +69,12 @@ const Native = (() => {
     const ln = P("LocalNotifications");
     if (ln){
       try {
-        const pend = await ln.getPending(); if (pend.notifications?.length) await ln.cancel({notifications:pend.notifications.map(n => ({id:n.id}))});
-        if (list.length) await ln.schedule({notifications:list.slice(0, 60).map(n => ({id:n.id, title:n.title, body:n.body, schedule:{at:new Date(n.at), allowWhileIdle:true}}))});
+        let prev = []; try { prev = JSON.parse(localStorage.getItem("tribe.nids") || "null"); } catch(e){}
+        const pend = await ln.getPending(), mine = (pend.notifications||[]).filter(n => !prev || prev.includes(n.id));
+        if (mine.length) await ln.cancel({notifications:mine.map(n => ({id:n.id}))});
+        try { localStorage.setItem("tribe.nids", JSON.stringify(list.slice(0, 60).map(n => n.id))); } catch(e){}
+        await channel(ln);
+        if (list.length) await ln.schedule({notifications:list.slice(0, 60).map(n => ({id:n.id, title:n.title, body:n.body, channelId:"tribe", extra:n.extra||null, schedule:{at:new Date(n.at), allowWhileIdle:true}}))});
       } catch(e){}
       return;
     }
@@ -74,20 +82,26 @@ const Native = (() => {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     list.filter(n => n.at - Date.now() < 864e5*1.2 && n.at > Date.now()).forEach(n => webTimers.push(setTimeout(() => { try { new Notification(n.title, {body:n.body, icon:"icon-192.png"}); } catch(e){} }, n.at - Date.now())));
   }
-  async function notifyNow(title, body){
+  async function notifyNow(title, body, extra = null, force = false){
     const ln = P("LocalNotifications");
-    if (ln){ try { await ln.schedule({notifications:[{id:Math.floor(Math.random()*1e8), title, body, schedule:{at:new Date(Date.now()+1000)}}]}); } catch(e){} return; }
-    if ("Notification" in window && Notification.permission === "granted" && document.hidden){ try { new Notification(title, {body, icon:"icon-192.png"}); } catch(e){} }
+    if (ln){ try { await channel(ln); await ln.schedule({notifications:[{id:Math.floor(Math.random()*1e8), title, body, channelId:"tribe", extra, schedule:{at:new Date(Date.now()+800), allowWhileIdle:true}}]}); } catch(e){} return; }
+    if ("Notification" in window && Notification.permission === "granted" && (document.hidden || force)){ try { const n = new Notification(title, {body, icon:"icon-192.png"}); n.onclick = () => { window.focus(); if (extra) openFromNotif(extra); }; } catch(e){} }
   }
+  async function notifyAt(title, body, at, extra = null){
+    const ln = P("LocalNotifications");
+    if (ln){ await channel(ln); return ln.schedule({notifications:[{id:Math.floor(Math.random()*1e8), title, body, channelId:"tribe", extra, schedule:{at:new Date(at), allowWhileIdle:true}}]}); }
+    setTimeout(() => notifyNow(title, body, extra, true), at - Date.now());
+  }
+  function openFromNotif(x){ if (!x) return; if (x.go === "assistant"){ UI.aiTab = x.tab || "ask"; go("assistant"); if (x.auto) maybeAutoReview(); } else if (x.go) go(x.go); }
 
   /* Clavier : garde le champ actif visible au-dessus du clavier */
   function initKeyboard(){
     const root = document.documentElement;
-    const setKb = h => { root.style.setProperty("--kb", Math.max(0, h) + "px"); document.body.classList.toggle("kb-open", h > 80); };
+    const setKb = (h, shift = true) => { root.style.setProperty("--kb", (shift ? Math.max(0, h) : 0) + "px"); document.body.classList.toggle("kb-open", h > 80); };
     const kb = P("Keyboard");
-    if (kb){
-      kb.addListener("keyboardWillShow", i => setKb(i.keyboardHeight));
-      kb.addListener("keyboardDidShow", i => { setKb(i.keyboardHeight); keepFocusVisible(); });
+    if (kb){ // l'APK redimensionne déjà la vue (resize « native ») : on ne décale pas une 2e fois
+      kb.addListener("keyboardWillShow", i => setKb(i.keyboardHeight, false));
+      kb.addListener("keyboardDidShow", i => { setKb(i.keyboardHeight, false); keepFocusVisible(); });
       kb.addListener("keyboardWillHide", () => setKb(0));
     } else if (window.visualViewport){
       const vv = window.visualViewport;
@@ -100,12 +114,14 @@ const Native = (() => {
 
   function initApp(){
     const app = P("App");
-    if (app) app.addListener("backButton", () => { if (document.querySelector("#layer .scrim")) { closeSheet(); } else if (UI.view !== "home") { go("home"); } else app.exitApp(); });
+    const ln = P("LocalNotifications");
+    if (ln){ try { ln.addListener("localNotificationActionPerformed", a => setTimeout(() => openFromNotif(a.notification?.extra), 300)); } catch(e){} }
+    if (app) app.addListener("backButton", () => { if (document.querySelector("#layer .scrim")) { closeSheet(); } else if (UI.view !== "home") { if (typeof stopPlay === "function") stopPlay(); go("home"); } else app.exitApp(); });
     const sb = P("StatusBar");
     if (sb){ try { sb.setOverlaysWebView({overlay:false}); } catch(e){} }
   }
   function statusBarTheme(dark){ const sb = P("StatusBar"); if (sb){ try { sb.setStyle({style: dark ? "DARK" : "LIGHT"}); sb.setBackgroundColor({color: getComputedStyle(document.body).backgroundColor.startsWith("rgb") ? rgbHex(getComputedStyle(document.body).backgroundColor) : "#F6F4FB"}); } catch(e){} } }
   const rgbHex = s => "#" + (s.match(/\d+/g)||[246,244,251]).slice(0,3).map(n => (+n).toString(16).padStart(2,"0")).join("");
 
-  return { isApp, P, takePhoto, share, saveText, download, notifPermission, schedule, notifyNow, initKeyboard, initApp, statusBarTheme };
+  return { isApp, P, notifyAt, openFromNotif, takePhoto, share, saveText, download, notifPermission, schedule, notifyNow, initKeyboard, initApp, statusBarTheme };
 })();

@@ -160,9 +160,9 @@ const blankState = () => ({ v:3, demo:false, active:null, children:[], timer:nul
   family:{name:"", members:[]}, me:null,
   settings:{theme:null, bg:"lavande", lang:null, appName:"Tribe", features:Object.fromEntries(FEATURES.map(f=>[f.k,true])),
     notif:{enabled:false, events:true, vaccines:true, memories:true, goals:false, goalTime:"19:00", review:true},
-    ai:{model:"gemini-3.8-flash", topics:["sommeil","alimentation","activite"], freq:"semaine", lastReview:null, search:true},
+    ai:{model:"", speed:"rapide", topics:["sommeil","alimentation","activite"], freq:"semaine", reviewDay:0, reviewTime:"19:00", lastReview:null, search:true},
     parental:{pin:null, kidMode:false, allow:{chat:true, groups:false, photos:true, ai:false, health:false, delete:false, settings:false, selfApprove:false}}},
-  events:[], memories:[], photos:[], tasks:[], completions:[], rewards:[], redemptions:[], avail:{}, messages:[], groups:[], reviews:[], aiChat:[] });
+  events:[], memories:[], photos:[], tasks:[], completions:[], rewards:[], redemptions:[], avail:{}, messages:[], groups:[], reviews:[], aiChat:[], kidevents:[], stories:[], recipes:[], aiHist:[] });
 let S;
 function migrate(old){
   const s = blankState();

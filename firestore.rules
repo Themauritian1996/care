@@ -47,6 +47,7 @@ service cloud.firestore {
       match /completions/{id} { allow read, write: if isMember(fid); }
       match /redemptions/{id} { allow read, write: if isMember(fid); }
       match /photos/{id} { allow read, write: if isMember(fid); }
+      match /kidevents/{id} { allow read, write: if isMember(fid); }
     }
 
     match /groups/{gid} {

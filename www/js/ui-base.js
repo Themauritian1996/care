@@ -13,7 +13,7 @@ function sheet(inner, cls=""){
   $("#layer").innerHTML = `<div class="scrim" data-act="closeSheet"><div class="sheet ${cls}" role="dialog" aria-modal="true"><div class="sheet-grab"></div>${inner}</div></div>`;
   if (!Native.isApp && window.matchMedia("(min-width:821px)").matches){ const f = $("#layer input:not([type=radio]):not([type=checkbox]):not([type=file]), #layer textarea"); if (f) setTimeout(()=>f.focus({preventScroll:true}), 60); }
 }
-function closeSheet(){ $("#layer").innerHTML = ""; }
+function closeSheet(){ $("#layer").innerHTML = ""; if (typeof FAM !== "undefined" && FAM.on){ clearInterval(FAM.t); FAM.on = false; } if (typeof PL !== "undefined" && PL.on) stopPlay(); }
 const fld = (id,l,inp) => `<div class="field"><label for="${id}">${l}</label>${inp}</div>`;
 const inp = (id, val="", attrs="") => `<input class="inp" id="${id}" value="${esc(val)}" ${attrs}>`;
 const radios = (name, opts, sel) => `<div class="radio-row" role="radiogroup">${opts.map(o => { const [v,l] = Array.isArray(o) ? o : [o,o]; return `<label><input type="radio" name="${name}" value="${esc(v)}" ${v===sel?"checked":""}><span>${esc(l)}</span></label>`; }).join("")}</div>`;
@@ -36,15 +36,25 @@ function confetti(){
 }
 /* mini-markdown sûr (réponses IA) */
 function md(t){
-  const lines = esc(t).split(/\n/); let out = "", inList = false;
-  for (let l of lines){
-    l = l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\*(.+?)\*/g, "<i>$1</i>");
-    if (/^\s*[-*•]\s+/.test(l)){ if (!inList){ out += "<ul>"; inList = true; } out += `<li>${l.replace(/^\s*[-*•]\s+/, "")}</li>`; continue; }
-    if (inList){ out += "</ul>"; inList = false; }
-    if (/^#{1,4}\s/.test(l)) out += `<h4>${l.replace(/^#{1,4}\s/, "")}</h4>`; else if (l.trim()) out += `<p>${l}</p>`;
+  const inline = l => l.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, txt, url) => `<a href="${url.replace(/&amp;/g,"&").replace(/"/g,"%22")}" target="_blank" rel="noopener">${/google\.[a-z.]+\/maps|maps\.app/.test(url)?`${icon("pin").replace("<svg",'<svg style="width:14px;height:14px;vertical-align:-2px"')} `:""}${txt}</a>`)
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>");
+  const lines = esc(t||"").split(/\n/); let out = "", list = null, i = 0;
+  const close = () => { if (list){ out += `</${list}>`; list = null; } };
+  while (i < lines.length){
+    let l = lines[i];
+    if (/^\s*\|.*\|\s*$/.test(l)){ close(); const rows = []; while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){ rows.push(lines[i]); i++; }
+      const cells = r => r.trim().replace(/^\||\|$/g, "").split("|").map(c => inline(c.trim())); const body = rows.filter(r => !/^\s*\|[\s:|-]+\|\s*$/.test(r));
+      out += `<div class="tbl"><table><thead><tr>${cells(body[0]).map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${body.slice(1).map(r => `<tr>${cells(r).map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`; continue; }
+    if (/^\s*[-*•]\s+/.test(l)){ if (list !== "ul"){ close(); out += "<ul>"; list = "ul"; } out += `<li>${inline(l.replace(/^\s*[-*•]\s+/, ""))}</li>`; i++; continue; }
+    if (/^\s*\d+[.)]\s+/.test(l)){ if (list !== "ol"){ close(); out += "<ol>"; list = "ol"; } out += `<li>${inline(l.replace(/^\s*\d+[.)]\s+/, ""))}</li>`; i++; continue; }
+    close();
+    if (/^#{1,4}\s/.test(l)) out += `<h4>${inline(l.replace(/^#{1,4}\s/, ""))}</h4>`; else if (/^```/.test(l)) {} else if (l.trim()) out += `<p>${inline(l)}</p>`;
+    i++;
   }
-  return `<div class="md">${out}${inList?"</ul>":""}</div>`;
+  close(); return `<div class="md">${out}</div>`;
 }
+const mapsUrl = q => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+const placeLink = (q, label) => q ? `<a class="place" href="${mapsUrl(q)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${icon("pin").replace("<svg",'<svg style="width:14px;height:14px;vertical-align:-2px"')} ${esc(label || q)}</a>` : "";
 
 /* ---------- apparence ---------- */
 const isDark = () => S.settings.theme === "dark" || (!S.settings.theme && matchMedia("(prefers-color-scheme: dark)").matches);
@@ -77,7 +87,7 @@ function renderNav(){
   const btn = n => `<button class="nav-btn" data-act="go" data-v="${n.id}" ${UI.view===n.id?'aria-current="page"':""}>${icon(n.ic)}<span>${n.label}</span>${n.badge?`<span class="badge">${n.badge}</span>`:""}</button>`;
   $("#sidenav").innerHTML = items.map(btn).join("") + (isKidUser() && !allow("settings") ? "" : btn({id:"plus", label:T("Réglages"), ic:"sliders"}));
   $("#bottomnav").innerHTML = items.slice(0,5).map(btn).join("");
-  $("#brand").innerHTML = `${logo(40)}<span style="display:flex;flex-direction:column"><b>${esc(appName())}</b><span class="tiny muted">${esc(S.family.name || T("Ma famille"))}</span></span>`;
+  $("#brand").innerHTML = `${logo(40)}<span style="display:flex;flex-direction:column">${wordmark()}<span class="tiny muted">${esc(S.family.name || T("Ma famille"))}</span></span>`;
   $("#sidefoot").innerHTML = `${Cloud.user ? `<div class="row small muted" style="padding:0 8px">${icon("user").replace("<svg",'<svg style="width:16px;height:16px"')}${esc(Cloud.user.email||"")}</div>` : ""}<button class="nav-btn" data-act="urgence">${icon("phone")}<span>${T("Urgence")} · 811</span></button>`;
   const fab = $("#fab"); fab.hidden = !(feat("ai") && allow("ai")); fab.setAttribute("aria-label", T("Assistant IA"));
 }
@@ -98,12 +108,13 @@ let renderPending = false;
 function render(){
   applyLook(); renderNav();
   if (Cloud.ready && Cloud.mustLogin()){ $("#main").innerHTML = authView(); return; }
-  if (!navItems().some(n => n.id === UI.view) && UI.view !== "plus") UI.view = "home";
-  let html = topbar();
+  if (!navItems().some(n => n.id === UI.view) && !["plus","assistant"].includes(UI.view)) UI.view = "home";
+  let html = UI.view === "assistant" ? "" : topbar();
   if (S.demo && !isKidUser()) html += `<div class="banner info">${icon("info")}<div>${T("Vous voyez des <b>données d'exemple</b>.")} <button class="btn sm ghost" data-act="clearDemo" style="margin-left:6px">${T("Commencer avec ma famille")}</button></div></div>`;
-  html += ({home:homeView, kid:kidView, agenda:agendaView, tribu:tribuView, souvenirs:souvenirsView, plus:plusView}[UI.view] || homeView)();
+  html += ({home:homeView, kid:kidView, agenda:agendaView, tribu:tribuView, souvenirs:souvenirsView, plus:plusView, assistant:assistantView}[UI.view] || homeView)();
   $("#main").innerHTML = html;
   afterRender();
+  if (!S.settings.onboarded && !UI.obShown) setTimeout(() => { if (!UI.obShown && !$("#layer .scrim") && !(Cloud.ready && Cloud.mustLogin()) && (Cloud.ready || !window.TRIBE_FIREBASE)){ UI.obShown = true; maybeOnboard(); } }, 700);
 }
 const AFTER = [];
 function afterRender(){ AFTER.splice(0).forEach(f => { try { f(); } catch(e){ console.error(e); } }); }
@@ -114,7 +125,7 @@ function softRender(){ if ($("#layer .scrim") || document.activeElement?.matches
 function homeView(){
   const h0 = new Date().getHours(), hello = h0 < 12 ? T("Bonjour") : h0 < 18 ? T("Bon après-midi") : T("Bonsoir");
   const m = me();
-  let h = `<section class="hero" style="background:var(--surface)"><div>${logo(64)}</div><div class="stack" style="gap:4px;min-width:0"><span class="eyebrow">${fmtD(today(),{weekday:"long",day:"numeric",month:"long"})}</span><h1>${hello}${m?.name && m.name !== T("Moi") ? ", "+esc(m.name) : ""}</h1>
+  let h = `<section class="hero" style="background:var(--surface)"><div>${S.family.photo ? familyPic(72) : logo(64)}</div><div class="stack" style="gap:4px;min-width:0"><span class="eyebrow">${fmtD(today(),{weekday:"long",day:"numeric",month:"long"})}</span><h1>${hello}${m?.name && m.name !== T("Moi") ? ", "+esc(m.name) : ""}</h1>
     <div class="row">${S.family.members.slice(0,8).map(x => `<span title="${esc(x.name)}">${avatarOf(x, 32)}</span>`).join("")}${isKidUser()?"":`<button class="btn sm ghost" data-act="go" data-v="plus">${icon("people")}${T("Ma famille")}</button>`}</div></div></section>`;
   if (!S.children.length && !isKidUser()) h += `<div class="card"><div class="empty">${logo(72)}<h2>${T("Bienvenue dans {app}",{app:esc(appName())})}</h2><p>${T("L'app tout-en-un de la famille : suivi des enfants de la grossesse à 18 ans, agenda partagé, défis, souvenirs.")}</p><div class="row"><button class="btn kid" data-act="kidForm">${T("Ajouter un enfant")}</button><button class="btn ghost" data-act="kidForm" data-v="__pre">${T("Bébé à naître")}</button></div></div></div>`;
   h += `<div class="grid">`;
@@ -129,7 +140,7 @@ function homeView(){
   });
   // aujourd'hui
   if (feat("planner")){
-    const ev = allEvents().filter(e => e.date === iso(today())).sort(evSort);
+    const ev = allEvents().filter(e => e.date === iso(today()) && e.type !== "photo").sort(evSort);
     const up = allEvents().filter(e => e.date > iso(today()) && e.type !== "sport").sort(evSort).slice(0,4);
     h += `<div class="card c6"><div class="card-h"><h2>${T("Aujourd'hui")}</h2><button class="btn sm ghost" data-act="eventForm">${icon("plus")}${T("Ajouter")}</button></div>
       ${ev.length ? `<div class="list">${ev.map(eventRow).join("")}</div>` : `<p class="muted small">${T("Rien de prévu aujourd'hui.")}</p>`}
@@ -138,12 +149,12 @@ function homeView(){
   // souvenir ce jour-là + photo du jour
   if (feat("memories") || feat("photos")){
     const md0 = iso(today()).slice(5), past = S.memories.filter(x => x.date.slice(5) === md0 && x.date < iso(today()));
-    const photoToday = S.photos.find(p => p.date === iso(today()));
+    const photosToday = S.photos.filter(p => p.date === iso(today()));
     h += `<div class="card c6"><div class="card-h"><h2>${T("Souvenirs")}</h2><button class="btn sm ghost" data-act="go" data-v="souvenirs">${T("Album")}</button></div>
       ${past.length ? past.map(x => `<div class="memory"><b>${T("Il y a {n} an(s) aujourd'hui",{n:today().getFullYear()-parseD(x.date).getFullYear()})}</b><div>${esc(x.title)}</div></div>`).join("") : ""}
-      ${feat("photos") ? (photoToday ? `<div class="row"><img id="homePhoto" class="avatar" style="width:72px;height:72px;border-radius:16px" alt=""><div class="grow small">${T("Photo du jour ajoutée.")} ${esc(photoToday.caption||"")}</div></div>` : `<button class="btn kid" data-act="photoDay">${icon("camera")}${T("Prendre la photo du jour")}</button>`) : ""}
+      ${feat("photos") ? (photosToday.length ? `<div class="thumbs">${photosToday.map(p => `<button data-act="openPhoto" data-v="${p.id}" aria-label="${esc(p.caption||T("Photo"))}"><img data-photo="${p.id}" alt=""></button>`).join("")}<button class="add" data-act="photoDay" aria-label="${T("Ajouter une photo")}">${icon("plus")}</button></div>` : `<button class="btn kid" data-act="photoDay">${icon("camera")}${T("Prendre la photo du jour")}</button>`) : ""}
       ${feat("memories") ? `<button class="btn ghost" data-act="memoryForm">${icon("star")}${T("Noter un moment précieux")}</button>` : ""}</div>`;
-    if (photoToday) AFTER.push(async () => { const d = await PhotoDB.get(photoToday.id); const el = $("#homePhoto"); if (el && d) el.src = d; });
+    if (photosToday.length) AFTER.push(async () => { for (const el of $$(".thumbs img[data-photo]")){ const d = await PhotoDB.get(el.dataset.photo); if (d) el.src = d; } });
   }
   // défis
   if (feat("rewards") && S.tasks.length){
@@ -170,7 +181,7 @@ const tipCard = t => `<div class="tipcard" style="background:var(--${TIPCAT[t[0]
 function authView(){
   return `<div class="auth"><div class="card" style="align-items:stretch">
     <div class="row" style="justify-content:center">${logo(64)}</div>
-    <h1 style="text-align:center">${esc(appName())}</h1><p class="muted small" style="text-align:center">${T("L'app tout-en-un de la famille.")}</p>
+    <h1 style="text-align:center;font-size:2.4rem">${wordmark()}</h1><p class="muted small" style="text-align:center">${T("L'app tout-en-un de la famille.")}</p>
     <button class="btn line block" data-act="googleLogin">${icon("google")}${T("Continuer avec Google")}</button>
     <div class="or">${T("ou avec un courriel")}</div>
     <form class="stack" data-form="emailAuth">
@@ -211,15 +222,16 @@ function plusView(){
       <p class="small muted">${Cloud.user ? T("Vos données sont sauvegardées dans votre compte et sur cet appareil.") : T("Les données restent sur cet appareil. Exportez-les régulièrement.")}</p>
       <div class="row"><button class="btn ghost" data-act="exportJson">${icon("db")}${T("Tout exporter (JSON)")}</button><button class="btn ghost" data-act="exportCsv">${icon("doc")}${T("Journal et mesures (CSV)")}</button><button class="btn ghost" data-act="exportIcs">${icon("cal")}${T("Agenda (.ics)")}</button><label class="btn line" style="cursor:pointer">${T("Importer")}<input type="file" id="impFile" accept=".json,application/json" hidden data-change="importFile"></label></div>
       <div class="sep"></div><button class="btn danger" data-act="askWipe" style="align-self:flex-start">${T("Tout effacer sur cet appareil")}</button><div id="wipeConfirm"></div></div>
-    <div class="card c12"><div class="row" style="gap:14px">${logo(48)}<div><h2>${esc(appName())}</h2><p class="small muted">${T("Suivi des enfants, agenda, défis et souvenirs pour toute la famille.")} · v3.0</p></div></div></div>
+    <div class="card c12"><div class="row" style="gap:14px">${logo(48)}<div><h2>${wordmark()}</h2><p class="small muted">${T("Suivi des enfants, agenda, défis et souvenirs pour toute la famille.")} · v4.0</p></div></div></div>
   </div>`;
 }
 function notifSettings(){
   const N = S.settings.notif;
   const sw = (k, l) => `<label class="switch"><input type="checkbox" data-change="notif" data-k="${k}" ${N[k]?"checked":""} ${N.enabled?"":"disabled"}><span class="tg"></span><span class="grow">${l}</span></label>`;
   return `<label class="switch"><input type="checkbox" data-change="notifOn" ${N.enabled?"checked":""}><span class="tg"></span><span class="grow"><b>${T("Activer les rappels")}</b><span class="tiny muted" style="display:block">${Native.isApp ? T("Rappels sur le téléphone, même app fermée.") : T("Dans le navigateur, seulement quand la page est ouverte. L'APK les envoie en tout temps.")}</span></span></label>
-    ${sw("events",T("Rendez-vous et événements (la veille et 1 h avant)"))}${sw("vaccines",T("Vaccins et visites à prévoir"))}${sw("memories",T("Souvenirs « ce jour-là »"))}${sw("review",T("Revue IA prête"))}
-    <label class="switch"><input type="checkbox" data-change="notif" data-k="goals" ${N.goals?"checked":""} ${N.enabled?"":"disabled"}><span class="tg"></span><span class="grow">${T("Rappel quotidien des objectifs (lecture, activité)")}</span><input class="inp" type="time" value="${N.goalTime}" data-change="goalTime" style="width:auto"></label>`;
+    ${sw("events",T("Rendez-vous et événements (la veille et 1 h avant)"))}${sw("vaccines",T("Vaccins et visites à prévoir"))}${sw("memories",T("Souvenirs « ce jour-là »"))}${sw("review",T("Revue IA (au jour et à l'heure choisis dans l'Assistant)"))}${sw("tasks",T("Défis à heure fixe"))}${sw("chat",T("Messages et mentions @ dans la discussion"))}
+    <label class="switch"><input type="checkbox" data-change="notif" data-k="goals" ${N.goals?"checked":""} ${N.enabled?"":"disabled"}><span class="tg"></span><span class="grow">${T("Rappel quotidien des objectifs (lecture, activité)")}</span><input class="inp" type="time" value="${N.goalTime}" data-change="goalTime" style="width:auto"></label>
+    ${N.enabled?`<button class="btn sm ghost" data-act="notifTest">${icon("bell")}${T("Envoyer une notification test (dans 5 s)")}</button>`:""}`;
 }
 
 /* ---------- profils ---------- */
@@ -266,8 +278,10 @@ function memberForm(id){
     ${avatarPicker(m, "mem")}
     <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${m.id && m.id !== S.me ? `<button type="button" class="btn danger" data-act="delMember" data-v="${m.id}">${T("Retirer")}</button>`:""}</div></form>`);
 }
+const familyPic = (sz = 64) => S.family.photo ? `<img src="${S.family.photo}" alt="${esc(S.family.name||T("Ma famille"))}" class="fampic" style="width:${sz}px;height:${sz}px">` : `<span class="fampic empty" style="width:${sz}px;height:${sz}px">${icon("people")}</span>`;
 function familySheet(){
   sheet(`${sheetHead(T("Ma famille"))}
+    <div class="row">${familyPic(72)}<div class="stack" style="gap:6px"><button class="btn sm ghost" data-act="famPhoto">${icon("camera")}${S.family.photo?T("Changer la photo de famille"):T("Ajouter une photo de famille")}</button>${S.family.photo?`<button class="btn sm line" data-act="famPhotoDel">${T("Retirer")}</button>`:""}</div></div>
     ${fld("fam-name",T("Nom de la famille"),inp("fam-name",S.family.name,`placeholder="${T("Famille Tremblay")}" data-change="famName"`))}
     <div class="list">${S.family.members.map(m => `<button class="li" data-act="memberForm" data-v="${m.id}">${avatarOf(m,40)}<div class="grow"><div class="li-title">${esc(m.name)}${m.id===S.me?` <span class="chip">${T("moi")}</span>`:""}</div><div class="small muted">${T({parent:"Parent",enfant:"Enfant",autre:"Autre"}[m.role]||"")}${m.email?` · ${esc(m.email)}`:""}</div></div></button>`).join("")}</div>
     <button class="btn ghost" data-act="memberForm">${icon("plus")}${T("Ajouter un membre sans compte")}</button>
@@ -293,5 +307,23 @@ function urgence(){
   const n = (l, num, sub, col) => `<div class="li"><div class="ic" style="background:var(--${col}-bg);color:var(--${col}-ink)">${icon("phone")}</div><div class="grow"><div class="small muted" style="font-weight:700">${l}</div><div class="phone num">${num}</div>${sub?`<div class="tiny muted">${sub}</div>`:""}</div><a class="btn sm ${col==="rose"?"danger":"ghost"}" href="tel:${num.replace(/[^0-9]/g,"")}">${T("Appeler")}</a></div>`;
   sheet(`${sheetHead(T("Urgence et ressources"))}
     <div class="banner alert">${icon("alert")}<div>${T("Difficulté à respirer, lèvres bleues, convulsion, perte de conscience, étouffement : <b>911</b> immédiatement.")}</div></div>
+    <button class="btn kid" data-act="firstAid" style="justify-content:flex-start">${icon("heart")}<span class="grow" style="text-align:left">${T("Premiers soins : RCR, étouffement, position de sécurité (selon l'âge)")}</span>${icon("right")}</button>
     <div class="list">${n(T("Urgence"),"911","","rose")}${n(T("Info-Santé · Info-Social"),"811",T("Infirmière 24 h/24 (option 1), intervenant psychosocial (option 2)"),"sky")}${n(T("Centre antipoison du Québec"),"1-800-463-5060",T("24 h/24"),"butter")}${n("Tel-jeunes","1-800-263-2266",T("Pour les jeunes. Texto : 514-600-1002"),"lilac")}${n("LigneParents","1-800-361-5085",T("Soutien aux parents, 24 h/24"),"mint")}${n(T("Ligne de crise suicide"),"988",T("Appel ou texto, 24 h/24"),"rose")}</div>`);
 }
+
+/* ---------- premier lancement : créer son profil (aucun enfant par défaut) ---------- */
+function maybeOnboard(){
+  if (S.settings.onboarded || isKidUser() || $("#layer .scrim") || (Cloud.ready && Cloud.mustLogin())) return;
+  const m = me(); if (S.children.length && m && m.name && m.name !== T("Moi")){ S.settings.onboarded = true; save(); return; }
+  sheet(`<form class="stack" data-form="onboard" style="gap:14px"><div class="center">${logo(72)}<div style="font-size:2rem">${wordmark()}</div></div><h2 class="center">${T("Bienvenue dans {app} !",{app:esc(appName())})}</h2>
+    <p class="small muted center">${T("Commençons par votre profil. Vous ajouterez ensuite vos enfants (ou un bébé à naître) et, si vous voulez, l'autre parent.")}</p>
+    ${fld("ob-name",T("Votre prénom"),inp("ob-name", m?.name && m.name !== T("Moi") ? m.name : (Cloud.user?.displayName||""), `required autocomplete="given-name"`))}
+    ${fld("ob-fam",T("Nom de la famille (facultatif)"),inp("ob-fam", S.family.name||"", `placeholder="${T("Famille Tremblay")}"`))}
+    <div class="field"><label>${T("Votre couleur")}</label>${swatches("obcolor", m?.color || "lilac")}</div>
+    <button class="btn kid" type="submit">${T("Continuer")}</button></form>`);
+}
+function onboardKids(){
+  sheet(`${sheetHead(T("Vos enfants"))}<p class="small muted">${T("Ajoutez un enfant ou un bébé à naître. Vous pourrez en ajouter d'autres plus tard.")}</p>
+    <div class="stack"><button class="btn kid" data-act="kidForm">${icon("kid")}${T("Ajouter un enfant")}</button><button class="btn ghost" data-act="kidForm" data-v="__pre">${icon("baby")}${T("Bébé à naître")}</button><button class="btn line" data-act="closeSheet">${T("Plus tard")}</button></div>`);
+}
+Object.assign(FORMS, { onboard: () => { const m = me(), n = val("ob-name"); if (!n) return toast(T("Votre prénom")); m.name = n; m.color = radio("obcolor") || m.color || "lilac"; if (val("ob-fam")) S.family.name = val("ob-fam"); S.settings.onboarded = true; save(); render(); if (!S.children.length) onboardKids(); else closeSheet(); } });

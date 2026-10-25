@@ -77,16 +77,19 @@ const I = {
 const icon = (n, cls="") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" class="${cls}" aria-hidden="true">${I[n]||I.star}</svg>`;
 
 /* ---------- logo : trois têtes (parent, enfant, bébé) dans un nid ---------- */
+/* logo : une tribu (trois silhouettes de tailles différentes, unies par un même arc) sur un dégradé corail → lilas */
+const LOGO_FIG = `<g fill="#fff"><circle cx="20.5" cy="18.5" r="6.3"/><path d="M9.5 49c0-9.6 4.9-18.4 11-18.4s11 8.8 11 18.4z"/></g>
+    <g fill="#FFE6A6"><circle cx="43.5" cy="21" r="5.8"/><path d="M33 49c0-8.6 4.7-16.4 10.5-16.4S54 40.4 54 49z"/></g>
+    <g fill="#fff" stroke="#EE7A97" stroke-width="2.2"><circle cx="32" cy="33.5" r="4.9"/><path d="M24.6 52.5c0-7.2 3.3-12.6 7.4-12.6s7.4 5.4 7.4 12.6z"/></g>
+    <path d="M7.5 54c7.8 4.6 16 6.8 24.5 6.8S48.7 58.6 56.5 54" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>`;
+let logoN = 0;
 function logo(s = 36){
-  return `<svg viewBox="0 0 64 64" width="${s}" height="${s}" aria-hidden="true">
-    <rect width="64" height="64" rx="15" fill="var(--peach-bg)"/>
-    <circle cx="22" cy="24" r="12" fill="#FF9E7A"/><circle cx="42" cy="27" r="9.5" fill="#62C9A4"/><circle cx="32" cy="36" r="7.5" fill="#FFD36E"/>
-    <g fill="#2A2340"><circle cx="18.5" cy="23" r="1.9"/><circle cx="25.5" cy="23" r="1.9"/><circle cx="39.3" cy="26.3" r="1.5"/><circle cx="44.7" cy="26.3" r="1.5"/><circle cx="30" cy="35.2" r="1.25"/><circle cx="34" cy="35.2" r="1.25"/></g>
-    <g fill="#F4A0B9"><circle cx="16" cy="27.5" r="2.4"/><circle cx="28" cy="27.5" r="2.4"/><circle cx="38" cy="30" r="1.8"/><circle cx="46" cy="30" r="1.8"/></g>
-    <path d="M19.6 27.6a2.6 2.6 0 0 0 4.8 0M40.3 30.2a2 2 0 0 0 3.4 0" fill="none" stroke="#2A2340" stroke-width="1.2" stroke-linecap="round"/>
-    <path d="M6 44h52a26 14 0 0 1-52 0z" fill="#ECB084" stroke="#B24A22" stroke-width="3.2" stroke-linejoin="round"/>
-    <path d="M12 48l7-2M21 52l7-2M34 52l7-2M45 49l7-2.5" stroke="#B24A22" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+  const id = "tlg" + (++logoN);
+  return `<svg viewBox="0 0 64 64" width="${s}" height="${s}" aria-hidden="true" class="logo"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A6A"/><stop offset=".55" stop-color="#F0789C"/><stop offset="1" stop-color="#8676F0"/></linearGradient></defs>
+    <rect width="64" height="64" rx="18" fill="url(#${id})"/>${LOGO_FIG}</svg>`;
 }
+/* mot-symbole : nom de l'app en minuscules arrondies, point du i en cœur */
+const wordmark = (name = appName()) => `<span class="wordmark" aria-label="${esc(name)}">${esc(name.toLowerCase()).replace("i", `<span class="wm-i">ı<svg class="wm-dot" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C1 8.6 3 5 6.6 5c2.2 0 3.6 1.2 5.4 3.2C13.8 6.2 15.2 5 17.4 5 21 5 23 8.6 21.6 11.8 19.5 16.4 12 21 12 21z" fill="#FF7E79"/></svg></span>`)}</span>`;
 /* ---------- avatars : 10 animaux + 10 symboles ---------- */
 const EYES = (y=32, dx=8, r=2.6) => `<circle cx="${32-dx}" cy="${y}" r="${r}" fill="#2A2340"/><circle cx="${32+dx}" cy="${y}" r="${r}" fill="#2A2340"/><circle cx="${32-dx+.9}" cy="${y-.9}" r=".8" fill="#fff"/><circle cx="${32+dx+.9}" cy="${y-.9}" r=".8" fill="#fff"/>`;
 const CHEEKS = (y=39) => `<circle cx="19" cy="${y}" r="3.2" fill="var(--rose)" opacity=".5"/><circle cx="45" cy="${y}" r="3.2" fill="var(--rose)" opacity=".5"/>`;

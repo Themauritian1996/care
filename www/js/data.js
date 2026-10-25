@@ -321,6 +321,7 @@ const MODULES = [
 /* fonctions de la famille, affichables ou non */
 const FEATURES = [
   {k:"planner", l:"Agenda familial", d:"Calendrier partagé, disponibilités"},
+  {k:"kidcal", l:"Agenda des enfants", d:"Les enfants ajoutent leurs propres activités (fête d'amis, pratique…)"},
   {k:"rewards", l:"Défis et récompenses", d:"Tâches, points, récompenses"},
   {k:"memories", l:"Souvenirs", d:"Moments précieux, « ce jour-là »"},
   {k:"photos", l:"Photo du jour", d:"Album classé par catégorie"},
@@ -363,7 +364,7 @@ const PREG_CHECK = [
 ];
 
 /* ---------- agenda ---------- */
-const EVT = { medecin:["rose","Médecin / IPS"], dentiste:["mint","Dentiste"], vaccin:["butter","Vaccin"], garde:["sky","Garderie / école"], therapie:["lilac","Thérapie"], sport:["mint","Sport / activité"], famille:["peach","Famille"], groupe:["teal","Groupe"], autre:["coral","Autre"], anniv:["peach","Anniversaire"], visite:["rose","Visite suggérée"], souvenir:["butter","Souvenir"], photo:["lilac","Photo du jour"], note:["sky","Note qui reste"] };
+const EVT = { enfant:["sky","Activité d'enfant"], medecin:["rose","Médecin / IPS"], dentiste:["mint","Dentiste"], vaccin:["butter","Vaccin"], garde:["sky","Garderie / école"], therapie:["lilac","Thérapie"], sport:["mint","Sport / activité"], famille:["peach","Famille"], groupe:["teal","Groupe"], autre:["coral","Autre"], anniv:["peach","Anniversaire"], visite:["rose","Visite suggérée"], souvenir:["butter","Souvenir"], photo:["lilac","Photo du jour"], note:["sky","Note qui reste"] };
 const PHOTO_CATS = [
   {id:"cute", l:"Trop mignon", c:"rose"},{id:"loufoque", l:"Loufoque", c:"butter"},{id:"sortie", l:"Sortie", c:"mint"},
   {id:"famille", l:"En famille", c:"peach"},{id:"premiere", l:"Première fois", c:"lilac"},{id:"fete", l:"Fête", c:"coral"},{id:"autre", l:"Autre", c:"sky"},

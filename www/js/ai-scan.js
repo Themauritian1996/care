@@ -21,15 +21,15 @@ async function aiScan(kind){
   if (kind !== "events" && !c) return toast(T("Ajoutez d'abord un enfant"));
   const data = await Native.takePhoto({source:"prompt"}); if (!data) return;
   const img = await shrinkImage(data, 1600, 0.85);
-  sheet(`${sheetHead(T(K.l))}<img src="${img}" alt="" style="border-radius:16px;max-height:240px;object-fit:contain;background:var(--surface2)"><p class="muted">${T("Lecture du document…")}</p>`);
+  sheet(`${sheetHead(T(K.l))}<img src="${img}" alt="" style="border-radius:16px;max-height:240px;object-fit:contain;background:var(--surface2)"><p class="muted"><span class="spin"></span> ${T("Lecture du document…")}</p>`);
   const m = c && !isPrenatal(c) ? ageMonths(c) : null;
   const who = c ? `Enfant : ${esc(c.nick||c.name)}, ${m != null ? ageLabel(m) : "à naître"}. Allergies connues : ${c.allergies||"aucune"}.` : "";
   const S_ = (type, extra = {}) => ({type, ...extra}), STR = S_("STRING"), NUM = S_("NUMBER");
   const P = {
     label: {
       prompt:`Lis cette étiquette d'aliment (tableau de valeur nutritive canadien et liste d'ingrédients). ${who}
-Donne : product (nom du produit), portion (portion indiquée), calories, nutrients (chaque ligne du tableau : name, amount avec unité, dv = % valeur quotidienne si présent), ingredients (texte), allergens (parmi : ${ALLERGENS.join(", ")}, plus tout autre allergène prioritaire mentionné, y compris « peut contenir »), sugarsAdded (vrai si sucre, sirop, miel, jus concentré parmi les ingrédients), sodiumMg, group (groupe du Guide alimentaire canadien : legfruits, proteines, grains, laitiers ou autres), flags (mises en garde courtes pour CET enfant : miel avant 12 mois, sucres ajoutés avant 2 ans, sodium élevé > 15 % VQ, risque d'étouffement avant 4 ans, allergène connu, boisson sucrée, caféine), verdict (une ou deux phrases rassurantes et concrètes : convient-il, à quelle fréquence, meilleure alternative si besoin).`,
-      schema:{type:"OBJECT", properties:{product:STR, portion:STR, calories:NUM, nutrients:{type:"ARRAY", items:{type:"OBJECT", properties:{name:STR, amount:STR, dv:STR}, required:["name","amount"]}}, ingredients:STR, allergens:{type:"ARRAY", items:STR}, sugarsAdded:S_("BOOLEAN"), sodiumMg:NUM, group:{type:"STRING", enum:Object.keys(FOOD_GROUPS)}, flags:{type:"ARRAY", items:STR}, verdict:STR}, required:["product","group","verdict"]}},
+Donne : product (nom du produit), portion (portion indiquée), calories, nutrients (chaque ligne du tableau : name, amount avec unité, dv = % valeur quotidienne si présent), ingredients (texte), allergens (parmi : ${ALLERGENS.join(", ")}, plus tout autre allergène prioritaire mentionné, y compris « peut contenir »), sugarsAdded (vrai si sucre, sirop, miel, jus concentré parmi les ingrédients), sodiumMg, group (groupe du Guide alimentaire canadien : legfruits, proteines, grains, laitiers ou autres), flags (mises en garde courtes pour CET enfant : miel avant 12 mois, sucres ajoutés avant 2 ans, sodium élevé > 15 % VQ, risque d'étouffement avant 4 ans, allergène connu, boisson sucrée, caféine), verdict (une ou deux phrases rassurantes et concrètes : convient-il, à quelle fréquence, meilleure alternative si besoin), nut (valeurs pour UNE portion : kcal, prot g, carb g, fat g, fiber g, sugar g, sodium mg, calcium mg, iron mg ; convertis les % VQ en quantités).`,
+      schema:{type:"OBJECT", properties:{product:STR, portion:STR, calories:NUM, nutrients:{type:"ARRAY", items:{type:"OBJECT", properties:{name:STR, amount:STR, dv:STR}, required:["name","amount"]}}, ingredients:STR, allergens:{type:"ARRAY", items:STR}, sugarsAdded:S_("BOOLEAN"), sodiumMg:NUM, group:{type:"STRING", enum:Object.keys(FOOD_GROUPS)}, flags:{type:"ARRAY", items:STR}, verdict:STR, nut:NUT_SCHEMA}, required:["product","group","verdict"]}},
     daycare: {
       prompt:`Lis ce rapport quotidien de garderie (souvent manuscrit). ${who}
 Donne : date (si visible), meals (time, items : name, group parmi legfruits/proteines/grains/laitiers/autres, qty ; note sur la quantité mangée), naps (start, end), diapers (time, kind : « Pipi », « Selle » ou « Pipi et selle »), bottles (time, ml), mood (un mot), notes (le reste : activités, messages de l'éducatrice). N'invente rien : laisse vide ce qui n'est pas écrit.`,
@@ -47,8 +47,8 @@ Pour chaque mesure : date, weight en kg, height en cm, ofc (périmètre crânien
       schema:{type:"OBJECT", properties:{days:{type:"ARRAY", items:{type:"OBJECT", properties:{date:STR, meal:STR, allergens:{type:"ARRAY", items:STR}, flag:STR}, required:["date","meal"]}}}}},
   }[kind];
   try {
-    const r = await gemini({system:todayCtx(), json:P.schema, contents:[{role:"user", parts:[{inline_data:{mime_type:"image/jpeg", data:img.split(",")[1]}}, {text:P.prompt}]}]});
-    UI.scan = {kind, out:JSON.parse(r.text), kid:c?.id};
+    const r = await gemini({tier:"quality", system:todayCtx(), json:P.schema, contents:[{role:"user", parts:[{inline_data:{mime_type:"image/jpeg", data:img.split(",")[1]}}, {text:P.prompt}]}]});
+    UI.scan = {kind, out:parseJSON(r.text), kid:c?.id}; aiHist("scan", T(K.l), "```\n"+JSON.stringify(UI.scan.out, null, 1).slice(0, 3000)+"\n```", {kid:c?.id||null});
     scanResult();
   } catch(e){ closeSheet(); toast(e.message); }
 }
@@ -119,50 +119,6 @@ function scanImport(){
   closeSheet(); commit(T("{n} élément(s) importé(s)",{n}));
 }
 
-/* ---------- outils créatifs ---------- */
-const CREATE_KINDS = {
-  story:{l:"Histoire du soir", ic:"moon", d:"Une histoire courte où votre enfant est le héros."},
-  plan:{l:"Menu de la semaine", ic:"dish", d:"7 jours de repas selon l'âge, les favoris et les allergies, avec la liste d'épicerie."},
-  ideas:{l:"Idées d'activités", ic:"run", d:"Jeux et sorties adaptés à l'âge, selon le temps qu'il fait et le temps dont vous disposez."},
-  talk:{l:"Préparer une discussion", ic:"chat", d:"Comment aborder un sujet délicat (deuil, puberté, écrans, consentement, drogues…)."},
-};
-function createPane(){
-  const k = UI.createKind || "story", c = kidById(UI.aiKid) || child();
-  const f = {
-    story:`${fld("cr-a",T("Thème ou héros (facultatif)"),`<input class="inp" id="cr-a" placeholder="${T("Dinosaures, l'espace, un chat qui parle…")}">`)}${fld("cr-b",T("Ce qu'on veut transmettre (facultatif)"),`<input class="inp" id="cr-b" placeholder="${T("Le courage, partager, s'endormir calme…")}">`)}<div class="field"><label>${T("Longueur")}</label>${radios("cr-len",[["courte",T("3 minutes")],["moyenne",T("6 minutes")]],"courte")}</div>`,
-    plan:`${fld("cr-a",T("Contraintes (facultatif)"),`<input class="inp" id="cr-a" placeholder="${T("Végé, budget serré, soupers en 20 min…")}">`)}`,
-    ideas:`<div class="field"><label>${T("Où ?")}</label>${radios("cr-where",[["dedans",T("À l'intérieur")],["dehors",T("Dehors")],["sortie",T("Sortie à Montréal ou aux environs")]],"dedans")}</div><div class="field"><label>${T("Temps disponible")}</label>${radios("cr-time",[["15",T("15 min")],["60",T("1 h")],["jour",T("Une journée")]],"60")}</div>`,
-    talk:`${fld("cr-a",T("Sujet"),`<input class="inp" id="cr-a" placeholder="${T("Ex. : parler de la mort de grand-papa")}">`)}`,
-  }[k];
-  return `<div class="pick">${Object.entries(CREATE_KINDS).map(([id,x]) => `<button data-act="createKind" data-v="${id}" aria-pressed="${id===k}">${T(x.l)}</button>`).join("")}</div>
-    <p class="small muted">${T(CREATE_KINDS[k].d)}</p><form class="stack" data-form="aiCreate" style="gap:10px">${f}<button class="btn kid" type="submit">${icon("spark")}${T("Créer")}</button></form><div id="aiOut"></div>`;
-}
-async function aiCreate(){
-  const k = UI.createKind || "story", c = kidById(UI.aiKid) || child(), out = $("#aiOut");
-  const name = c ? (c.nick||c.name) : T("l'enfant"), age = c && !isPrenatal(c) ? ageLabel(ageMonths(c)) : "";
-  const fav = (c?.foodFav||[]).map(f => f.name).join(", ");
-  const prompts = {
-    story:`Écris une histoire du soir ${radio("cr-len")==="moyenne"?"d'environ 700 mots":"d'environ 350 mots"} pour ${name}, ${age}, qui en est le héros. Thème : ${val("cr-a")||"au choix, doux et imaginatif"}. Message : ${val("cr-b")||"au choix"}. Vocabulaire adapté à l'âge, rythme apaisant, fin calme propice au sommeil. Donne un titre en première ligne (# Titre).`,
-    plan:`Propose un menu de 7 jours (déjeuner, dîner, souper, 1 ou 2 collations) pour une famille avec ${name}, ${age}. Suis le Guide alimentaire canadien (moitié légumes et fruits, quart protéines, quart grains entiers), les textures sûres pour l'âge, et les portions de l'enfant. Aliments aimés : ${fav||"inconnus"}. Allergies : ${c?.allergies||"aucune connue"}. Contraintes : ${val("cr-a")||"aucune"}. Termine par la liste d'épicerie groupée par rayon. Tableau Markdown pour les repas.`,
-    ideas:`Donne 6 idées d'activités pour ${name}, ${age}, ${{dedans:"à l'intérieur", dehors:"dehors", sortie:"en sortie dans la région de Montréal"}[radio("cr-where")]||"à l'intérieur"}, durée ${radio("cr-time")==="jour"?"une journée":radio("cr-time")+" minutes"}, en ${fmtD(today(),{month:"long"})}. Pour chacune : matériel, déroulement en 2 phrases, ce que ça développe (motricité, langage, social…). Variées, peu coûteuses.`,
-    talk:`Aide un parent à préparer une discussion avec ${name}, ${age}, sur : ${val("cr-a")||"un sujet délicat"}. Donne : ce que l'enfant comprend à cet âge, 4 ou 5 phrases simples à dire, les questions probables et comment y répondre, ce qu'il vaut mieux éviter, et quand demander de l'aide (CLSC, psychologue, 811). Appuie-toi sur les sources reconnues (SCP, Naître et grandir, Tel-jeunes, INSPQ).`,
-  };
-  if (k === "talk" && !val("cr-a")) return toast(T("Indiquez le sujet"));
-  out.innerHTML = `<p class="muted">${T("Création en cours…")}</p>`;
-  try {
-    const r = await gemini({system: AI_SYSTEM().replace("en 120 à 250 mots", "") + "\n" + kidContext(c), contents:[{role:"user", parts:[{text:prompts[k]}]}], search: k === "talk" || k === "ideas" && radio("cr-where") === "sortie"});
-    UI.aiOut = {kind:k, text:r.text, kid:c?.id};
-    out.innerHTML = `<div class="card" style="box-shadow:none;background:var(--surface2)">${md(r.text)}${r.sources?.length?`<div class="tiny"><b>${T("Sources")}</b> : ${r.sources.slice(0,5).map(s=>`<a href="${esc(s.uri)}" target="_blank" rel="noopener">${esc(s.title||"lien")}</a>`).join(" · ")}</div>`:""}</div>
-      <div class="row">${k==="story"&&"speechSynthesis" in window?`<button class="btn kid" data-act="aiSpeak">${icon("play")}${T("Lire à voix haute")}</button>`:""}<button class="btn ghost" data-act="aiOutShare">${icon("share")}${T("Partager")}</button>${k==="story"&&feat("memories")?`<button class="btn ghost" data-act="aiOutKeep">${icon("star")}${T("Garder dans les souvenirs")}</button>`:""}</div>`;
-  } catch(e){ out.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
-}
-function aiSpeak(){
-  const s = window.speechSynthesis; if (s.speaking){ s.cancel(); return; }
-  const u = new SpeechSynthesisUtterance((UI.aiOut?.text||"").replace(/[#*_>|]/g, " "));
-  u.lang = LANG === "en" ? "en-CA" : "fr-CA"; u.rate = 0.92; const v = s.getVoices().find(x => x.lang?.startsWith(u.lang)) || s.getVoices().find(x => x.lang?.startsWith(LANG)); if (v) u.voice = v;
-  s.speak(u);
-}
-
 /* ---------- souvenirs : texte et récit de l'année ---------- */
 async function aiMemoryText(targetId, titleId){
   if (!aiKey()){ aiSheet(); return; }
@@ -172,7 +128,7 @@ async function aiMemoryText(targetId, titleId){
   try {
     const parts = []; if (photo) parts.push({inline_data:{mime_type:"image/jpeg", data:photo.split(",")[1]}});
     parts.push({text:`Écris 2 à 4 phrases chaleureuses et simples, comme un parent dans un album de bébé, pour ce souvenir de ${c?(c.nick||c.name):"notre enfant"}${c&&!isPrenatal(c)?`, ${ageLabel(ageMonths(c))}`:""} : « ${title||"(voir la photo)"} ». ${photo?"Décris ce qu'on voit sur la photo sans inventer de détails.":""} Pas de titre, pas d'emoji excessif. En ${LANG==="en"?"anglais":"français"}.`});
-    const r = await gemini({contents:[{role:"user", parts}]}); ta.value = r.text.trim();
+    const r = await gemini({tier:"fast", contents:[{role:"user", parts}]}); ta.value = r.text.trim();
   } catch(e){ ta.value = ""; toast(e.message); }
 }
 async function aiYearStory(kidId, year){
@@ -187,21 +143,18 @@ async function aiYearStory(kidId, year){
   try {
     const data = mems.map(m => `- ${m.date} [${m.kind||"moment"}] ${m.title}${m.text?` : ${m.text.slice(0,300)}`:""}${m.answers?` : ${Object.entries(m.answers).map(([q,a])=>`${q} ${a}`).join("; ")}`:""}`).join("\n");
     const r = await gemini({contents:[{role:"user", parts:[{text:`Écris le récit de l'année ${year} de ${c.nick||c.name} (né·e le ${c.dob}), comme une page d'album de famille : 250 à 400 mots, chronologique, tendre, avec des intertitres courts par saison. N'invente aucun fait : utilise seulement ces éléments.\nSouvenirs :\n${data||"aucun"}\nJalons atteints : ${ms.join("; ")||"aucun"}\nMesures : ${gr.length>1?`de ${gr[0].weight||"?"} kg / ${gr[0].height||"?"} cm à ${gr[gr.length-1].weight||"?"} kg / ${gr[gr.length-1].height||"?"} cm`:"non"}\nPhotos du jour prises : ${photos}. En ${LANG==="en"?"anglais":"français"}.`}]}]});
-    UI.aiOut = {kind:"year", text:r.text, kid:c.id, year};
+    UI.aiOut = {kind:"year", text:r.text, kid:c.id, year}; aiHist("memory", T("L'année {y} de {n}",{y:year, n:c.nick||c.name}), r.text, {kid:c.id});
     sheet(`${sheetHead(T("L'année {y} de {n}",{y:year, n:esc(c.nick||c.name)}))}<div>${md(r.text)}</div><div class="row"><button class="btn kid" data-act="aiOutKeep">${icon("star")}${T("Garder dans les souvenirs")}</button><button class="btn ghost" data-act="aiOutShare">${icon("share")}${T("Partager")}</button></div>`, "wide");
   } catch(e){ closeSheet(); toast(e.message); }
 }
 
 Object.assign(ACT, {
   aiScan: v => aiScan(v), scanImport: () => scanImport(),
-  scanMeal: () => { const o = UI.scan.out; mealForm({items:[{name:o.product||"", group:FOOD_GROUPS[o.group]?o.group:"autres", qty:o.portion||""}], comment:o.verdict, ai:true}); },
+  scanMeal: () => { const o = UI.scan.out; mealForm({items:[{name:o.product||"", group:FOOD_GROUPS[o.group]?o.group:"autres", qty:o.portion||"", nut:o.nut||null}], comment:o.verdict, ai:true}); },
   scanFav: () => { const o = UI.scan.out, c = kidById(UI.scan.kid); if (!c.foodFav.some(f => f.name === o.product)) c.foodFav.push({name:o.product, group:FOOD_GROUPS[o.group]?o.group:"autres"}); commit(T("Ajouté aux favoris")); },
-  createKind: v => { UI.createKind = v; aiSheet("create"); },
-  aiSpeak: () => aiSpeak(),
   aiOutShare: () => Native.share({title:appName(), text:UI.aiOut?.text||""}),
   aiOutKeep: () => { const o = UI.aiOut; if (!o) return; const title = (o.text.match(/^#+\s*(.+)$/m)||[])[1] || (o.kind === "year" ? T("Notre année {y}",{y:o.year}) : T("Histoire du soir"));
     S.memories.push({id:uid(), kind:o.kind === "year" ? "yearbook" : "story", date:o.kind === "year" ? `${o.year}-12-31` > iso(today()) ? iso(today()) : `${o.year}-12-31` : iso(today()), title, text:o.text, kidIds:o.kid?[o.kid]:[]}); commit(T("Souvenir enregistré")); },
   aiMemText: v => { const [a, b] = (v||"m-text|m-title").split("|"); aiMemoryText(a, b); },
   aiYear: v => { const [kid, y] = v.split("|"); aiYearStory(kid, y); },
 });
-Object.assign(FORMS, { aiCreate: () => aiCreate() });

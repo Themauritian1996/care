@@ -86,7 +86,7 @@ if (cfg && cfg.apiKey){
 
   /* ---------- envoi des changements (diff par document) ---------- */
   const J = o => JSON.stringify(o);
-  const COLS = ["events","memories","tasks","completions","rewards","redemptions","reviews"];
+  const COLS = ["events","memories","tasks","completions","rewards","redemptions","reviews","kidevents","stories","recipes"];
   C.push = async (force) => {
     if (!fid || !C.user) return;
     if (pushing){ pushAgain = true; return; }
@@ -95,12 +95,13 @@ if (cfg && cfg.apiKey){
       const batch = []; const isParent = role === "parent";
       const put = (path, data, merge) => { const k = J(data); if (!force && last[path] === k) return; last[path] = k; batch.push({path, data, merge}); };
       if (isParent){
-        put(`families/${fid}`, {name:S.family.name||"", members:membersObj(), shared:sharedSettings(), roles:rolesObj()}, "fields");
+        put(`families/${fid}`, {name:S.family.name||"", members:membersObj(), shared:sharedSettings(), roles:rolesObj(), photo:S.family.photo||null}, "fields");
         S.children.forEach(c => { const {logs, ...rest} = c; put(`families/${fid}/kids/${c.id}`, rest); });
         Object.keys(last).filter(p => p.startsWith(`families/${fid}/kids/`) && !S.children.some(c => p.endsWith("/"+c.id))).forEach(p => { delete last[p]; batch.push({path:p, del:true}); });
         COLS.forEach(col => { (S[col]||[]).forEach(x => put(`families/${fid}/${col}/${x.id}`, x)); Object.keys(last).filter(p => p.startsWith(`families/${fid}/${col}/`) && !(S[col]||[]).some(x => p.endsWith("/"+x.id))).forEach(p => { delete last[p]; batch.push({path:p, del:true}); }); });
       } else {
         ["completions","redemptions"].forEach(col => (S[col]||[]).filter(x => x.memberId === S.me).forEach(x => put(`families/${fid}/${col}/${x.id}`, x)));
+        (S.kidevents||[]).filter(x => x.by === S.me).forEach(x => put(`families/${fid}/kidevents/${x.id}`, x));
       }
       // journal : un document par enfant et par mois, fusion champ par champ
       S.children.forEach(c => {
@@ -119,7 +120,7 @@ if (cfg && cfg.apiKey){
       // disponibilités (chacun la sienne ; les parents celles de tous)
       Object.entries(S.avail||{}).forEach(([mid, map]) => { if (isParent || mid === S.me) put(`families/${fid}/avail/${mid}`, {map}); });
       // photos (image comprise, réduite)
-      for (const p of S.photos){ const path = `families/${fid}/photos/${p.id}`; if (!force && last[path]) continue; const data = await PhotoDB.get(p.id); if (!data) continue; last[path] = "1"; batch.push({path, data:{...p, data}}); }
+      for (const p of S.photos){ const path = `families/${fid}/photos/${p.id}`, k = J(p); if (!force && last[path] === k) continue; if (!isParent && p.by !== S.me) continue; const data = await PhotoDB.get(p.id); if (!data) continue; last[path] = k; batch.push({path, data:{...p, data}}); }
       Object.keys(last).filter(p => p.startsWith(`families/${fid}/photos/`) && !S.photos.some(x => p.endsWith("/"+x.id))).forEach(p => { delete last[p]; batch.push({path:p, del:true}); });
       for (let i = 0; i < batch.length; i += 400){
         const wb = writeBatch(db);
@@ -139,12 +140,12 @@ if (cfg && cfg.apiKey){
     unsubs.push(onSnapshot(fam, s => {
       const d = s.data(); if (!d) return;
       role = d.roles?.[C.user.uid] || "parent";
-      S.family.name = d.name || ""; const mems = Object.values(d.members || {});
+      S.family.name = d.name || ""; S.family.photo = d.photo || null; const mems = Object.values(d.members || {});
       if (mems.length) S.family.members = mems;
       const mine = S.family.members.find(m => m.uid === C.user.uid); if (mine) S.me = mine.id;
       if (d.shared){ S.settings.features = {...S.settings.features, ...d.shared.features}; if (d.shared.parental){ S.settings.parental.allow = {...S.settings.parental.allow, ...d.shared.parental.allow}; if (d.shared.parental.pin) S.settings.parental.pin = d.shared.parental.pin; } if (d.shared.appName && !S.settings.appNameLocal) S.settings.appName = d.shared.appName; }
       if (role === "enfant" && mine) mine.role = "enfant";
-      last[`families/${fid}`] = J({name:S.family.name||"", members:membersObj(), shared:sharedSettings(), roles:rolesObj()});
+      last[`families/${fid}`] = J({name:S.family.name||"", members:membersObj(), shared:sharedSettings(), roles:rolesObj(), photo:S.family.photo||null});
       applyRemote();
     }));
     unsubs.push(onSnapshot(collection(fam, "kids"), qs => {
@@ -174,19 +175,26 @@ if (cfg && cfg.apiKey){
         if (ch.type === "removed"){ S.photos = S.photos.filter(p => p.id !== d.id); continue; }
         const {data, ...meta} = d; if (data) await PhotoDB.put(d.id, data);
         const i = S.photos.findIndex(p => p.id === d.id); if (i >= 0) S.photos[i] = meta; else S.photos.push(meta);
-        last[`families/${fid}/photos/${d.id}`] = "1";
+        last[`families/${fid}/photos/${d.id}`] = J(meta);
       }
       applyRemote();
     }));
     let first = true;
     unsubs.push(onSnapshot(query(collection(fam, "messages"), orderBy("at"), limitToLast(300)), qs => {
       const before = S.messages.length; S.messages = qs.docs.map(d => d.data());
-      if (!first && S.messages.length > before){ const m = S.messages[S.messages.length-1]; if (m.uid !== C.user.uid) Native.notifyNow(m.name || appName(), m.text); }
+      if (!first && S.messages.length > before){ const m = S.messages[S.messages.length-1]; if (m.uid !== C.user.uid) chatNotify(m, T("Famille")); }
       first = false; applyRemote();
     }));
   }
+  const chatNotify = (m, where) => {
+    const mentioned = (m.mentions||[]).includes(C.user.uid) || (m.mentions||[]).includes("all");
+    if (mentioned){ Native.notifyNow(T("{n} vous a mentionné · {w}",{n:m.name||"", w:where}), m.text, {go:"tribu"}, true); if (!document.hidden) toast(T("{n} vous a mentionné",{n:m.name||""})); }
+    else if (S.settings.notif.chat !== false) Native.notifyNow(`${where} · ${m.name||""}`, m.text, {go:"tribu"});
+  };
   C.send = async (channel, text) => {
-    const m = {text, uid:C.user.uid, name:me()?.name || C.user.displayName || "", at:Date.now()};
+    const people = mentionables(channel), low = text.toLowerCase();
+    const mentions = /@(tous|all|everyone)\b/i.test(text) ? ["all"] : people.filter(p => p.uid && low.includes("@" + p.name.toLowerCase().split(" ")[0])).map(p => p.uid);
+    const m = {text, uid:C.user.uid, name:me()?.name || C.user.displayName || "", at:Date.now(), mentions};
     if (channel === "family") await addDoc(collection(db, "families", fid, "messages"), m);
     else await addDoc(collection(db, "groups", channel, "messages"), m);
   };
@@ -210,7 +218,7 @@ if (cfg && cfg.apiKey){
       S.groups = qs.docs.map(d => ({...(S.groups||[]).find(g => g.id === d.id), ...d.data(), id:d.id}));
       ids.forEach(id => { if (groupUnsubs[id]) return; groupUnsubs[id] = [
         onSnapshot(collection(db, "groups", id, "events"), q2 => { const g = S.groups.find(x => x.id === id); if (g){ g.events = q2.docs.map(d => ({...d.data(), id:d.id})); softRender(); } }),
-        onSnapshot(query(collection(db, "groups", id, "messages"), orderBy("at"), limitToLast(200)), q2 => { const g = S.groups.find(x => x.id === id); if (g){ const before = (g.messages||[]).length; g.messages = q2.docs.map(d => d.data()); if (before && g.messages.length > before){ const m = g.messages[g.messages.length-1]; if (m.uid !== C.user.uid) Native.notifyNow(`${g.name} · ${m.name}`, m.text); } softRender(); } }),
+        onSnapshot(query(collection(db, "groups", id, "messages"), orderBy("at"), limitToLast(200)), q2 => { const g = S.groups.find(x => x.id === id); if (g){ const before = (g.messages||[]).length; g.messages = q2.docs.map(d => d.data()); if (before && g.messages.length > before){ const m = g.messages[g.messages.length-1]; if (m.uid !== C.user.uid) chatNotify(m, g.name); } softRender(); } }),
       ]; });
       Object.keys(groupUnsubs).filter(id => !ids.includes(id)).forEach(id => { groupUnsubs[id].forEach(u => u()); delete groupUnsubs[id]; });
       softRender();
@@ -225,6 +233,7 @@ if (cfg && cfg.apiKey){
   };
   C.groupEvent = async (gid, e) => { await setDoc(doc(db, "groups", gid, "events", e.id), e); };
   C.groupRsvp = async (gid, eid, ok) => { await updateDoc(doc(db, "groups", gid, "events", eid), {[`rsvp.${C.user.uid}`]:{ok, name:myName()}}); };
+  C.groupPhoto = async (gid, photo) => { await updateDoc(doc(db, "groups", gid), {photo}); };
   C.groupAvail = async (gid, map) => { await updateDoc(doc(db, "groups", gid), {[`avail.${C.user.uid}`]:map}); };
 
   /* ---------- Google Drive (souvenirs) ---------- */
@@ -244,9 +253,19 @@ if (cfg && cfg.apiKey){
     if (!id){ const r = await (await fetch("https://www.googleapis.com/drive/v3/files", {method:"POST", headers:{Authorization:"Bearer "+tok, "Content-Type":"application/json"}, body:JSON.stringify({name, mimeType:"application/vnd.google-apps.folder"})})).json(); id = r.id; }
     S.settings.driveFolder = id; save(); return id;
   }
-  C.driveUpload = async (name, mime, base64, description = "") => {
+  /* sous-dossiers : catégorie / sous-catégorie / date (créés au besoin, mémorisés) */
+  async function driveSub(tok, parent, name){
+    const dirs = S.settings.driveDirs = S.settings.driveDirs || {}, key = parent + "/" + name; if (dirs[key]) return dirs[key];
+    const q = encodeURIComponent(`name='${name.replace(/\\/g,"\\\\").replace(/'/g,"\\'")}' and '${parent}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+    const l = await (await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {headers:{Authorization:"Bearer "+tok}})).json();
+    let id = l.files?.[0]?.id;
+    if (!id){ const r = await (await fetch("https://www.googleapis.com/drive/v3/files", {method:"POST", headers:{Authorization:"Bearer "+tok, "Content-Type":"application/json"}, body:JSON.stringify({name, mimeType:"application/vnd.google-apps.folder", parents:[parent]})})).json(); id = r.id; }
+    if (!id) throw new Error("Drive"); dirs[key] = id; save(); return id;
+  }
+  C.driveUpload = async (name, mime, base64, description = "", path = []) => {
     const tok = await driveToken(); if (!tok) throw new Error(T("Connexion Google requise"));
-    const folder = await driveFolder(tok), bnd = "tribe" + Date.now();
+    let folder = await driveFolder(tok); for (const p of path.filter(Boolean)) folder = await driveSub(tok, folder, String(p).replace(/[\/]/g, "-").slice(0, 100));
+    const bnd = "tribe" + Date.now();
     const meta = {name, parents:[folder], description};
     const body = `--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${bnd}\r\nContent-Type: ${mime}\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64}\r\n--${bnd}--`;
     const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {method:"POST", headers:{Authorization:"Bearer "+tok, "Content-Type":`multipart/related; boundary=${bnd}`}, body});

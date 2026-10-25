@@ -57,10 +57,7 @@ function defisJour(parent, viewer){
   if (parent && pending.length) h += `<div class="card"><div class="card-h"><h2>${T("À valider")}</h2><span class="chip butter">${pending.length}</span></div>${pending.map(x => { const t = S.tasks.find(y => y.id === x.taskId), m = member(x.memberId);
     return `<div class="taskrow">${avatarOf(m,32)}<div class="grow"><b>${esc(t?.title||"")}</b><div class="tiny muted">${esc(m?.name||"")} · ${fmtD(x.date,{day:"numeric",month:"short"})} · +${x.points}${x.team?` · ${T("en équipe")}`:""}</div></div><button class="btn sm kid" data-act="approve" data-v="${x.id}" aria-label="${T("Valider")}">${icon("check")}</button><button class="btn sm ghost" data-act="refuse" data-v="${x.id}" aria-label="${T("Refuser")}">${icon("x")}</button></div>`; }).join("")}</div>`;
   const list = S.tasks.filter(t => taskDueOn(t, d));
-  const row = (t, who) => { const ms = who.map(member).filter(Boolean); if (!ms.length) return "";
-    const cps = ms.map(m => completionOf(t.id, m.id, ds)), cp = cps.find(Boolean), team = t.team && ms.length > 1;
-    const col = ms[0].color || "peach";
-    return `<div class="taskrow"><div class="ic" style="background:var(--${col}-bg);color:var(--${col}-ink)">${icon(t.icon||"star")}</div><div class="grow"><b>${esc(t.title)}</b>${team?` <span class="chip teal">${icon("people").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("équipe")}</span>`:""}<div class="tiny muted">${team ? ms.map(m => esc(m.name)).join(" + ") : esc(ms[0].name)} · +${t.points} ${T("pts")}${team?" "+T("chacun"):""}</div></div>${cp ? `<span class="chip ${cp.status==="ok"?"mint":cp.status==="pending"?"butter":"rose"}">${cp.status==="ok"?T("Fait !"):cp.status==="pending"?T("À valider"):T("Refusé")}</span>` : `<button class="btn sm kid" data-act="taskDone" data-v="${t.id}|${team ? ms.map(m=>m.id).join(",") : ms[0].id}">${icon("check")}${team?T("Fait ensemble"):T("Fait")}</button>`}</div>`; };
+  const row = (t, who) => taskRows(t, who, ds, parent);
   h += `<div class="card"><div class="card-h"><h2>${T("Défis d'aujourd'hui")}</h2>${parent?`<button class="btn sm kid" data-act="taskForm">${icon("plus")}${T("Défi")}</button>`:""}</div>
     ${list.length ? list.map(t => { const who = (t.assignees||[]).filter(a => parent || a === viewer.id || (t.team && (t.assignees||[]).includes(viewer.id)));
       if (!who.length) return ""; return t.team && t.assignees.length > 1 ? row(t, t.assignees) : who.map(a => row(t, [a])).join(""); }).join("") : empty("star", parent ? T("Créez des défis : lit fait, lecture, devoirs, ménage… Les parents peuvent aussi s'en donner !") : T("Aucun défi aujourd'hui."))}</div>`;
@@ -68,6 +65,18 @@ function defisJour(parent, viewer){
   return h;
 }
 
+/* une ligne par personne (ou équipe) et par moment de la journée ; cochable aussi depuis l'agenda */
+function taskRows(t, who, ds, parent){
+  const ms = who.map(member).filter(Boolean); if (!ms.length) return "";
+  const team = t.team && ms.length > 1, col = ms[0].color || "peach", future = ds > iso(today());
+  return taskSlots(t).map(sl => { const cps = ms.map(m => completionOf(t.id, m.id, ds, sl)), cp = cps.find(Boolean), lab = slotLabel(t, sl);
+    const mine = cp && (parent || (cp.status === "pending" && cp.memberId === actor().id));
+    return `<div class="taskrow"><div class="ic" style="background:var(--${col}-bg);color:var(--${col}-ink)">${icon(t.icon||"star")}</div><div class="grow"><b>${esc(t.title)}</b>${lab?` <span class="chip">${icon("clock").replace("<svg",'<svg style="width:12px;height:12px;vertical-align:-2px"')} ${esc(lab)}</span>`:""}${team?` <span class="chip teal">${T("équipe")}</span>`:""}<div class="tiny muted">${team ? ms.map(m => esc(m.name)).join(" + ") : esc(ms[0].name)} · +${t.points} ${T("pts")}${team?" "+T("chacun"):""}</div></div>${cp ? `<button class="chip ${cp.status==="ok"?"mint":cp.status==="pending"?"butter":"rose"}" ${mine?`data-act="taskUndo" data-v="${t.id}|${ms.map(m=>m.id).join(",")}|${ds}|${sl}" title="${T("Toucher pour décocher")}"`:""}>${icon("check").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${cp.status==="ok"?T("Fait !"):cp.status==="pending"?T("À valider"):T("Refusé")}</button>` : future ? `<span class="chip">${T("À venir")}</span>` : `<button class="btn sm kid" data-act="taskDone" data-v="${t.id}|${team ? ms.map(m=>m.id).join(",") : ms[0].id}|${ds}|${sl}">${icon("check")}${team?T("Fait ensemble"):T("Fait")}</button>`}</div>`; }).join("");
+}
+function tasksForDay(d, parent, viewer){
+  return S.tasks.filter(t => taskDueOn(t, d)).map(t => { const who = (t.assignees||[]).filter(a => parent || a === viewer.id || (t.team && (t.assignees||[]).includes(viewer.id)));
+    if (!who.length) return ""; return t.team && t.assignees.length > 1 ? taskRows(t, t.assignees, iso(d), parent) : who.map(a => taskRows(t, [a], iso(d), parent)).join(""); }).join("");
+}
 function defisRecomp(parent, viewer){
   const solo = S.rewards.filter(r => !r.team);
   let h = `<div class="card"><div class="card-h"><h2>${T("Récompenses")}</h2>${parent?`<button class="btn sm ghost" data-act="rewardForm">${icon("plus")}${T("Récompense")}</button>`:""}</div>
@@ -117,7 +126,7 @@ function defisHisto(parent, viewer){
   h += `<div class="card"><div class="row between"><h2>${fmtD(first,{month:"long",year:"numeric"})}</h2><div class="row"><button class="icon-btn" data-act="histNav" data-v="-1" aria-label="${T("Mois précédent")}">${icon("left")}</button><button class="icon-btn" data-act="histNav" data-v="1" aria-label="${T("Mois suivant")}">${icon("right")}</button></div></div>
     <div class="stats"><div class="stat"><span class="muted tiny">${T("Défis réussis")}</span><div class="v" style="color:var(--mint-ink)">${nTasks}</div></div><div class="stat"><span class="muted tiny">${T("Points gagnés")}</span><div class="v">+${gained}</div></div><div class="stat"><span class="muted tiny">${T("Points dépensés")}</span><div class="v" style="color:var(--coral-ink)">−${spent}</div></div></div>
     <div class="cal">${dow.map(x => `<span class="dow">${x}</span>`).join("")}${cells}</div>
-    <div class="row tiny muted" style="gap:12px;flex-wrap:wrap"><span><i class="legend" style="background:var(--mint)"></i> ${T("défis réussis")}</span><span><i class="legend" style="background:var(--coral)"></i> ${T("points dépensés")}</span><span><i class="legend" style="background:var(--rose)"></i> ${T("dons")}</span></div></div>`;
+    <div class="row tiny muted" style="gap:12px;flex-wrap:wrap"><span><i class="lgd" style="background:var(--mint)"></i> ${T("défis réussis")}</span><span><i class="lgd" style="background:var(--coral)"></i> ${T("points dépensés")}</span><span><i class="lgd" style="background:var(--rose)"></i> ${T("dons")}</span></div></div>`;
   h += `<div class="card"><div class="card-h"><h2>${sel ? fmtD(sel,{weekday:"long",day:"numeric",month:"long"}) : T("Ce mois-ci")}</h2>${sel?`<button class="btn sm ghost" data-act="histDay" data-v="">${T("Tout le mois")}</button>`:""}</div>
     ${shown.length ? `<div class="list">${shown.map(e => { const m = member(e.who); return `<div class="li"><div class="ic" style="background:var(--${e.pts>0?"mint":"coral"}-bg);color:var(--${e.pts>0?"mint":"coral"}-ink)">${icon(e.ic)}</div><div class="grow"><div class="li-title">${esc(e.title)}${e.team?` · ${T("en équipe")}`:""}</div><div class="small muted">${who==="all"&&m?esc(m.name)+" · ":""}${fmtD(e.date,{day:"numeric",month:"short"})}${e.pending?" · "+T("en attente"):""}</div></div><b class="num" style="color:var(--${e.pts>0?"mint":"coral"}-ink)">${e.pts>0?"+":"−"}${Math.abs(e.pts)}</b></div>`; }).join("")}</div>` : empty("cal", T("Rien ce mois-ci."))}</div>`;
   return h;
@@ -159,6 +168,7 @@ Object.assign(ACT, {
   histOf: v => { UI.defTab = "histo"; UI.histWho = v; UI.histSel = null; render(); },
   histWho: v => { UI.histWho = v; render(); }, histDay: v => { UI.histSel = v || null; render(); },
   histNav: v => { const b = UI.histMonth ? parseD(UI.histMonth) : new Date(today().getFullYear(), today().getMonth(), 1); UI.histMonth = iso(addMonths(b, +v)); UI.histSel = null; render(); },
+  taskUndo: v => { const [tid, ids, ds, sl = ""] = v.split("|"); const mids = ids.split(","); S.completions = S.completions.filter(x => !(x.taskId === tid && mids.includes(x.memberId) && x.date === ds && (x.slot||"") === sl)); commit(T("Décoché")); },
   kidAs: v => { S.settings.parental.kidAs = v; commit(); },
   redeem: v => { const r = S.rewards.find(x => x.id === v); if (!r) return;
     if (!isKidUser()) return redeemSheet(v);
@@ -169,8 +179,8 @@ Object.assign(ACT, {
   contribForm: v => contribForm(v), giftForm: () => giftForm(), teamGoalForm: () => teamGoalForm(),
   teamTpl: v => { const b = document.querySelector(`[data-act=teamTpl][data-v="${v}"]`); $("#tg-title").value = b.textContent; $("#tg-cost").value = v; },
   teamDone: v => { const r = S.rewards.find(x => x.id === v); r.doneAt = iso(today()); commit(T("Bravo l'équipe !")); confetti(); },
-  taskDone: v => { const [tid, ids] = v.split("|"), t = S.tasks.find(x => x.id === tid), mids = ids.split(","), auto = !isKidUser() || S.settings.parental.allow.selfApprove;
-    mids.forEach(mid => { if (!completionOf(tid, mid, iso(today()))) S.completions.push({id:uid(), taskId:tid, memberId:mid, date:iso(today()), points:t.points, status: auto ? "ok" : "pending", at:Date.now(), team: mids.length > 1}); });
+  taskDone: v => { const [tid, ids, dd, sl = ""] = v.split("|"), ds = dd || iso(today()), t = S.tasks.find(x => x.id === tid), mids = ids.split(","), auto = !isKidUser() || S.settings.parental.allow.selfApprove;
+    mids.forEach(mid => { if (!completionOf(tid, mid, ds, sl)) S.completions.push({id:uid(), taskId:tid, memberId:mid, date:ds, slot:sl, points:t.points, status: auto ? "ok" : "pending", at:Date.now(), team: mids.length > 1}); });
     commit(auto ? (mids.length > 1 ? T("+{n} points chacun, bravo l'équipe !",{n:t.points}) : T("+{n} points !",{n:t.points})) : T("Envoyé au parent pour validation")); if (auto) confetti(); },
 });
 Object.assign(FORMS, {
