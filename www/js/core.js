@@ -173,6 +173,16 @@ function migrate(old){
   }
   return s;
 }
+/* anciennes données d'exemple (Léa, Noah, « Petit pois », Alex et Sam) : on repart à neuf */
+const DEMO_KIDS = ["k_lea","k_noah","k_bebe"];
+const isDemoData = s => !!s && (s.demo || (s.children||[]).some(c => DEMO_KIDS.includes(c.id)) || (s.family?.members||[]).some(m => m.id === "m_p2" && m.name === "Sam" && !m.uid));
+function freshFrom(old){
+  const s = blankState(); ["theme","lang","bg","appName","appNameLocal"].forEach(k => { if (old.settings?.[k] != null) s.settings[k] = old.settings[k]; });
+  if (old.settings?.ai) s.settings.ai = {...s.settings.ai, ...old.settings.ai};
+  const mine = (old.family?.members||[]).find(m => m.id === old.me && m.uid);
+  if (mine) s.family.members = [{...mine, name: mine.name === "Alex" ? T("Moi") : mine.name, avatar: mine.name === "Alex" ? {kind:"auto"} : mine.avatar}];
+  s.me = s.family.members[0]?.id || null; return s;
+}
 function normalize(){
   S.children.forEach(c => { const b = blankKid(); for (const k in b) if (c[k] === undefined) c[k] = b[k]; });
   if (!S.family.members.length) S.family.members = [{id:"m_"+uid(), name:T("Moi"), role:"parent", color:"lilac", avatar:{kind:"symbole", id:"coeur"}}];

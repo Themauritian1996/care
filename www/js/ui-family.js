@@ -68,7 +68,7 @@ function agendaView(){
     <div class="cal">${dow.map(d=>`<div class="dow">${d}</div>`).join("")}${cells}</div>
     <div class="legend">${["medecin","vaccin","garde","sport","famille","groupe","souvenir"].map(k=>`<span><i style="background:var(--${EVT[k][0]});width:8px;height:8px;border-radius:50%"></i>${T(EVT[k][1])}</span>`).join("")}</div></div>
     <div class="card c5"><div class="card-h"><h2 style="text-transform:capitalize">${fmtD(sel,{weekday:"long",day:"numeric",month:"long"})}</h2></div>
-      <div class="row">${isKidUser()?"":`<button class="btn sm kid" data-act="eventForm" data-v="${sel}">${icon("plus")}${T("Événement")}</button>`}${feat("memories")?`<button class="btn sm ghost" data-act="memoryForm" data-v="${sel}">${icon("star")}${T("Souvenir")}</button>`:""}${feat("photos")&&allow("photos")?`<button class="btn sm ghost" data-act="photoDay" data-v="${sel}">${icon("camera")}${T("Photo")}</button>`:""}</div>
+      <div class="row">${isKidUser()?"":`<button class="btn sm kid" data-act="eventForm" data-v="${sel}">${icon("plus")}${T("Événement")}</button>${aiBtn("aiScan","events",T("Lire une invitation (IA)"),"camera")}`}${feat("memories")?`<button class="btn sm ghost" data-act="memoryForm" data-v="${sel}">${icon("star")}${T("Souvenir")}</button>`:""}${feat("photos")&&allow("photos")?`<button class="btn sm ghost" data-act="photoDay" data-v="${sel}">${icon("camera")}${T("Photo")}</button>`:""}</div>
       ${selEv.length?`<div class="list">${selEv.map(eventRow).join("")}</div>`:`<p class="muted small">${T("Rien ce jour-là.")}</p>`}</div></div>`;
 }
 function eventForm(v){
@@ -118,9 +118,10 @@ function availView(){
 
 /* ======== SOUVENIRS ET PHOTOS ======== */
 function souvenirsView(){
-  const tabs = [feat("photos")&&["photos",T("Photo du jour")], feat("memories")&&["moments",T("Moments précieux")]].filter(Boolean);
+  const tabs = [feat("photos")&&["photos",T("Photos")], feat("memories")&&["speciaux",T("Spéciaux")], feat("memories")&&["moments",T("Moments")]].filter(Boolean);
   if (!tabs.some(t=>t[0]===UI.sub.souv)) UI.sub.souv = tabs[0][0];
   let h = tabs.length > 1 ? `<div class="seg">${tabs.map(([id,l])=>`<button data-act="souvTab" data-v="${id}" aria-pressed="${UI.sub.souv===id}">${l}</button>`).join("")}</div>` : "";
+  if (UI.sub.souv === "speciaux") return h + specialView();
   if (UI.sub.souv === "photos"){
     const list = S.photos.filter(p => UI.photoCat === "all" || p.cat === UI.photoCat).sort((a,b)=>a.date<b.date?1:-1);
     h += `<div class="card"><div class="card-h"><h2>${T("Album")}</h2><button class="btn kid" data-act="photoDay">${icon("camera")}${T("Photo du jour")}</button></div>
@@ -160,7 +161,7 @@ function memoryForm(date, id){
   sheet(`<form class="stack" data-form="memory" data-id="${m.id||""}" style="gap:14px">${sheetHead(m.id?T("Modifier le souvenir"):T("Un moment précieux"))}
     ${fld("m-title",T("Quoi ?"),inp("m-title",m.title,`required placeholder="${T("Premiers pas, première dent, une phrase drôle…")}"`))}
     ${fld("m-date",T("Date (même passée)"),inp("m-date",m.date,'type="date" required'))}
-    ${fld("m-text",T("Raconte (facultatif)"),`<textarea class="inp" id="m-text">${esc(m.text||"")}</textarea>`)}
+    ${fld("m-text",T("Raconte (facultatif)"),`<textarea class="inp" id="m-text">${esc(m.text||"")}</textarea>`)}${aiReady()?`<button type="button" class="btn sm ghost" data-act="aiMemText" data-v="m-text|m-title" style="align-self:flex-start">${icon("spark")}${T("Écrire avec l'IA")}</button>`:""}
     ${S.children.length?`<div class="field"><label>${T("Enfants")}</label>${checks("mkids",S.children.map(k=>[k.id,k.nick||k.name]),m.kidIds||[])}</div>`:""}
     <button type="button" class="btn ghost" data-act="memPhoto">${icon("camera")}${T("Ajouter une photo (facultatif)")}</button><div id="memPhotoPrev"></div>
     ${Cloud.canDrive?.() ? `<label class="switch"><input type="checkbox" id="m-drive" checked><span class="tg"></span><span class="grow">${T("Garder aussi une copie dans Google Drive")}</span></label>` : ""}
@@ -169,8 +170,9 @@ function memoryForm(date, id){
 async function openMemory(id){
   const m = S.memories.find(x => x.id === id); if (!m) return;
   const ph = m.photoId ? await PhotoDB.get(m.photoId) : null;
-  sheet(`${sheetHead(esc(m.title))}<span class="small muted">${fmtD(m.date,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</span>${ph?`<img src="${ph}" alt="" style="border-radius:16px;max-height:50vh;object-fit:contain">`:""}${m.text?`<p>${esc(m.text)}</p>`:""}
-    <div class="row"><button class="btn kid" data-act="shareMemory" data-v="${id}">${icon("share")}${T("Partager")}</button>${Cloud.canDrive?.()?`<button class="btn ghost" data-act="memoryDrive" data-v="${id}">${icon("drive")}${m.drive?T("Mettre à jour dans Drive"):T("Google Drive")}</button>`:""}<button class="btn ghost" data-act="memoryEdit" data-v="${id}">${icon("edit")}${T("Modifier")}</button></div>`);
+  const lk = lockedMem(m), canMod = !isKidUser() && (m.kind !== "letter" || !lk || m.by === S.me);
+  sheet(`${sheetHead(esc(m.kind === "quote" ? T("Mot d'enfant") : m.title))}<span class="small muted">${fmtD(m.date,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</span>${ph && !lk?`<img src="${ph}" alt="" style="border-radius:16px;max-height:50vh;object-fit:contain">`:""}${m.kind ? specialDetail(m) : m.text?`<p>${esc(m.text)}</p>`:""}
+    ${lk ? (canMod ? `<div class="row"><button class="btn ghost" data-act="memoryEdit" data-v="${id}">${icon("edit")}${T("Relire ou modifier ma lettre")}</button></div>` : "") : `<div class="row"><button class="btn kid" data-act="shareMemory" data-v="${id}">${icon("share")}${T("Partager")}</button>${Cloud.canDrive?.()?`<button class="btn ghost" data-act="memoryDrive" data-v="${id}">${icon("drive")}${m.drive?T("Mettre à jour dans Drive"):T("Google Drive")}</button>`:""}${canMod?`<button class="btn ghost" data-act="memoryEdit" data-v="${id}">${icon("edit")}${T("Modifier")}</button>`:""}</div>`}`, m.kind === "story" || m.kind === "yearbook" ? "wide" : "");
 }
 
 /* ======== DÉFIS ET RÉCOMPENSES ======== */

@@ -382,3 +382,28 @@ const REWARD_TPL = [
   {t:"Choisir le souper", cost:50},{t:"Se coucher 30 min plus tard", cost:40},{t:"Une activité seul·e avec un parent", cost:80},
 ];
 const LEVELS = [0,50,150,300,500,800,1200,1700,2300,3000];
+
+/* ---------- SOUVENIRS SPÉCIAUX ---------- */
+const SPECIAL = [
+  {k:"first", l:"Premières fois", s:"Premières fois", ic:"star", c:"butter", d:"Premier sourire, premiers pas, première dent perdue…"},
+  {k:"quote", l:"Mots d'enfant", s:"Mots d'enfant", ic:"chat", c:"sky", d:"Les phrases drôles ou touchantes, avec l'âge du moment."},
+  {k:"interview", l:"Entrevue d'anniversaire", s:"Entrevues", ic:"gift", c:"peach", d:"Les mêmes questions chaque année, pour voir l'enfant grandir."},
+  {k:"letter", l:"Lettres pour plus tard", s:"Lettres", ic:"mail", c:"lilac", d:"Une lettre scellée jusqu'à la date choisie (ex. 18 ans)."},
+  {k:"art", l:"Dessins et créations", s:"Créations", ic:"pencil", c:"mint", d:"Photographiez les bricolages avant qu'ils disparaissent."},
+  {k:"trip", l:"Voyages et sorties", s:"Voyages", ic:"pin", c:"coral", d:"Lieux visités, ce qu'on a aimé."},
+];
+/* [clé, libellé, âge habituel en mois] */
+const FIRSTS = [
+  ["sourire","Premier vrai sourire",1.5],["rire","Premier éclat de rire",4],["nuit","Première nuit complète",5],["retourne","Se retourne seul·e",5],
+  ["aliment","Premier aliment solide",6],["dent","Première dent",7],["assis","S'assoit seul·e",7],["quatre","Marche à quatre pattes",9],
+  ["bravo","Premier bravo / au revoir de la main",10],["mot","Premier mot",12],["pas","Premiers pas",12],["cheveux","Première coupe de cheveux",14],
+  ["phrase","Première petite phrase",24],["proprete","Propre le jour",30],["garderie","Premier jour à la garderie",12],["dessin","Premier bonhomme dessiné",42],
+  ["ecole","Premier jour d'école",60],["velo","Vélo sans petites roues",66],["dentperdue","Première dent perdue",72],["lire","Lit son premier livre seul·e",78],
+  ["nage","Nage sans aide",84],["dodoami","Premier dodo chez un·e ami·e",96],["cellulaire","Premier cellulaire",144],["secondaire","Premier jour du secondaire",144],
+  ["emploi","Premier emploi",180],["conduite","Permis de conduire",192],["bal","Bal des finissants",204],
+];
+const INTERVIEW_Q = [
+  "Ta couleur préférée ?","Ton repas préféré ?","Ton jouet ou ton activité préférée ?","Ton meilleur ami ou ta meilleure amie ?",
+  "Qu'est-ce qui te fait rire ?","Qu'est-ce qui te fait peur ?","Ta chanson ou ton film préféré ?","Ce que tu veux faire quand tu seras grand·e ?",
+  "Ton moment préféré de l'année ?","Qu'est-ce que tu aimes chez maman / papa ?","Si tu avais un super-pouvoir ?","Ton endroit préféré ?",
+];

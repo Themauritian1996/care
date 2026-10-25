@@ -338,3 +338,19 @@ td{padding:9px 8px;border-top:1px solid var(--line);font-variant-numeric:tabular
   .hero > div:first-child .avatar{width:60px!important;height:60px!important}
   .hero h1{font-size:1.5rem}
 }
+
+/* ---------- souvenirs spéciaux ---------- */
+.spec-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (min-width:720px){.spec-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.spec-tile{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px;border-radius:18px;border:2px solid transparent;background:var(--cb);color:var(--ci);cursor:pointer;text-align:left;font:inherit;min-height:92px}
+.spec-tile svg{width:22px;height:22px}
+.spec-tile b{font-size:.84rem;line-height:1.15}
+.spec-tile .tiny{opacity:.75;margin-top:auto}
+.spec-tile[aria-pressed="true"]{border-color:var(--ci);box-shadow:0 4px 14px color-mix(in srgb,var(--c) 40%,transparent)}
+.quote{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px 16px 12px 40px;position:relative;border:0;border-radius:18px;background:var(--sky-bg);color:var(--ink);font:inherit;font-size:1.02rem;font-style:italic;cursor:pointer}
+.quote .small{font-style:normal}
+.quote .qmark{position:absolute;left:12px;top:2px;font-size:2.4rem;line-height:1;color:var(--sky-ink);font-family:Georgia,serif;font-style:normal}
+blockquote.quote.big{margin:0;font-size:1.25rem;cursor:default}
+.card-h .row{flex-wrap:wrap;justify-content:flex-end}
+.pick button svg{width:16px;height:16px;vertical-align:-3px}
+.seg button{flex:1 0 auto;padding:7px 10px}

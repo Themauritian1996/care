@@ -15,7 +15,7 @@ if (cfg && cfg.apiKey){
   const {doc, collection, setDoc, deleteDoc, getDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limitToLast, deleteField, arrayUnion, serverTimestamp, writeBatch} = F;
   const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
   const NativeAuth = Native.isApp ? window.Capacitor?.Plugins?.FirebaseAuthentication : null;
-  let fid = null, role = "parent", unsubs = [], groupUnsubs = {}, last = {}, pushing = false, pushAgain = false;
+  let fid = null, role = "parent", purging = false, unsubs = [], groupUnsubs = {}, last = {}, pushing = false, pushAgain = false;
   C.configured = true;
 
   const skipKey = "tribe.skipLogin";
@@ -75,7 +75,7 @@ if (cfg && cfg.apiKey){
   async function createFamilyFromLocal(user){
     const ref = doc(collection(db, "families"));
     const meM = me(); meM.uid = user.uid; meM.email = user.email || ""; if (!meM.name || meM.name === T("Moi")) meM.name = user.displayName || (user.email||"").split("@")[0];
-    if (S.demo){ S.demo = false; }
+    if (isDemoData(S)){ S = freshFrom(S); normalize(); }
     await setDoc(ref, {name:S.family.name||"", memberIds:[user.uid], roles:{[user.uid]:"parent"}, members:membersObj(), shared:sharedSettings(), at:serverTimestamp()});
     fid = ref.id; last = {}; await C.push(true);
     return ref.id;
@@ -95,7 +95,7 @@ if (cfg && cfg.apiKey){
       const batch = []; const isParent = role === "parent";
       const put = (path, data, merge) => { const k = J(data); if (!force && last[path] === k) return; last[path] = k; batch.push({path, data, merge}); };
       if (isParent){
-        put(`families/${fid}`, {name:S.family.name||"", members:membersObj(), shared:sharedSettings(), roles:rolesObj()}, true);
+        put(`families/${fid}`, {name:S.family.name||"", members:membersObj(), shared:sharedSettings(), roles:rolesObj()}, "fields");
         S.children.forEach(c => { const {logs, ...rest} = c; put(`families/${fid}/kids/${c.id}`, rest); });
         Object.keys(last).filter(p => p.startsWith(`families/${fid}/kids/`) && !S.children.some(c => p.endsWith("/"+c.id))).forEach(p => { delete last[p]; batch.push({path:p, del:true}); });
         COLS.forEach(col => { (S[col]||[]).forEach(x => put(`families/${fid}/${col}/${x.id}`, x)); Object.keys(last).filter(p => p.startsWith(`families/${fid}/${col}/`) && !(S[col]||[]).some(x => p.endsWith("/"+x.id))).forEach(p => { delete last[p]; batch.push({path:p, del:true}); }); });
@@ -123,7 +123,7 @@ if (cfg && cfg.apiKey){
       Object.keys(last).filter(p => p.startsWith(`families/${fid}/photos/`) && !S.photos.some(x => p.endsWith("/"+x.id))).forEach(p => { delete last[p]; batch.push({path:p, del:true}); });
       for (let i = 0; i < batch.length; i += 400){
         const wb = writeBatch(db);
-        batch.slice(i, i+400).forEach(b => { const r = doc(db, b.path); if (b.del) wb.delete(r); else wb.set(r, b.data, b.merge ? {merge:true} : undefined); });
+        batch.slice(i, i+400).forEach(b => { const r = doc(db, b.path); if (b.del) wb.delete(r); else wb.set(r, b.data, b.merge === "fields" ? {mergeFields:Object.keys(b.data)} : b.merge ? {merge:true} : undefined); });
         await wb.commit();
       }
     } catch(e){ console.error("push", e); if (String(e.code||"").includes("permission")) toast(T("Certaines modifications demandent un compte parent")); }
@@ -152,6 +152,7 @@ if (cfg && cfg.apiKey){
       kids.forEach(k => { const local = kidById(k.id); last[`families/${fid}/kids/${k.id}`] = J(k); if (local){ const logs = local.logs; Object.keys(local).forEach(x => delete local[x]); Object.assign(local, k, {logs}); } else S.children.push({...blankKid(), ...k, logs:[]}); });
       S.children = S.children.filter(c => kids.some(k => k.id === c.id)); if (!S.children.some(c => c.id === S.active)) S.active = S.children[0]?.id || null;
       normalize(); applyRemote();
+      if (role === "parent" && isDemoData(S) && !purging){ purging = true; setTimeout(async () => { const mine = me(); S = freshFrom(S); if (mine?.uid){ S.family.members = [{...mine, name: mine.name === "Alex" ? (C.user.displayName || T("Moi")) : mine.name}]; S.me = mine.id; } normalize(); await C.push(); purging = false; render(); toast(T("Données d'exemple retirées : votre espace est prêt")); }, 2500); }
     }));
     unsubs.push(onSnapshot(collection(fam, "logs"), qs => {
       qs.docChanges().forEach(ch => {

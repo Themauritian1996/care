@@ -80,7 +80,7 @@ function ringsCard(c){
 }
 function quotidien(c){
   const m = ageMonths(c), G = goals(c);
-  let h = `<div class="card"><div class="card-h"><h2>${T("Noter")}</h2>${isKidUser()?"":`<button class="btn sm ghost" data-act="modules">${icon("sliders")}${T("Choisir les boutons")}</button>`}</div>${quickButtons(c)}</div>`;
+  let h = `<div class="card"><div class="card-h"><h2>${T("Noter")}</h2>${isKidUser()?"":`<button class="btn sm ghost" data-act="modules">${icon("sliders")}${T("Choisir les boutons")}</button>`}</div>${quickButtons(c)}${m < 72 && !isKidUser() && aiReady() ? `<div class="row" style="margin-top:8px">${aiBtn("aiScan","daycare",T("Importer le rapport de garderie (IA)"),"doc")}</div>` : ""}</div>`;
   h += `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Touchez une mesure pour voir sa tendance")}</span><h2>${T("Bien-être d'aujourd'hui")}</h2></div>${isKidUser()?"":`<button class="btn sm ghost" data-act="goalsForm">${icon("target")}${T("Objectifs")}</button>`}</div>${ringsCard(c)}
     <p class="tiny muted">${T("Recommandations pour {b} (Directives canadiennes de mouvement sur 24 h) : sommeil {s1} à {s2} h, {a} {am}, écran {sc}.",{b:G.rec.band, s1:G.rec.sleep[0], s2:G.rec.sleep[1], a:T(G.rec.actLbl).toLowerCase(), am:fmtMin(G.rec.act), sc:G.rec.screen?T("au plus {v}",{v:fmtMin(G.rec.screen)}):T("aucun")})}</p></div>`;
   h += weeklyStats(c);
@@ -237,7 +237,8 @@ function repas(c){
   }
   if (!mod(c,"solids")) return h;
   const fav = c.foodFav || [];
-  h += `<div class="card"><div class="card-h"><h2>${T("Noter un repas")}</h2><div class="row">${feat("ai")&&allow("ai")?`<button class="btn sm ghost" data-act="aiMealPhoto">${icon("camera")}${T("Photo du repas (IA)")}</button>`:""}<button class="btn sm kid" data-act="log" data-v="solid">${icon("plus")}${T("Repas")}</button></div></div>
+  h += `<div class="card"><div class="card-h"><h2>${T("Noter un repas")}</h2><button class="btn sm kid" data-act="log" data-v="solid">${icon("plus")}${T("Repas")}</button></div>
+    ${aiReady() && !isKidUser() ? `<span class="eyebrow">${icon("spark").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("Avec Gemini")}</span><div class="row" style="flex-wrap:wrap;gap:6px">${aiBtn("aiMealPhoto",null,T("Photo du repas"),"camera")}${aiBtn("aiScan","label",T("Lire une étiquette"),"tag")}${aiBtn("aiScan","menu",T("Menu de la garderie"),"dish")}</div>` : ""}
     ${fav.length ? `<span class="eyebrow">${T("Favoris : touchez pour noter")}</span><div class="pick">${fav.map(f => `<button data-act="quickFood" data-v="${esc(f.name)}" style="border-color:var(--${FOOD_GROUPS[f.group]?.color||"line"})">${esc(f.name)}</button>`).join("")}</div>` : `<p class="small muted">${T("Les aliments marqués d'une étoile apparaîtront ici pour les noter en un geste.")}</p>`}
     <div class="banner soft">${icon("spoon")}<div class="small"><b>${T("Portions pour cet âge :")}</b> ${T(portionHint(m))}</div></div></div>`;
   // répartition par groupe sur 7 jours
@@ -415,7 +416,8 @@ function vaccins(c){
     h += `<div class="vgroup"><div><div class="vage">${T(g.label)}</div><div class="tiny muted">${fmtD(ds[0].due,{month:"short",year:"numeric"})}</div></div><div>${g.note?`<p class="small muted" style="margin-bottom:6px">${T(g.note)}</p>`:""}
       ${ds.map(d => `<div class="vdose"><div class="grow"><div style="font-weight:700">${esc(d.name)}</div><div class="tiny muted">${esc(T(d.short))}${d.rec?` · ${fmtD(d.rec.date)}${d.rec.lot?` · ${T("lot")} ${esc(d.rec.lot)}`:""}${d.rec.site?` · ${esc(T(d.rec.site))}`:""}`:""}</div>${d.rec?.reactions?`<div class="tiny" style="color:var(--rose-ink)">${T("Réaction :")} ${esc(d.rec.reactions)}</div>`:""}</div>
         <span class="chip ${VSTAT[d.st][0]}">${T(VSTAT[d.st][1])}</span>${isKidUser()?"":`<button class="btn sm ${d.rec?"ghost":"line"}" data-act="vaxForm" data-v="${d.id}">${d.rec?T("Modifier"):T("Noter")}</button>`}</div>`).join("")}</div></div>`; });
-  return h + `</div><p class="tiny muted">${T("Dates approximatives selon la date de naissance. En cas de retard, le CLSC établit le rattrapage selon les intervalles minimaux du PIQ.")}</p></div>`;
+  if ((c.vaxOther||[]).length) h += `<div class="vgroup"><div><div class="vage">${T("Autres vaccins")}</div></div><div>${c.vaxOther.map(v => `<div class="vdose"><div class="grow"><div style="font-weight:700">${esc(v.name)}</div><div class="tiny muted">${fmtD(v.date)}${v.lot?` · ${T("lot")} ${esc(v.lot)}`:""}</div></div><span class="chip mint">${T("Reçu")}</span></div>`).join("")}</div></div>`;
+  return h + `</div>${isKidUser()?"":`<div class="row">${aiBtn("aiScan","carnet",T("Lire le carnet papier (IA)"),"camera")}</div>`}<p class="tiny muted">${T("Dates approximatives selon la date de naissance. En cas de retard, le CLSC établit le rattrapage selon les intervalles minimaux du PIQ.")}</p></div>`;
 }
 function vaxForm(doseId){
   const c = child(), g = PIQ.find(g => g.doses.some(d=>d.id===doseId)), d = g.doses.find(d=>d.id===doseId);

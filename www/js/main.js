@@ -65,7 +65,7 @@ Object.assign(ACT, {
   setAppName: v => { S.settings.appName = v; S.settings.appNameLocal = true; commit(); },
   urgence: () => urgence(),
   clearDemo: () => { const keep = {theme:S.settings.theme, lang:S.settings.lang, bg:S.settings.bg}; S = blankState(); Object.assign(S.settings, keep); normalize(); save(); render(); memberForm(S.me); },
-  ai: () => aiSheet(), aiTab: v => aiSheet(v), aiKid: v => { UI.aiKid = v; aiSheet("ask"); },
+  ai: () => aiSheet(), aiTab: v => aiSheet(v), aiKid: v => { UI.aiKid = v; aiSheet("ask"); }, aiKidC: v => { UI.aiKid = v; aiSheet("create"); },
   aiAskQuick: v => aiAsk(v), aiMealPhoto: () => aiMealPhoto(),
   aiReview: () => { S.settings.ai.topics = checked("aitopics"); S.settings.ai.freq = radio("aifreq") || S.settings.ai.freq; save(); return aiReview(UI.aiKid); },
   aiForget: () => { try { localStorage.removeItem(AI_KEY); } catch(e){} render(); toast(T("Clé retirée")); },
@@ -170,12 +170,12 @@ Object.assign(ACT, {
   /* souvenirs */
   souvTab: v => { UI.sub.souv = v; render(); }, photoCat: v => { UI.photoCat = v; render(); },
   photoDay: v => photoDay(v), openPhoto: v => openPhoto(v), openMemory: v => openMemory(v),
-  memoryForm: v => memoryForm(v), memoryEdit: v => memoryForm(null, v),
+  memoryForm: v => memoryForm(v), memoryEdit: v => { const m = S.memories.find(x => x.id === v); if (m?.kind && SPECIAL.some(k => k.k === m.kind)){ UI.specKid = (m.kidIds||[])[0]; specialForm(m.kind + "|" + (m.key||""), v); } else memoryForm(null, v); },
   memPhoto: async () => { const d = await Native.takePhoto({source:"prompt"}); if (!d) return; UI.photoDraft.mem2 = await shrinkImage(d, 1280, 0.82); $("#memPhotoPrev").innerHTML = `<img src="${UI.photoDraft.mem2}" alt="" style="border-radius:14px;max-height:180px;object-fit:cover">`; },
   delMemory: v => { S.memories = S.memories.filter(m => m.id !== v); closeSheet(); commit(T("Supprimé")); },
   delPhoto: async v => { S.photos = S.photos.filter(p => p.id !== v); await PhotoDB.del(v); closeSheet(); commit(T("Photo supprimée")); },
   sharePhoto: async v => { const p = S.photos.find(x => x.id === v), d = await PhotoDB.get(v); Native.share({title:p.caption || T("Photo du jour"), text:`${p.caption||""} · ${fmtD(p.date,{day:"numeric",month:"long",year:"numeric"})}`, dataUrl:d, filename:`photo-${p.date}.jpg`}); },
-  shareMemory: async v => { const m = S.memories.find(x => x.id === v), d = m.photoId ? await PhotoDB.get(m.photoId) : null; Native.share({title:m.title, text:`${m.title} · ${fmtD(m.date,{day:"numeric",month:"long",year:"numeric"})}${m.text?"\n\n"+m.text:""}`, dataUrl:d, filename:`souvenir-${m.date}.jpg`}); },
+  shareMemory: async v => { const m = S.memories.find(x => x.id === v); if (lockedMem(m)) return; const d = m.photoId ? await PhotoDB.get(m.photoId) : null; Native.share({title:m.title, text:`${m.title} · ${fmtD(m.date,{day:"numeric",month:"long",year:"numeric"})}${m.text?"\n\n"+m.text:""}`, dataUrl:d, filename:`souvenir-${m.date}.jpg`}); },
   photoDrive: async v => { const p = S.photos.find(x => x.id === v), d = await PhotoDB.get(v); toast(T("Envoi vers Google Drive…")); await Cloud.driveUpload(`${p.date} ${p.caption||T("Photo du jour")}.jpg`, "image/jpeg", d.split(",")[1], `${T(PHOTO_CATS.find(c=>c.id===p.cat)?.l||"")} · ${p.date}`); toast(T("Enregistrée dans Google Drive")); },
   memoryDrive: v => memoryToDrive(S.memories.find(x => x.id === v), true),
 
@@ -206,7 +206,7 @@ async function memoryToDrive(m, verbose){
   if (!m || !Cloud.canDrive?.()) return;
   try {
     if (verbose) toast(T("Envoi vers Google Drive…"));
-    const txt = `${m.title}\n${fmtD(m.date,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}\n${(m.kidIds||[]).map(id=>kidById(id)?.name).filter(Boolean).join(", ")}\n\n${m.text||""}`;
+    const txt = `${m.title}\n${fmtD(m.date,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}\n${(m.kidIds||[]).map(id=>kidById(id)?.name).filter(Boolean).join(", ")}\n\n${m.text||""}${m.answers?Object.entries(m.answers).map(([q,a])=>`\n${T(q)} ${a}`).join(""):""}`;
     await Cloud.driveUpload(`${m.date} ${m.title}.txt`, "text/plain", btoa(unescape(encodeURIComponent(txt))), m.title);
     if (m.photoId){ const d = await PhotoDB.get(m.photoId); if (d) await Cloud.driveUpload(`${m.date} ${m.title}.jpg`, "image/jpeg", d.split(",")[1], m.title); }
     m.drive = true; save(); if (verbose) toast(T("Enregistré dans Google Drive"));
@@ -314,60 +314,12 @@ Object.assign(FORMS, {
 });
 
 /* ======== DONNÉES D'EXEMPLE ======== */
-function demoState(){
-  const s = blankState(), t = today(), n = Date.now(), H = 36e5;
-  s.demo = true; s.family.name = LANG === "en" ? "The Gagnon family" : "Famille Gagnon";
-  const p1 = {id:"m_p1", name:"Alex", role:"parent", color:"lilac", avatar:{kind:"symbole", id:"coeur"}}, p2 = {id:"m_p2", name:"Sam", role:"parent", color:"teal", avatar:{kind:"animal", id:"renard"}};
-  s.family.members = [p1, p2]; s.me = p1.id;
-  const dob1 = iso(addDays(t, -232)), d1 = parseD(dob1), at = mm => iso(addMonths(d1, mm));
-  const lea = {...blankKid(), id:"k_lea", name:"Léa", dob:dob1, sex:"F", gaW:35, gaD:2, color:"peach", hFather:178, hMother:164, meds:"Vitamine D", doctor:"Dre Tremblay", avatar:{kind:"animal", id:"poussin"}};
-  lea.vaccines = {vrs:{date:iso(addDays(d1,2)),lot:"VR2241",site:"Cuisse gauche",reactions:""}, dcat2:{date:at(2),lot:"A81K",site:"Cuisse gauche",reactions:"Fièvre légère le soir"}, pneu2:{date:at(2),lot:"P553",site:"Cuisse droite",reactions:""}, rota2:{date:at(2),lot:"R19",site:"Oral",reactions:""}, dcat4:{date:at(4),lot:"A90B",site:"Cuisse gauche",reactions:""}, pneu4:{date:at(4),lot:"P601",site:"Cuisse droite",reactions:""}, rota4:{date:at(4),lot:"R22",site:"Oral",reactions:""}};
-  lea.teeth = {liL:iso(addDays(t,-12)), liR:iso(addDays(t,-5))};
-  lea.allergensLog = {"Arachides":[iso(addDays(t,-20)),iso(addDays(t,-13)),iso(addDays(t,-6))],"Œufs":[iso(addDays(t,-18)),iso(addDays(t,-9))]};
-  lea.growth = [[0,2.45,46,32],[0.5,2.7,47.2,32.8],[1,3.2,49.5,34.2],[2,4.3,53.5,36.4],[4,5.6,59.5,39.4],[6,6.6,63.4,41.2],[7.5,7.1,65.6,42]].map(([m,w,h,c]) => ({id:uid(), date:iso(addDays(d1, Math.round(m*MONTH_DAYS))), weight:w, height:h, ofc:c}));
-  MS.filter(it => it.b <= 6.5 || ["Assis sans appui","Transfère un objet d'une main à l'autre"].includes(it.t)).forEach(it => lea.milestones[it.k] = iso(addDays(t,-20)));
-  lea.foodFav = [{name:"Purée de patate douce", group:"legfruits"},{name:"Gruau", group:"grains"},{name:"Lentilles", group:"proteines"},{name:"Banane", group:"legfruits"}];
-  for (let d=0; d<14; d++){ const base = addDays(t, -d).getTime();
-    lea.logs.push({id:uid(), type:"sleep", t:base - 3.5*H, end:base + 6.5*H, data:{kind:"Nuit"}}, {id:uid(), type:"sleep", t:base + 13*H, end:base + (14.2 + (d%3)*0.3)*H, data:{kind:"Sieste"}}, {id:uid(), type:"tummy", t:base + 10*H, data:{min:15 + (d%4)*5}}, {id:uid(), type:"read", t:base + 19*H, data:{min:10 + (d%2)*5, title:"Imagier des animaux"}});
-    if (d < 7) lea.logs.push({id:uid(), type:"solid", t:base + 12*H, data:{items:[{name:["Purée de patate douce","Gruau","Lentilles","Banane"][d%4], group:["legfruits","grains","proteines","legfruits"][d%4], qty:"3 c. à soupe"}]}});
-    for (let k=0;k<6;k++) lea.logs.push({id:uid(), type:"feed", t:base + (k*3.5+1)*H, data:{mode:k%3===2?"Biberon":k%2?"Sein droit":"Sein gauche", ml:k%3===2?150:""}});
-    for (let k=0;k<5;k++) lea.logs.push({id:uid(), type:"diaper", t:base + (k*4+2)*H, data:{kind:k===2?"Pipi et selle":"Pipi"}}); }
-  lea.logs = lea.logs.filter(l => l.t < n && (!l.end || l.end < n));
-  const dob2 = iso(addMonths(t, -161)), d2 = parseD(dob2);
-  const noah = {...blankKid(), id:"k_noah", name:"Noah", dob:dob2, sex:"M", gaW:39, gaD:4, color:"sky", hFather:178, hMother:164, allergies:"Arachides (anaphylaxie, auto-injecteur)", conditions:"Asthme léger", meds:"Salbutamol au besoin", doctor:"Dre Tremblay", avatar:{kind:"symbole", id:"eclair"}};
-  PIQ.forEach(g => { if (g.age < 160) g.doses.forEach(d => { if (!d.seasonal) noah.vaccines[d.id] = {date:iso(addMonths(d2, g.age)), lot:"", site:"", reactions:""}; }); });
-  noah.growth = [[24,12.4,87],[48,16.5,103],[72,21,116.5],[96,26,128],[108,29.5,134],[120,33.2,140],[132,37.6,145.5],[144,42.5,152],[156,48,159]].map(([m,w,h]) => ({id:uid(), date:iso(addMonths(d2, m)), weight:w, height:h}));
-  noah.trackers = [{id:"tr_eau", name:"Verres d'eau", type:"count", unit:"", goal:6, goalKind:"min", color:"teal", icon:"drop"}];
-  for (let d=0; d<14; d++){ const base = addDays(t, -d).getTime();
-    noah.logs.push({id:uid(), type:"sleep", t:base - 1.5*H + (d%3)*0.5*H, end:base + 7*H, data:{kind:"Nuit"}}, {id:uid(), type:"screen", t:base + 17*H, data:{min:[95,140,80,160,110,70,130][d%7]}},
-      d%2===0 ? {id:uid(), type:"activity", t:base + 18*H, data:{what:d%4===0?"Soccer":"Vélo", min:d%4===0?75:40, intensity:"Intense"}} : {id:uid(), type:"activity", t:base + 15.5*H, data:{what:"Marche vers l'école", min:25, intensity:"Modérée"}},
-      {id:uid(), type:"read", t:base + 21*H, data:{min:[20,15,30,10,25,20,10][d%7], title:"Roman graphique"}}, {id:uid(), type:"mood", t:base + 20*H, data:{mood:["Bien","Super","Bien","Moyen","Bien","Super","Bien"][d%7]}}, {id:uid(), type:"trk", t:base + 16*H, data:{tid:"tr_eau", v:3 + d%4}}); }
-  noah.logs = noah.logs.filter(l => l.t < n && (!l.end || l.end < n));
-  noah.activities = [{id:uid(), name:"Soccer", days:[2,4], time:"18:00", place:"Parc Laurier"},{id:uid(), name:"Natation", days:[6], time:"10:00", place:"Piscine du quartier"}];
-  const bebe = {...blankKid(), id:"k_bebe", name:"Petit pois", dob:null, dueDate:iso(addDays(t, 96)), sex:"", color:"rose", look:"auto"};
-  bebe.prenatal = {checks:{0:iso(addDays(t,-120)),1:iso(addDays(t,-100)),2:iso(addDays(t,-40))}, names:["Éloïse","Arthur","Romy"]};
-  s.children = [lea, noah, bebe]; s.active = lea.id;
-  s.events = [{id:uid(), date:iso(addDays(t,9)), time:"09:30", title:"Suivi 9 mois de Léa", type:"medecin", kidIds:[lea.id], recur:"none"}, {id:uid(), date:iso(addDays(t,14)), time:"16:00", title:"Dentiste", type:"dentiste", kidIds:[noah.id], recur:"none"},
-    {id:uid(), date:iso(addDays(t,-((t.getDay()+2)%7))), time:"17:30", title:"Souper chez grand-maman", type:"famille", recur:"weekly", kidIds:[], memberIds:[]}, {id:uid(), date:iso(t), title:"Acheter des couches et de la vitamine D", type:"note", pinned:true, recur:"none"},
-    {id:uid(), date:iso(addDays(t,21)), time:"10:00", title:"Échographie (bébé)", type:"medecin", kidIds:[bebe.id], recur:"none"}];
-  s.memories = [{id:uid(), date:iso(addDays(t,-60)), title:"Premier vrai éclat de rire de Léa", text:"En regardant le chat.", kidIds:[lea.id]}, {id:uid(), date:iso(addDays(t,-12)), title:"Première dent", text:"Incisive du bas.", kidIds:[lea.id]},
-    {id:uid(), date:iso(new Date(t.getFullYear()-1, t.getMonth(), t.getDate())), title:"Premier but de Noah au soccer", text:"Il a couru jusqu'aux estrades !", kidIds:[noah.id]}];
-  const noahM = {id:"m_"+noah.id, name:"Noah", role:"enfant", kidId:noah.id, color:"sky", avatar:{kind:"symbole", id:"eclair"}};
-  s.family.members.push(noahM);
-  s.tasks = [{id:"t1", title:"Faire son lit", points:5, assignees:[noahM.id], recur:"daily", icon:"bed"}, {id:"t2", title:"Lire 20 minutes", points:10, assignees:[noahM.id], recur:"daily", icon:"book"},
-    {id:"t3", title:"Vider le lave-vaisselle", points:10, assignees:[noahM.id, p2.id], recur:"weekly", days:[1,3,5], icon:"dish"}, {id:"t4", title:"Courir 30 minutes (parent)", points:15, assignees:[p1.id, p2.id], recur:"weekly", days:[2,4,6], icon:"run"}];
-  for (let d=1; d<6; d++){ s.completions.push({id:uid(), taskId:"t1", memberId:noahM.id, date:iso(addDays(t,-d)), points:5, status:"ok"}, {id:uid(), taskId:"t2", memberId:noahM.id, date:iso(addDays(t,-d)), points:10, status:"ok"}); }
-  s.completions.push({id:uid(), taskId:"t4", memberId:p1.id, date:iso(addDays(t,-2)), points:15, status:"ok"}, {id:uid(), taskId:"t1", memberId:noahM.id, date:iso(t), points:5, status:"pending"});
-  s.rewards = [{id:"r1", title:"Choisir le film du vendredi", cost:40}, {id:"r2", title:"Sortie crème glacée", cost:60}, {id:"r3", title:"30 min d'écran en plus", cost:30}];
-  s.avail = {[p1.id]:{"6-am":true,"6-pm":true,"0-am":true,"0-pm":true,"3-ev":true}, [p2.id]:{"6-pm":true,"0-am":true,"0-pm":true,"5-ev":true}, [noahM.id]:{"6-pm":true,"0-pm":true,"0-am":true,"3-ev":true}};
-  return s;
-}
-
 /* ======== DÉMARRAGE ======== */
 (function boot(){
   const stored = loadLocal();
   LANG = (stored?.settings?.lang) || ((navigator.language||"fr").toLowerCase().startsWith("fr") ? "fr" : "en");
-  S = stored ? migrate(stored) : demoState();
+  S = stored ? migrate(stored) : blankState();
+  if (isDemoData(S)) S = freshFrom(S);
   normalize();
   try { const h = location.hash.slice(1); if (["home","kid","agenda","tribu","souvenirs","plus"].includes(h)) UI.view = h; } catch(e){}
   $("#fab").addEventListener("click", () => aiSheet());

@@ -47,6 +47,10 @@ function aiSheet(tab){
       <div class="stack" id="aiThread">${hist.length ? hist.map(x => `<div class="msg mine" style="max-width:90%">${esc(x.q)}</div><div class="msg" style="max-width:95%">${md(x.a)}${x.sources?.length?`<div class="tiny" style="margin-top:6px"><b>${T("Sources")}</b> : ${x.sources.slice(0,5).map(s=>`<a href="${esc(s.uri)}" target="_blank" rel="noopener">${esc(s.title||"lien")}</a>`).join(" · ")}</div>`:""}</div>`).join("") : `<div class="stack small muted">${T("Exemples :")}<div class="pick">${[T("Comment savoir s'il dort assez ?"),T("Idées de repas avec du fer pour mon bébé"),T("Comment parler d'alcool avec mon ado ?"),T("Est-ce normal qu'il ne marche pas encore ?")].map(q=>`<button data-act="aiAskQuick" data-v="${esc(q)}">${q}</button>`).join("")}</div></div>`}</div>
       <form class="composer" data-form="aiAsk"><textarea class="inp" id="ai-q" rows="2" placeholder="${T("Votre question…")}"></textarea><button class="btn kid" type="submit" aria-label="${T("Envoyer")}">${icon("send")}</button></form>
       <p class="tiny muted">${T("Réponses fondées sur la littérature, avec sources quand c'est possible. Ne remplace pas un avis médical. Urgence : 911 · Info-Santé : 811.")}</p>`;
+  } else if (UI.aiTab === "scan"){
+    body = `<p class="small muted">${T("Photographiez un document : Gemini le lit et vous propose de remplir l'app. Rien n'est enregistré sans votre accord.")}</p><div class="list">${Object.entries(SCAN_KINDS).map(([k,x]) => `<button class="li" data-act="aiScan" data-v="${k}"><div class="ic" style="background:var(--lilac-bg);color:var(--lilac-ink)">${icon(x.ic)}</div><div class="grow"><div class="li-title">${T(x.l)}</div><div class="small muted">${T(x.d)}</div></div>${icon("right")}</button>`).join("")}</div>`;
+  } else if (UI.aiTab === "create"){
+    body = `${S.children.length>1?`<div class="pick">${S.children.map(k=>`<button data-act="aiKidC" data-v="${k.id}" aria-pressed="${k.id===c?.id}">${esc(k.nick||k.name)}</button>`).join("")}</div>`:""}${createPane()}`;
   } else if (UI.aiTab === "meal"){
     body = `<p class="small muted">${T("Prenez le repas en photo : l'assistant reconnaît les aliments, estime les quantités et les classe par groupe. Vous pouvez tout corriger avant d'enregistrer.")}</p><button class="btn kid" data-act="aiMealPhoto">${icon("camera")}${T("Photographier un repas")}</button>`;
   } else {
@@ -58,13 +62,14 @@ function aiSheet(tab){
       ${revs.map(r => `<div class="card" style="box-shadow:none;background:var(--surface2)"><span class="eyebrow">${fmtD(r.date,{day:"numeric",month:"long",year:"numeric"})}</span>${md(r.text)}</div>`).join("")}`;
   }
   sheet(`${sheetHead(`${icon("spark").replace("<svg",'<svg style="width:22px;height:22px;vertical-align:-4px;color:var(--lilac-ink)"')} ${T("Assistant")}`)}
-    ${hasKey?`<div class="seg">${[["ask",T("Questions")],["meal",T("Photo de repas")],["review",T("Revues")]].map(([k,l])=>`<button data-act="aiTab" data-v="${k}" aria-pressed="${UI.aiTab===k}">${l}</button>`).join("")}</div>`:""}${body}`, "wide");
+    ${hasKey?`<div class="seg">${[["ask",T("Questions")],["scan",T("Lire")],["meal",T("Repas")],["create",T("Créer")],["review",T("Revues")]].map(([k,l])=>`<button data-act="aiTab" data-v="${k}" aria-pressed="${UI.aiTab===k}">${l}</button>`).join("")}</div>`:""}${body}`, "wide");
   const th = $("#aiThread"); if (th) th.scrollIntoView({block:"end"});
 }
 const aiKeyForm = () => `<form class="stack" data-form="aiKey">${fld("ai-key",T("Clé API Gemini"),`<input class="inp" id="ai-key" type="password" autocomplete="off" placeholder="AIza…">`)}<button class="btn kid" type="submit">${T("Enregistrer la clé")}</button></form>`;
 function aiSettings(){
   const has = !!aiKey();
   return `<p class="small muted">${T("Facultatif. Photo de repas, questions avec sources scientifiques, revues automatiques. Fonctionne avec votre clé Gemini, conservée seulement sur cet appareil.")}</p>
+    <ul class="small" style="margin:0;padding-left:18px;line-height:1.6">${[T("Questions avec sources scientifiques"),T("Photo de repas → aliments, groupes et quantités"),T("Lecture d'étiquettes, de rapports de garderie, du carnet de santé, d'invitations et de menus"),T("Histoires du soir, menu de la semaine, idées d'activités, préparer une discussion"),T("Texte des souvenirs et récit de l'année"),T("Revues automatiques du suivi")].map(x=>`<li>${x}</li>`).join("")}</ul>
     ${has ? `<div class="row"><span class="chip mint">${icon("check")}${T("Clé enregistrée")}</span><button class="btn sm ghost" data-act="aiForget">${T("Retirer la clé")}</button><button class="btn sm kid" data-act="ai">${T("Ouvrir l'assistant")}</button></div>` : aiKeyForm()}
     ${fld("ai-model",T("Modèle"),`<input class="inp" id="ai-model" value="${esc(S.settings.ai.model)}" data-change="aiModel">`)}`;
 }
