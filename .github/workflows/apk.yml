@@ -18,7 +18,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      - name: SDK Android (préinstallé sur le serveur GitHub)
+        run: echo "sdk.dir=$ANDROID_HOME" && ls "$ANDROID_HOME/platforms"
       - name: Dépendances
         run: npm install
       - name: Projet Android
@@ -29,6 +30,7 @@ jobs:
       - name: Compiler l'APK
         working-directory: android
         run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
       - name: Renommer
