@@ -183,7 +183,14 @@ function freshFrom(old){
   if (mine) s.family.members = [{...mine, name: mine.name === "Alex" ? T("Moi") : mine.name, avatar: mine.name === "Alex" ? {kind:"auto"} : mine.avatar}];
   s.me = s.family.members[0]?.id || null; return s;
 }
+function fixDates(){
+  const td = new Date(); const d0 = x => { const t = x?.at || x?.created || Date.now(); const d = new Date(t); return isNaN(d) ? iso(td) : iso(d); };
+  S.photos = (S.photos||[]).filter(p => p && p.id && typeof p.date === "string" && p.date.length >= 7);
+  (S.memories||[]).forEach(m => { if (m && typeof m.date !== "string") m.date = d0(m); });
+  S.memories = (S.memories||[]).filter(Boolean);
+}
 function normalize(){
+  try { fixDates(); } catch(e){ console.error(e); }
   S.children.forEach(c => { const b = blankKid(); for (const k in b) if (c[k] === undefined) c[k] = b[k]; });
   if (!S.family.members.length) S.family.members = [{id:"m_"+uid(), name:T("Moi"), role:"parent", color:"lilac", avatar:{kind:"symbole", id:"coeur"}}];
   if (!S.me || !S.family.members.some(m => m.id === S.me)) S.me = S.family.members[0].id;
@@ -222,7 +229,7 @@ const PhotoDB = (() => {
   const tx = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction("p", mode), st = t.objectStore("p"); const r = fn(st); t.oncomplete = () => res(r?.result); t.onerror = () => rej(t.error); }); };
   return {
     async put(id, data){ mem.set(id, data); try { await tx("readwrite", s => s.put(data, id)); } catch(e){} },
-    async get(id){ if (mem.has(id)) return mem.get(id); try { const v = await tx("readonly", s => s.get(id)); if (v) mem.set(id, v); return v || null; } catch(e){ return null; } },
+    async get(id, local){ if (mem.has(id)) return mem.get(id); let v = null; try { v = await tx("readonly", s => s.get(id)); if (v) mem.set(id, v); } catch(e){} if (!v && !local && typeof Cloud !== "undefined" && Cloud.fetchPhoto) v = await Cloud.fetchPhoto(id); return v || null; },
     async del(id){ mem.delete(id); try { await tx("readwrite", s => s.delete(id)); } catch(e){} },
     cached: id => mem.get(id),
   };

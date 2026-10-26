@@ -120,25 +120,35 @@ if (cfg && cfg.apiKey){
       // disponibilités (chacun la sienne ; les parents celles de tous)
       Object.entries(S.avail||{}).forEach(([mid, map]) => { if (isParent || mid === S.me) put(`families/${fid}/avail/${mid}`, {map}); });
       // photos (image comprise, réduite)
-      for (const p of S.photos){ const path = `families/${fid}/photos/${p.id}`, k = J(p); if (!force && last[path] === k) continue; if (!isParent && p.by !== S.me) continue; const data = await PhotoDB.get(p.id); if (!data) continue; last[path] = k; batch.push({path, data:{...p, data}}); }
+      for (const p of S.photos){ const path = `families/${fid}/photos/${p.id}`, k = J(p); if (!force && last[path] === k) continue; if (!isParent && p.by !== S.me) continue; let data = await PhotoDB.get(p.id, true); if (!data) continue; if (data.length > 900000) data = await shrinkImage(data, 1000, 0.7); last[path] = k; batch.push({path, data:{...p, data}}); }
       // images des souvenirs, spéciaux et histoires : même collection, marquées « blob » (pas dans l'album)
       const blobIds = new Set();
       S.memories.forEach(m => { if (isParent || m.by === S.me) [m.photoId, ...(m.photoIds||[])].filter(Boolean).forEach(id => blobIds.add(id)); });
       (S.stories||[]).forEach(st => (st.chapters||[]).forEach(ch => ch.img && isParent && blobIds.add(ch.img)));
-      for (const id of blobIds){ const path = `families/${fid}/photos/${id}`, data = await PhotoDB.get(id); if (!data || data.length > 1000000) continue; const k = J({id, blob:true, h:data.length + data.slice(-24)}); if (!force && last[path] === k) continue; last[path] = k; batch.push({path, data:{id, blob:true, data}}); }
+      for (const id of blobIds){ const path = `families/${fid}/photos/${id}`; let data = await PhotoDB.get(id, true); if (!data) continue; if (data.length > 900000) data = await shrinkImage(data, 1000, 0.7); if (data.length > 900000) data = await shrinkImage(data, 760, 0.6); if (data.length > 1000000) continue; const k = J({id, blob:true, h:data.length + data.slice(-24)}); if (!force && last[path] === k) continue; last[path] = k; batch.push({path, data:{id, blob:true, data}}); }
       Object.keys(last).filter(p => p.startsWith(`families/${fid}/photos/`) && !S.photos.some(x => p.endsWith("/"+x.id)) && !blobIds.has(p.split("/").pop()) && !(last[p]||"").includes('"blob":true')).forEach(p => { delete last[p]; batch.push({path:p, del:true}); });
-      for (let i = 0; i < batch.length; i += 400){
-        const wb = writeBatch(db);
-        batch.slice(i, i+400).forEach(b => { const r = doc(db, b.path); if (b.del) wb.delete(r); else wb.set(r, b.data, b.merge === "fields" ? {mergeFields:Object.keys(b.data)} : b.merge ? {merge:true} : undefined); });
-        await wb.commit();
+      // lots limités en nombre ET en poids (un commit dépasse vite 10 Mo avec des photos)
+      const chunks = []; let cur = [], w = 0;
+      for (const b of batch){ const sz = b.del ? 100 : (b.data?.data && typeof b.data.data === "string" ? b.data.data.length : J(b.data||{}).length) + 200; if (cur.length && (cur.length >= 400 || w + sz > 3e6)){ chunks.push(cur); cur = []; w = 0; } cur.push(b); w += sz; }
+      if (cur.length) chunks.push(cur);
+      let done = 0;
+      try {
+        for (const ch of chunks){
+          const wb = writeBatch(db);
+          ch.forEach(b => { const r = doc(db, b.path); if (b.del) wb.delete(r); else wb.set(r, b.data, b.merge === "fields" ? {mergeFields:Object.keys(b.data)} : b.merge ? {merge:true} : undefined); });
+          await wb.commit(); done++;
+        }
+      } catch(err){ // ce qui n'est pas parti sera renvoyé à la prochaine synchro
+        chunks.slice(done).flat().forEach(b => { delete last[b.path]; }); throw err;
       }
-    } catch(e){ console.error("push", e); if (String(e.code||"").includes("permission")) toast(T("Certaines modifications demandent un compte parent")); }
+      C.status = {ok:true, at:Date.now(), n:batch.length}; C._retry = 0;
+    } catch(e){ console.error("push", e); C.status = {ok:false, at:Date.now(), err:e.code || e.message}; if (String(e.code||"").includes("permission")) toast(T("Certaines modifications demandent un compte parent")); else if ((C._retry = (C._retry||0) + 1) <= 3) setTimeout(() => C.push(), 20000 * C._retry); }
     pushing = false;
     if (pushAgain){ pushAgain = false; C.push(); }
   };
 
   /* ---------- réception (temps réel) ---------- */
-  const applyRemote = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} softRender(); };
+  const applyRemote = () => { try { fixDates(); } catch(e){} try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} softRender(); };
   function subscribe(){
     unsubs.forEach(u => u()); unsubs = [];
     const fam = doc(db, "families", fid);
@@ -177,9 +187,9 @@ if (cfg && cfg.apiKey){
     unsubs.push(onSnapshot(collection(fam, "photos"), async qs => {
       for (const ch of qs.docChanges()){
         const d = ch.doc.data();
-        if (ch.type === "removed"){ if (!d.blob) S.photos = S.photos.filter(p => p.id !== d.id); continue; }
+        if (ch.type === "removed"){ if (!d.blob && d.date) S.photos = S.photos.filter(p => p.id !== d.id); continue; }
         const {data, ...meta} = d; if (data) await PhotoDB.put(d.id, data);
-        if (d.blob){ if (data) last[`families/${fid}/photos/${d.id}`] = J({id:d.id, blob:true, h:data.length + data.slice(-24)}); continue; }
+        if (d.blob || !d.date){ if (data) last[`families/${fid}/photos/${d.id}`] = J({id:d.id, blob:true, h:data.length + data.slice(-24)}); continue; }
         const i = S.photos.findIndex(p => p.id === d.id); if (i >= 0) S.photos[i] = meta; else S.photos.push(meta);
         last[`families/${fid}/photos/${d.id}`] = J(meta);
       }
@@ -209,6 +219,22 @@ if (cfg && cfg.apiKey){
   const newCode = () => Array.from({length:6}, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("");
   C.invite = async (roleWanted, mid = null) => { const code = newCode(); await setDoc(doc(db, "codes", code), {kind:"family", id:fid, role:roleWanted, by:C.user.uid, at:Date.now(), ...(mid ? {mid} : {})}); return code; };
   C.familyId = () => fid;
+  C.syncLine = () => !C.user || !fid ? "" : !C.status ? "" : C.status.ok ? `${T("Synchronisé")} · ${new Date(C.status.at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}` : `${T("Synchro en attente")} · ${C.status.err}`;
+  /* renvoie tout, puis récupère les images manquantes */
+  C.resync = async () => {
+    phWait.clear(); await C.push(true);
+    const ids = new Set(); S.photos.forEach(p => ids.add(p.id)); S.memories.forEach(m => [m.photoId, ...(m.photoIds||[])].filter(Boolean).forEach(i => ids.add(i)));
+    let got = 0; for (const id of ids){ if (!(await PhotoDB.get(id, true))){ if (await C.fetchPhoto(id)) got++; } }
+    softRender(); return got;
+  };
+  /* va chercher une image absente de cet appareil (souvenir d'un autre membre arrivé avant sa photo) */
+  const phWait = new Map();
+  C.fetchPhoto = async id => {
+    if (!fid || !C.user || !id) return null;
+    const miss = phWait.get(id); if (miss && typeof miss === "number" && Date.now() - miss < 45000) return null; if (miss && miss.then) return miss;
+    const pr = getDoc(doc(db, "families", fid, "photos", id)).then(async s => { const d = s.exists() ? s.data().data : null; if (d){ await PhotoDB.put(id, d); phWait.delete(id); return d; } phWait.set(id, Date.now()); return null; }).catch(() => { phWait.set(id, Date.now()); return null; });
+    phWait.set(id, pr); return pr;
+  };
   C.joinFamily = async code => {
     const cs = await getDoc(doc(db, "codes", code.toUpperCase())); if (!cs.exists() || cs.data().kind !== "family") throw new Error(T("Code invalide"));
     const {id, role:r, mid:target} = cs.data(), mid = target || "m_" + C.user.uid.slice(0,10), rr = r === "enfant" ? "enfant" : "parent";

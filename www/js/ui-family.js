@@ -266,7 +266,7 @@ function tribuView(){
   if (!tabs.some(t=>t[0]===UI.sub.tribu)) UI.sub.tribu = tabs[0]?.[0];
   let h = tabs.length > 1 ? `<div class="seg">${tabs.map(([id,l])=>`<button data-act="tribuTab" data-v="${id}" aria-pressed="${UI.sub.tribu===id}">${l}</button>`).join("")}</div>` : "";
   if (UI.sub.tribu === "defis") return h + defisView();
-  if (UI.sub.tribu === "chat") return h + (famCommon().length ? famCommonCard() : `<button class="btn ghost" data-act="famEvent" data-v="" style="align-self:flex-start">${icon("people")}${T("Proposer une activité commune")}</button>`) + chatView("family");
+  if (UI.sub.tribu === "chat") return h + chatView("family");
   return h + groupsView();
 }
 function taskForm(id){
@@ -324,8 +324,9 @@ function groupDetail(id){
     ${(g.events||[]).filter(e=>e.date>=iso(today())).sort(evSort).map(e => `<div class="taskrow"><div class="ic" style="background:var(--teal-bg);color:var(--teal-ink)">${icon("cal")}</div><div class="grow"><b>${esc(e.title)}</b><div class="tiny muted">${fmtD(e.date,{weekday:"long",day:"numeric",month:"long"})}${e.time?" · "+e.time:""}</div>${e.place?`<div class="small">${placeLink(e.place)}</div>`:""}${e.notes?`<div class="small muted">${esc(e.notes)}</div>`:""}<div class="tiny">${T("Présents")} : ${Object.values(e.rsvp||{}).filter(r=>r.ok).map(r=>esc(r.name)).join(", ")||"—"}</div></div><button class="btn sm ${e.rsvp?.[Cloud.user.uid]?.ok?"kid":"ghost"}" data-act="groupRsvp" data-v="${id}|${e.id}">${e.rsvp?.[Cloud.user.uid]?.ok?T("J'y serai"):T("Je viens")}</button><button class="icon-btn flat" data-act="groupEvent" data-v="${id}|${e.id}" aria-label="${T("Modifier")}">${icon("edit")}</button></div>`).join("") || `<p class="small muted">${T("Aucune activité prévue.")}</p>`}</div>
     <div class="card"><div class="card-h"><h2>${T("Mes disponibilités pour ce groupe")}</h2></div>${weekPicker(gcustom)}${availGrid(myAvail, true, `data-group="${id}"`)}
     <h3>${T("Quand le groupe est libre")}</h3>${heatGrid(people, p => effMap((g.avail||{})[p.id]))}</div>
-    <div class="row" style="flex-wrap:wrap"><button class="btn line" data-act="groupLeave" data-v="${id}">${icon("left")}${T("Quitter le groupe")}</button>${!g.owner || g.owner === Cloud.user.uid ? `<button class="btn danger" data-act="groupDelete" data-v="${id}">${icon("trash")}${T("Supprimer le groupe pour tous")}</button>` : ""}</div>`;
+    ${groupDangerZone(g)}`;
 }
+const groupDangerZone = g => `<div class="stack" style="gap:8px;margin-top:6px"><div class="row" style="flex-wrap:wrap"><button type="button" class="btn line" data-act="groupLeave" data-v="${g.id}">${icon("left")}${T("Quitter le groupe")}</button><button type="button" class="btn danger" data-act="groupDelete" data-v="${g.id}">${icon("trash")}${T("Supprimer le groupe pour tous")}</button></div>${g.owner && g.owner !== Cloud.user?.uid ? `<p class="tiny muted">${T("Vous n'êtes pas le créateur : si la suppression est refusée, vous quitterez simplement le groupe.")}</p>` : ""}</div>`;
 
 /* ======== RAPPORT POUR LE MÉDECIN ======== */
 function reportData(c){

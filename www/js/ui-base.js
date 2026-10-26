@@ -39,6 +39,9 @@ const radio = n => (document.querySelector(`input[name="${n}"]:checked`)||{}).va
 const checked = n => [...document.querySelectorAll(`input[name="${n}"]:checked`)].map(i => i.value);
 const tsOf = id => { const v = val(id); return v ? new Date(v).getTime() : Date.now(); };
 const numOf = id => Number(val(id).replace(",", ".")) || 0;
+/* confirmation maison (les confirm() natifs sont parfois bloqués dans les applis installées) */
+let CF = null;
+function askConfirm(msg, okLabel, fn, danger = true){ CF = fn; sheet(`${sheetHead(T("Confirmer"))}<p>${esc(msg)}</p><div class="row"><button class="btn ${danger?"danger":"kid"} grow" data-act="cfOk">${esc(okLabel)}</button><button class="btn ghost" data-act="closeSheet">${T("Annuler")}</button></div>`); }
 const empty = (ic, txt, btn="") => `<div class="empty">${icon(ic)}<p>${txt}</p>${btn}</div>`;
 function confetti(){
   if (window.matchMedia("(prefers-reduced-motion:reduce)").matches) return;
@@ -125,7 +128,8 @@ function render(){
   if (!navItems().some(n => n.id === UI.view) && !["plus","assistant"].includes(UI.view)) UI.view = "home";
   let html = UI.view === "assistant" ? "" : topbar();
   if (S.demo && !isKidUser()) html += `<div class="banner info">${icon("info")}<div>${T("Vous voyez des <b>données d'exemple</b>.")} <button class="btn sm ghost" data-act="clearDemo" style="margin-left:6px">${T("Commencer avec ma famille")}</button></div></div>`;
-  html += ({home:homeView, kid:kidView, agenda:agendaView, tribu:tribuView, souvenirs:souvenirsView, plus:plusView, assistant:assistantView}[UI.view] || homeView)();
+  try { html += ({home:homeView, kid:kidView, agenda:agendaView, tribu:tribuView, souvenirs:souvenirsView, plus:plusView, assistant:assistantView}[UI.view] || homeView)(); }
+  catch(e){ console.error("view", UI.view, e); AFTER.length = 0; html += `<div class="card">${empty("alert", T("Cette page n'a pas pu s'afficher."), `<button class="btn kid" data-act="retryView">${T("Réessayer")}</button>`)}<p class="tiny muted" style="text-align:center">${esc(String(e.message||e))}</p></div>`; }
   $("#main").innerHTML = html;
   afterRender(); centerPressed("#main");
   if (!S.settings.onboarded && !UI.obShown) setTimeout(() => { if (!UI.obShown && !$("#layer .scrim") && !(Cloud.ready && Cloud.mustLogin()) && (Cloud.ready || !window.TRIBE_FIREBASE)){ UI.obShown = true; maybeOnboard(); } }, 700);
@@ -237,6 +241,7 @@ function plusView(){
     <div class="card c6"><div class="card-h"><h2>${T("Notifications")}</h2>${icon("bell")}</div>${notifSettings()}</div>
     <div class="card c6"><div class="card-h"><h2>${T("Assistant IA")}</h2>${icon("spark")}</div>${aiSettings()}</div>
     <div class="card c12"><div class="card-h"><h2>${T("Mes données")}</h2>${icon("db")}</div>
+      ${Cloud.user && Cloud.syncLine?.() ? `<div class="row" style="flex-wrap:wrap;gap:8px"><span class="small ${Cloud.status?.ok===false?"":"muted"}" style="${Cloud.status?.ok===false?"color:var(--danger)":""}">${esc(Cloud.syncLine())}</span><button class="btn sm ghost" data-act="resync">${icon("auto")}${T("Resynchroniser (photos incluses)")}</button></div>` : ""}
       <p class="small muted">${Cloud.user ? T("Vos données sont sauvegardées dans votre compte et sur cet appareil.") : T("Les données restent sur cet appareil. Exportez-les régulièrement.")}</p>
       <div class="row"><button class="btn ghost" data-act="exportJson">${icon("db")}${T("Tout exporter (JSON)")}</button><button class="btn ghost" data-act="exportCsv">${icon("doc")}${T("Journal et mesures (CSV)")}</button><button class="btn ghost" data-act="exportIcs">${icon("cal")}${T("Agenda (.ics)")}</button><label class="btn line" style="cursor:pointer">${T("Importer")}<input type="file" id="impFile" accept=".json,application/json" hidden data-change="importFile"></label></div>
       <div class="sep"></div><button class="btn danger" data-act="askWipe" style="align-self:flex-start">${T("Tout effacer sur cet appareil")}</button><div id="wipeConfirm"></div></div>

@@ -155,26 +155,35 @@ function assistantView(){
   if (kids.length > 1 && !["hist","jobs","set","recipes"].includes(UI.aiTab)) h += `<div class="pick">${kids.map(k => `<button data-act="aiKid" data-v="${k.id}" aria-pressed="${k.id===UI.aiKid}">${avatarOf(k,20)} ${esc(k.nick||k.name)}</button>`).join("")}</div>`;
   return h + ({ask:askPane, scan:scanPane, create:createPane, stories:storiesPane, recipes:recipesPane, review:reviewPane, hist:histPane, jobs:() => `<div class="card"><div class="card-h"><h2>${T("En cours et terminés")}</h2></div><div id="aiJobs">${jobsList()}</div></div>`, set:setPane}[UI.aiTab] || askPane)();
 }
+const chatItems = c => { (S.aiChat||[]).forEach(x => { if (!x.id) x.id = uid(); }); return (S.aiChat||[]).filter(x => x.kid === (c?.id||null) && !x.arch); };
+/* l'entrée d'historique qui correspond à un échange (créée au besoin pour les anciens échanges) */
+function chatHist(x){
+  let e = (S.aiHist||[]).find(h => h.id === x.hid) || (S.aiHist||[]).find(h => h.cat === "question" && h.title === x.q && h.text === x.a);
+  if (!e){ e = aiHist("question", x.q, x.a, {sources:x.sources, kid:x.kid}); }
+  x.hid = e.id; return e;
+}
 function askPane(){
-  const c = kidById(UI.aiKid), hist = (S.aiChat||[]).filter(x => x.kid === (c?.id||null)).slice(-12);
+  const c = kidById(UI.aiKid), hist = chatItems(c).slice(-12);
   const ex = [T("Comment savoir s'il dort assez ?"), T("Idées de repas avec du fer"), T("Comment parler des écrans ?"), T("Fièvre : quand consulter ?")];
-  return `<div class="card ai-chat"><div class="stack" id="aiThread">${hist.length ? hist.map(qa).join("") : `<div class="stack small muted">${T("Exemples :")}<div class="pick">${ex.map(e => `<button data-act="aiAskQuick" data-v="${esc(e)}">${e}</button>`).join("")}</div></div>`}</div>
+  return `<div class="card ai-chat">${hist.length ? `<div class="row" style="justify-content:space-between"><span class="tiny muted">${T("Tout est gardé dans l'Historique.")}</span><button class="btn sm line" data-act="aiChatNew">${icon("plus")}${T("Nouvelle conversation")}</button></div>` : ""}<div class="stack" id="aiThread">${hist.length ? hist.map(qa).join("") : `<div class="stack small muted">${T("Exemples :")}<div class="pick">${ex.map(e => `<button data-act="aiAskQuick" data-v="${esc(e)}">${e}</button>`).join("")}</div></div>`}</div>
     <form class="composer" data-form="aiAsk"><textarea class="inp" id="ai-q" rows="2" placeholder="${T("Votre question…")}"></textarea><button class="btn kid" type="submit" aria-label="${T("Envoyer")}">${icon("send")}</button></form>
     <p class="tiny muted">${T("Réponses fondées sur la littérature, avec sources quand c'est possible. Ne remplace pas un avis médical. Urgence : 911 · Info-Santé : 811.")}</p></div>`;
 }
 const srcList = s => s?.length ? `<div class="tiny" style="margin-top:6px"><b>${T("Sources")}</b> : ${s.slice(0,6).map(x => `<a href="${esc(x.uri)}" target="_blank" rel="noopener">${esc(x.title||"lien")}</a>`).join(" · ")}</div>` : "";
-const qa = x => `<div class="msg mine">${esc(x.q)}</div><div class="msg ai">${md(x.a)}${srcList(x.sources)}</div>`;
+const qaActions = x => { const fav = !!(S.aiHist||[]).find(h => h.id === x.hid)?.fav; return `<div class="row" style="gap:6px;margin-top:8px"><button class="btn sm ${fav?"kid":"ghost"}" data-act="aiChatFav" data-v="${x.id}" aria-pressed="${fav}">${icon("star")}${fav?T("Gardé en favori"):T("Favori")}</button><button class="btn sm ghost" data-act="aiChatArch" data-v="${x.id}">${icon("clock")}${T("Archiver")}</button></div>`; };
+const qa = x => `<div class="msg mine">${esc(x.q)}</div><div class="msg ai">${md(x.a)}${srcList(x.sources)}${qaActions(x)}</div>`;
 function aiAsk(q){
   const c = kidById(UI.aiKid), wid = "aw" + uid();
   const th = $("#aiThread");
-  if (th){ if (!(S.aiChat||[]).some(x => x.kid === (c?.id||null))) th.innerHTML = ""; th.insertAdjacentHTML("beforeend", `<div class="msg mine">${esc(q)}</div><div class="msg ai" id="${wid}"><span class="spin"></span> ${T("Je cherche dans la littérature…")}</div>`); $("#"+wid)?.scrollIntoView({block:"nearest"}); }
+  if (th){ if (!chatItems(c).length) th.innerHTML = ""; th.insertAdjacentHTML("beforeend", `<div class="msg mine">${esc(q)}</div><div class="msg ai" id="${wid}"><span class="spin"></span> ${T("Je cherche dans la littérature…")}</div>`); $("#"+wid)?.scrollIntoView({block:"nearest"}); }
   aiJob("question", q.slice(0, 60), async j => {
     const w0 = $("#"+wid); if (w0) w0.innerHTML = `<span class="spin"></span> ${T("Je cherche dans la littérature…")}`;
-    const prev = (S.aiChat||[]).filter(x => x.kid === (c?.id||null)).slice(-4).flatMap(x => [{role:"user", parts:[{text:x.q}]}, {role:"model", parts:[{text:x.a}]}]);
+    const prev = chatItems(c).slice(-4).flatMap(x => [{role:"user", parts:[{text:x.q}]}, {role:"model", parts:[{text:x.a}]}]);
     const r = await gemini({system: AI_SYSTEM() + " Réponds en 120 à 250 mots.\n" + kidContext(c), contents:[...prev, {role:"user", parts:[{text:q}]}], search:S.settings.ai.search !== false, onText: t => { const w = $("#"+wid); if (w) w.innerHTML = md(t); }});
-    S.aiChat = S.aiChat || []; S.aiChat.push({kid:c?.id||null, q, a:r.text, sources:r.sources, at:Date.now()}); if (S.aiChat.length > 80) S.aiChat.splice(0, S.aiChat.length-80);
     const e = aiHist("question", q, r.text, {sources:r.sources, kid:c?.id||null});
-    const w = $("#"+wid); if (w) w.innerHTML = md(r.text) + srcList(r.sources);
+    const item = {id:uid(), hid:e.id, kid:c?.id||null, q, a:r.text, sources:r.sources, at:Date.now()};
+    S.aiChat = S.aiChat || []; S.aiChat.push(item); if (S.aiChat.length > 80) S.aiChat.splice(0, S.aiChat.length-80); save();
+    const w = $("#"+wid); if (w) w.innerHTML = md(r.text) + srcList(r.sources) + qaActions(item);
     return {histId:e.id};
   }, {kid:c?.id||null, quiet:true, onErr: e => { const w = $("#"+wid); if (w) w.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span> <button class="btn sm ghost" data-act="aiRetryLast">${T("Réessayer")}</button><div class="tiny muted">${esc(AI_LAST_ERR)}</div>`; }});
 }
@@ -340,6 +349,9 @@ Object.assign(ACT, {
     for (const m of [...new Set([...AI_MODELS.fast, ...AI_MODELS.quality])]){ const t0 = Date.now(); try { await geminiCall(m, {contents:[{role:"user", parts:[{text:"Réponds seulement : OK"}]}], temperature:0, timeout:20000}); res.push(`✅ ${m} · ${((Date.now()-t0)/1000).toFixed(1)} s`); if (!S.settings.ai.okModel) S.settings.ai.okModel = m; } catch(e){ res.push(`❌ ${m} · ${String(e.message).slice(0,90)}`); } out.innerHTML = res.map(esc).join("<br>"); }
     save(); }, aiHistOpen: v => aiHistOpen(v),
   histCat: v => { UI.histCat = v; render(); }, histFav: () => { UI.histFav = !UI.histFav; render(); },
+  aiChatFav: v => { const x = (S.aiChat||[]).find(y => y.id === v); if (!x) return; const e = chatHist(x); e.fav = !e.fav; save(); render(); toast(e.fav ? T("Gardé dans les favoris") : T("Retiré des favoris")); },
+  aiChatArch: v => { const x = (S.aiChat||[]).find(y => y.id === v); if (!x) return; chatHist(x); x.arch = true; save(); render(); toast(T("Archivé : retrouvez-le dans l'Historique")); },
+  aiChatNew: () => { chatItems(kidById(UI.aiKid)).forEach(x => { chatHist(x); x.arch = true; }); save(); render(); toast(T("Nouvelle conversation")); },
   histFavT: v => { const e = S.aiHist.find(x => x.id === v); e.fav = !e.fav; save(); aiHistOpen(v); },
   histShare: v => { const e = S.aiHist.find(x => x.id === v); Native.share({title:e.title, text:`${e.title}\n\n${e.text}`}); },
   histDel: v => { S.aiHist = S.aiHist.filter(x => x.id !== v); closeSheet(); commit(); },
