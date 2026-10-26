@@ -141,7 +141,9 @@ function homeView(){
   const m = me();
   let h = `<section class="hero" style="background:var(--surface)"><div>${S.family.photo || S.family.emoji ? familyPic(72) : logo(64)}</div><div class="stack" style="gap:4px;min-width:0"><span class="eyebrow">${fmtD(today(),{weekday:"long",day:"numeric",month:"long"})}</span><h1>${hello}${m?.name && m.name !== T("Moi") ? ", "+esc(m.name) : ""}</h1>
     <div class="row">${S.family.members.slice(0,8).map(x => `<span title="${esc(x.name)}">${avatarOf(x, 32)}</span>`).join("")}${isKidUser()?"":`<button class="btn sm ghost" data-act="go" data-v="plus">${icon("people")}${T("Ma famille")}</button>`}</div></div></section>`;
-  if (!S.children.length && !isKidUser()) h += `<div class="card"><div class="empty">${logo(72)}<h2>${T("Bienvenue dans {app}",{app:esc(appName())})}</h2><p>${T("L'app tout-en-un de la famille : suivi des enfants de la grossesse à 18 ans, agenda partagé, défis, souvenirs.")}</p><div class="row"><button class="btn kid" data-act="kidForm">${T("Ajouter un enfant")}</button><button class="btn ghost" data-act="kidForm" data-v="__pre">${T("Bébé à naître")}</button></div></div></div>`;
+  const pj = (() => { try { return localStorage.getItem("tribe.join"); } catch(e){ return null; } })();
+  if (pj && Cloud.configured !== false) h += `<div class="banner info">${icon("key")}<div class="grow small"><b>${T("Invitation reçue")}</b> · ${T("code {c}",{c:esc(pj)})}<br>${Cloud.user ? T("Touchez « Rejoindre » pour entrer dans la famille avec ce compte.") : T("Connectez-vous ou créez votre compte, puis touchez « Rejoindre ».")}</div><div class="stack" style="gap:4px">${Cloud.user ? `<button class="btn sm kid" data-act="joinPending">${T("Rejoindre")}</button>` : `<button class="btn sm kid" data-act="showLogin">${T("Se connecter")}</button>`}<button class="btn sm line" data-act="joinDismiss">${T("Ignorer")}</button></div></div>`;
+  if (!S.children.length && !isKidUser() && !pj) h += `<div class="card"><div class="empty">${logo(72)}<h2>${T("Bienvenue dans {app}",{app:esc(appName())})}</h2><p>${T("L'app tout-en-un de la famille : suivi des enfants de la grossesse à 18 ans, agenda partagé, défis, souvenirs.")}</p><div class="row"><button class="btn kid" data-act="kidForm">${T("Ajouter un enfant")}</button><button class="btn ghost" data-act="kidForm" data-v="__pre">${T("Bébé à naître")}</button></div></div></div>`;
   h += `<div class="grid">`;
   // enfants
   S.children.forEach(c => {
@@ -284,6 +286,15 @@ function kidForm(id){
       <div class="fgrid">${fld("k-me",T("Médicaments réguliers"),inp("k-me",c.meds||""))}${fld("k-dr",T("Médecin ou IPS"),inp("k-dr",c.doctor||""))}${fld("k-de",T("Courriel du médecin (pour les rapports)"),inp("k-de",c.doctorEmail||"",'type="email"'))}${fld("k-ph",T("Pharmacie"),inp("k-ph",c.pharmacy||""))}</div></div></details>
     <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${S.children.includes(c)?`<button type="button" class="btn danger" data-act="askDelKid" data-v="${c.id}">${T("Supprimer")}</button>`:""}</div><div id="delConfirm"></div></form>`);
 }
+/* accès personnel d'un enfant : lien ou code qui relie son propre compte à son profil */
+function accessBlock(m){
+  const c = m.kidId ? kidById(m.kidId) : null, age = c ? ageMonths(c) : null;
+  if (m.uid) return `<div class="banner ok">${icon("check")}<div class="small">${T("{n} a son propre accès ({e}).",{n:esc(m.name), e:esc(m.email||T("compte relié"))})} ${T("Ce que les enfants peuvent faire se règle dans Réglages > Contrôle parental.")}</div></div>`;
+  return `<div class="card tint" style="padding:12px 14px"><h3>${T("Son propre accès")}</h3>
+    <p class="small muted">${age != null && age < 96 ? T("Conseillé vers 8 ans et plus, quand l'enfant a son téléphone ou sa tablette.") : T("{n} peut avoir l'app sur son téléphone : ses défis, son agenda, la discussion de famille. Vous gardez le contrôle parental.",{n:esc(m.name)})}</p>
+    ${Cloud.user ? `<button type="button" class="btn sm kid" data-act="kidAccess" data-v="${m.id}">${icon("share")}${T("Créer un lien d'accès")}</button><div id="kidAccessOut"></div>` : `<p class="tiny muted">${T("Connectez-vous d'abord à un compte pour inviter.")}</p>`}</div>`;
+}
+const joinLink = code => `${location.origin}${location.pathname.replace(/index\.html$/, "")}?join=${code}`.replace(/^(capacitor|https?):\/\/localhost(:\d+)?\/?/, "https://themauritian1996.github.io/care/");
 function memberForm(id){
   const m = member(id) || {id:null, name:"", role:"parent", color:"lilac", avatar:{kind:"auto"}};
   UI.photoDraft = {mem: m.photo || null};
@@ -292,6 +303,7 @@ function memberForm(id){
     <div class="field"><label>${T("Rôle")}</label>${radios("role",[["parent",T("Parent")],["enfant",T("Enfant")],["autre",T("Autre (grand-parent, gardien)")]],m.role)}</div>
     <div class="field"><label>${T("Couleur")}</label>${swatches("mcolor", m.color)}</div>
     ${avatarPicker(m, "mem")}
+    ${m.id && m.role === "enfant" ? accessBlock(m) : ""}
     <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${m.id && m.id !== S.me ? `<button type="button" class="btn danger" data-act="delMember" data-v="${m.id}">${T("Retirer")}</button>`:""}</div></form>`);
 }
 const familyPic = (sz = 64) => S.family.photo ? `<img src="${S.family.photo}" alt="${esc(S.family.name||T("Ma famille"))}" class="fampic" style="width:${sz}px;height:${sz}px">` : S.family.emoji ? `<span class="fampic emo" style="width:${sz}px;height:${sz}px;font-size:${Math.round(sz*.55)}px">${S.family.emoji}</span>` : `<span class="fampic empty" style="width:${sz}px;height:${sz}px">${icon("people")}</span>`;
@@ -333,6 +345,7 @@ function urgence(){
 /* ---------- premier lancement : créer son profil (aucun enfant par défaut) ---------- */
 function maybeOnboard(){
   if (S.settings.onboarded || isKidUser() || $("#layer .scrim") || (Cloud.ready && Cloud.mustLogin())) return;
+  try { if (localStorage.getItem("tribe.join")) return; } catch(e){}
   const m = me(); if (S.children.length && m && m.name && m.name !== T("Moi")){ S.settings.onboarded = true; save(); return; }
   sheet(`<form class="stack" data-form="onboard" style="gap:14px"><div class="center">${logo(72)}<div style="font-size:2rem">${wordmark()}</div></div><h2 class="center">${T("Bienvenue dans {app} !",{app:esc(appName())})}</h2>
     <p class="small muted center">${T("Commençons par votre profil. Vous ajouterez ensuite vos enfants (ou un bébé à naître) et, si vous voulez, l'autre parent.")}</p>

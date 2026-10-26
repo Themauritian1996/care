@@ -134,6 +134,13 @@ Object.assign(ACT, {
   askDelKid: v => { $("#delConfirm").innerHTML = `<div class="banner alert"><div>${T("Supprimer ce profil et toutes ses données ?")} <div class="row" style="margin-top:8px"><button type="button" class="btn sm danger" data-act="delKid" data-v="${v}">${T("Oui, supprimer")}</button></div></div></div>`; },
   delKid: v => { S.children = S.children.filter(k => k.id !== v); S.family.members = S.family.members.filter(m => m.kidId !== v); S.active = S.children[0]?.id || null; closeSheet(); commit(T("Profil supprimé")); },
   delMember: v => { S.family.members = S.family.members.filter(m => m.id !== v); closeSheet(); commit(T("Membre retiré")); },
+  kidAccess: async v => { const m = member(v), out = $("#kidAccessOut"); try { const code = await Cloud.invite("enfant", v), link = joinLink(code);
+      const txt = T("Bonjour {n} ! Voici ton accès à {app} : ouvre ce lien, crée ton compte (ou connecte-toi), puis touche « Rejoindre ». Code : {c}\n{l}",{n:m.name, app:appName(), c:code, l:link});
+      if (out) out.innerHTML = `<div class="banner ok">${icon("key")}<div class="grow"><div class="phone">${code}</div><div class="small" style="word-break:break-all">${esc(link)}</div><div class="row" style="flex-wrap:wrap;margin-top:6px"><button type="button" class="btn sm kid" data-act="shareText" data-v="${esc(txt)}">${icon("share")}${T("Envoyer")}</button><button type="button" class="btn sm ghost" data-act="copyText" data-v="${esc(link)}">${T("Copier le lien")}</button></div><div class="tiny muted">${T("Le compte qui utilise ce code sera relié au profil de {n}, avec les droits d'un enfant.",{n:esc(m.name)})}</div></div></div>`; }
+    catch(e){ toast(e.message); } },
+  copyText: async v => { try { await navigator.clipboard.writeText(v); toast(T("Copié")); } catch(e){ toast(v); } },
+  joinPending: async () => { const code = localStorage.getItem("tribe.join"); if (!code) return; try { await Cloud.joinFamily(code); toast(T("Bienvenue dans la famille !")); render(); } catch(e){ toast(e.message); } },
+  joinDismiss: () => { try { localStorage.removeItem("tribe.join"); } catch(e){} render(); },
   invite: async v => { const code = await Cloud.invite(v); $("#inviteOut").innerHTML = `<div class="banner ok">${icon("key")}<div><div class="phone">${code}</div><div class="small">${v==="enfant"?T("Code pour un enfant"):T("Code pour un parent")} · ${T("à entrer dans Réglages > Ma famille après avoir créé un compte.")}</div><button class="btn sm ghost" data-act="shareText" data-v="${esc(T("Rejoins notre famille dans {app} avec le code {c}",{app:appName(), c:code}))}">${icon("share")}${T("Envoyer")}</button></div></div>`; },
   shareText: v => Native.share({title:appName(), text:v}),
 
@@ -176,7 +183,7 @@ Object.assign(ACT, {
     if (b.dataset.group){ const g = S.groups.find(x => x.id === b.dataset.group); g.avail = g.avail || {}; const map = g.avail[Cloud.user.uid] = toggleAvail(g.avail[Cloud.user.uid], v); render(); await Cloud.groupAvail(g.id, map); return; }
     const who = b.dataset.who; if (isKidUser() && who !== S.me) return; S.avail[who] = toggleAvail(S.avail[who], v); commit();
   },
-  planBest: v => { const wk = AW(); const d = wk === "type" ? addDays(today(), ((+v - today().getDay()) + 7) % 7 || 7) : addDays(parseD(wk), (+v + 6) % 7); eventForm(iso(d)); },
+  planBest: v => { const wk = AW(); const d = wk === "type" ? addDays(today(), ((+v - today().getDay()) + 7) % 7 || 7) : addDays(parseD(wk), (+v + 6) % 7); famEventForm(null, iso(d)); },
   availWeek: v => { UI.availWeek = v; render(); },
   availReset: v => { const pre = `W:${AW()}|`; S.avail[v] = Object.fromEntries(Object.entries(S.avail[v]||{}).filter(([k]) => !k.startsWith(pre))); commit(); },
 
@@ -356,6 +363,7 @@ Object.assign(FORMS, {
   S = stored ? migrate(stored) : blankState();
   if (isDemoData(S)) S = freshFrom(S);
   normalize();
+  try { const j = new URLSearchParams(location.search).get("join"); if (j && /^[A-Z0-9]{6}$/i.test(j)){ localStorage.setItem("tribe.join", j.toUpperCase()); history.replaceState(null, "", location.pathname + location.hash); } } catch(e){}
   try { const h = location.hash.slice(1); if (["home","kid","agenda","tribu","souvenirs","plus","assistant"].includes(h)) UI.view = h; } catch(e){}
   $("#fab").addEventListener("click", () => { if (UI.view === "assistant") go("home"); else aiSheet(); });
   Native.initKeyboard(); Native.initApp();

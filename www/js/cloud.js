@@ -201,11 +201,16 @@ if (cfg && cfg.apiKey){
 
   /* ---------- invitations ---------- */
   const newCode = () => Array.from({length:6}, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("");
-  C.invite = async (roleWanted) => { const code = newCode(); await setDoc(doc(db, "codes", code), {kind:"family", id:fid, role:roleWanted, by:C.user.uid, at:Date.now()}); return code; };
+  C.invite = async (roleWanted, mid = null) => { const code = newCode(); await setDoc(doc(db, "codes", code), {kind:"family", id:fid, role:roleWanted, by:C.user.uid, at:Date.now(), ...(mid ? {mid} : {})}); return code; };
+  C.familyId = () => fid;
   C.joinFamily = async code => {
     const cs = await getDoc(doc(db, "codes", code.toUpperCase())); if (!cs.exists() || cs.data().kind !== "family") throw new Error(T("Code invalide"));
-    const {id, role:r} = cs.data(), mid = "m_" + C.user.uid.slice(0,10);
-    await updateDoc(doc(db, "families", id), {memberIds:arrayUnion(C.user.uid), [`roles.${C.user.uid}`]: r === "enfant" ? "enfant" : "parent", [`members.${mid}`]:{id:mid, uid:C.user.uid, name:C.user.displayName || (C.user.email||"").split("@")[0], email:C.user.email||"", role:r === "enfant" ? "enfant" : "parent", color:"sky", avatar:{kind:"auto"}}, joinCode:code.toUpperCase()});
+    const {id, role:r, mid:target} = cs.data(), mid = target || "m_" + C.user.uid.slice(0,10), rr = r === "enfant" ? "enfant" : "parent";
+    // un code lié à un profil existant (ex. l'enfant qui reçoit son propre accès) : on relie ce compte à ce profil
+    const memberData = target ? {[`members.${mid}.uid`]:C.user.uid, [`members.${mid}.email`]:C.user.email||""}
+      : {[`members.${mid}`]:{id:mid, uid:C.user.uid, name:C.user.displayName || (C.user.email||"").split("@")[0], email:C.user.email||"", role:rr, color:"sky", avatar:{kind:"auto"}}};
+    await updateDoc(doc(db, "families", id), {memberIds:arrayUnion(C.user.uid), [`roles.${C.user.uid}`]:rr, ...memberData, joinCode:code.toUpperCase()});
+    try { localStorage.removeItem("tribe.join"); } catch(e){}
     await setDoc(doc(db, "users", C.user.uid), {fid:id}, {merge:true});
     fid = id; last = {}; const keep = {settings:S.settings}; S = {...blankState(), ...keep, me:mid}; S.family.members = [];
     subscribe();

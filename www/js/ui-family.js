@@ -109,7 +109,7 @@ function bestSlots(people, getMap){
 /* semaine type + semaines précises (clés « W:lundi|jour-moment » dans la même carte) */
 const AW = () => UI.availWeek || "type";
 function effMap(map, wk = AW()){
-  map = map || {}; const plain = Object.fromEntries(Object.entries(map).filter(([k]) => !k.startsWith("W:")));
+  map = map || {}; const plain = Object.fromEntries(Object.entries(map).filter(([k]) => !k.startsWith("W:") && !k.startsWith("R:")));
   if (wk === "type") return plain; const pre = `W:${wk}|`;
   return map[pre + "set"] ? Object.fromEntries(Object.entries(map).filter(([k]) => k.startsWith(pre) && k !== pre + "set").map(([k, v]) => [k.slice(pre.length), v])) : plain;
 }
@@ -126,18 +126,56 @@ function weekPicker(custom){
     <p class="tiny muted">${wk==="type" ? T("La semaine type s'applique à toutes les semaines, sauf celles que vous modifiez une par une.") : T("Semaine du {a} au {b}. Les changements ne touchent que cette semaine.",{a:fmtD(wk,{day:"numeric",month:"long"}), b:fmtD(addDays(parseD(wk),6),{day:"numeric",month:"long"})})}</p>`;
 }
 const weekStartOf = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay()+6)%7)); return x; };
+/* ======== ACTIVITÉS COMMUNES DE LA FAMILLE ========
+   Proposées par un parent (agenda) ou un enfant (son agenda à lui), visibles dans le calendrier ;
+   chacun répond « Je viens » depuis son téléphone (réponse rangée dans ses disponibilités : clé R:id). */
+const famCommon = () => [...S.events.filter(e => e.common), ...(S.kidevents||[]).filter(e => e.common)].filter(e => e.date >= iso(addDays(today(), -1))).sort(evSort);
+const famGoing = e => S.family.members.filter(m => (S.avail?.[m.id]||{})["R:"+e.id] === true);
+const famNo = e => S.family.members.filter(m => (S.avail?.[m.id]||{})["R:"+e.id] === false);
+const canEditCommon = e => !isKidUser() || e.by === actorId();
+function famCommonCard(){
+  const list = famCommon(), meId = actorId();
+  return `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Famille")}</span><h2>${T("Activités communes")}</h2></div><button class="btn sm kid" data-act="famEvent" data-v="">${icon("plus")}${T("Proposer")}</button></div>
+    ${list.length ? list.map(e => { const going = famGoing(e), no = famNo(e), mine = (S.avail?.[meId]||{})["R:"+e.id];
+      return `<div class="taskrow"><div class="ic" style="background:var(--peach-bg);color:var(--peach-ink)">${icon("people")}</div><div class="grow" style="min-width:0"><b>${esc(e.title)}</b><div class="tiny muted">${fmtD(e.date,{weekday:"long",day:"numeric",month:"long"})}${e.time?" · "+e.time:""}${e.by&&member(e.by)?` · ${T("proposé par {n}",{n:esc(member(e.by).name)})}`:""}</div>${e.place?`<div class="small">${placeLink(e.place)}</div>`:""}${e.notes?`<div class="small muted">${esc(e.notes)}</div>`:""}
+        <div class="row" style="gap:4px;margin-top:4px;flex-wrap:wrap">${going.map(m => `<span title="${esc(m.name)}">${avatarOf(m,22)}</span>`).join("")}<span class="tiny muted">${T("{a} sur {b} viennent",{a:going.length, b:S.family.members.length})}${no.length?` · ${T("{n} non",{n:no.length})}`:""}</span></div></div>
+        <div class="stack" style="gap:4px;align-items:flex-end"><button class="btn sm ${mine===true?"kid":"ghost"}" data-act="famRsvp" data-v="${e.id}|1">${mine===true?"✓ "+T("J'y serai"):T("Je viens")}</button>${mine!==false?`<button class="btn sm line" data-act="famRsvp" data-v="${e.id}|0">${T("Pas dispo")}</button>`:`<span class="tiny muted">${T("Pas dispo")}</span>`}${canEditCommon(e)?`<button class="icon-btn flat" data-act="famEvent" data-v="${e.id}" aria-label="${T("Modifier")}">${icon("edit")}</button>`:""}</div></div>`; }).join("")
+      : `<p class="small muted">${T("Une sortie, un souper, un match : proposez-la ici, elle va dans le calendrier et chacun répond depuis son téléphone.")}</p>`}</div>`;
+}
+function famEventForm(v, date){
+  const e = v ? [...S.events, ...(S.kidevents||[])].find(x => x.id === v) : null, best = bestSlots(S.family.members, p => effMap(S.avail[p.id]))[0];
+  sheet(`<form class="stack" data-form="famEvent" data-id="${e?.id||""}" style="gap:14px">${sheetHead(e ? T("Modifier l'activité") : T("Activité commune"))}
+    ${fld("fe-t",T("Activité"),`<input class="inp" id="fe-t" required value="${esc(e?.title||"")}" placeholder="${T("Pique-nique au parc, soirée jeux…")}">`)}
+    <div class="fgrid">${fld("fe-d",T("Date"),`<input class="inp" id="fe-d" type="date" required value="${e?.date || date || iso(addDays(today(), 3))}">`)}${fld("fe-h",T("Heure"),`<input class="inp" id="fe-h" type="time" value="${e?.time||""}">`)}</div>
+    ${!e && best ? `<p class="tiny muted">${icon("people").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("Meilleur moment selon les disponibilités : {d}",{d:`${WD()[best.d]} ${T(best.s).toLowerCase()} (${best.free}/${S.family.members.length})`})}</p>` : ""}
+    ${fld("fe-p",T("Lieu"),addrInput("fe-p", e?.place||""))}${fld("fe-n",T("Détails (facultatif)"),`<textarea class="inp" id="fe-n" rows="2">${esc(e?.notes||"")}</textarea>`)}
+    <div class="row"><button class="btn kid grow" type="submit">${e ? T("Enregistrer") : T("Proposer à la famille")}</button>${e?`<button type="button" class="btn danger" data-act="famEventDel" data-v="${e.id}">${icon("trash")}</button>`:""}</div></form>`);
+}
+Object.assign(ACT, {
+  famEvent: v => famEventForm(v),
+  famRsvp: v => { const [id, ok] = v.split("|"), mid = actorId(); S.avail = S.avail || {}; const map = {...(S.avail[mid]||{})}; map["R:"+id] = map["R:"+id] === (ok === "1") ? undefined : ok === "1"; if (map["R:"+id] === undefined) delete map["R:"+id]; S.avail[mid] = map; commit(); },
+  famEventDel: v => { if (!confirmDel()) return; S.events = S.events.filter(x => x.id !== v); S.kidevents = (S.kidevents||[]).filter(x => x.id !== v); closeSheet(); commit(T("Activité retirée")); },
+});
+Object.assign(FORMS, { famEvent: f => { const id = f.dataset.id, d = {title:val("fe-t"), date:val("fe-d"), time:val("fe-h"), place:val("fe-p"), notes:val("fe-n"), common:true};
+  if (!d.title) return toast(T("Titre requis"));
+  const ex = id && [...S.events, ...(S.kidevents||[])].find(x => x.id === id);
+  if (ex) Object.assign(ex, d);
+  else { const e = {id:uid(), ...d, recur:"none", by:actorId()};
+    if (isKidUser()) (S.kidevents = S.kidevents || []).push(e); else S.events.push({...e, type:"famille", pinned:false, kidIds:S.children.filter(c => !c.adult && !isPrenatal(c)).map(c => c.id), memberIds:S.family.members.map(m => m.id)});
+    const mid = actorId(); S.avail = S.avail || {}; S.avail[mid] = {...(S.avail[mid]||{}), ["R:"+e.id]:true}; }
+  closeSheet(); commit(ex ? T("Activité modifiée") : T("Proposée à la famille")); } });
 function availView(){
   const editId = UI.availWho || S.me, editable = !isKidUser() || editId === S.me;
   const people = S.family.members, wk = AW(), map = effMap(S.avail[editId]);
   const best = bestSlots(people, p => effMap(S.avail[p.id]));
   const custom = k => people.some(p => (S.avail[p.id]||{})[`W:${k}|set`]);
-  return `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Horaire type de la semaine")}</span><h2>${T("Mes moments libres")}</h2></div></div>
+  return famCommonCard() + `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Horaire type de la semaine")}</span><h2>${T("Mes moments libres")}</h2></div></div>
     <div class="pick">${people.map(p => `<button data-act="availWho" data-v="${p.id}" aria-pressed="${p.id===editId}">${esc(p.name)}</button>`).join("")}</div>
     <p class="small muted">${T("Touchez les cases où {n} est libre. Chacun peut remplir les siennes depuis son téléphone.",{n:esc(member(editId)?.name||"")})}</p>
     ${weekPicker(custom)}${availGrid(map, editable, `data-who="${editId}"`)}${wk!=="type" && (S.avail[editId]||{})[`W:${wk}|set`] && editable ? `<button class="btn sm ghost" data-act="availReset" data-v="${editId}">${T("Revenir à la semaine type pour cette semaine")}</button>`:""}</div>
     <div class="card"><div class="card-h"><h2>${T("Quand tout le monde est libre")}</h2></div>${heatGrid(people, p => effMap(S.avail[p.id]))}
     ${best.length?`<div class="banner ok">${icon("people")}<div class="small"><b>${T("Meilleurs moments :")}</b> ${best.map(b => `${WD()[b.d]} ${T(b.s).toLowerCase()} (${b.free}/${people.length})`).join(" · ")}</div></div>`:`<p class="small muted">${T("Remplissez les disponibilités de chacun pour trouver un moment commun.")}</p>`}
-    ${best.length && !isKidUser() ? `<button class="btn kid" data-act="planBest" data-v="${best[0].d}">${icon("cal")}${T("Planifier une activité à ce moment")}</button>`:""}</div>`;
+    ${best.length ? `<button class="btn kid" data-act="planBest" data-v="${best[0].d}">${icon("cal")}${T("Planifier une activité à ce moment")}</button>`:""}</div>`;
 }
 
 /* ======== SOUVENIRS ET PHOTOS ======== */
@@ -226,7 +264,7 @@ function tribuView(){
   if (!tabs.some(t=>t[0]===UI.sub.tribu)) UI.sub.tribu = tabs[0]?.[0];
   let h = tabs.length > 1 ? `<div class="seg">${tabs.map(([id,l])=>`<button data-act="tribuTab" data-v="${id}" aria-pressed="${UI.sub.tribu===id}">${l}</button>`).join("")}</div>` : "";
   if (UI.sub.tribu === "defis") return h + defisView();
-  if (UI.sub.tribu === "chat") return h + chatView("family");
+  if (UI.sub.tribu === "chat") return h + (famCommon().length ? famCommonCard() : `<button class="btn ghost" data-act="famEvent" data-v="" style="align-self:flex-start">${icon("people")}${T("Proposer une activité commune")}</button>`) + chatView("family");
   return h + groupsView();
 }
 function taskForm(id){

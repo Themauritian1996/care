@@ -187,7 +187,10 @@ function normalize(){
   S.children.forEach(c => { const b = blankKid(); for (const k in b) if (c[k] === undefined) c[k] = b[k]; });
   if (!S.family.members.length) S.family.members = [{id:"m_"+uid(), name:T("Moi"), role:"parent", color:"lilac", avatar:{kind:"symbole", id:"coeur"}}];
   if (!S.me || !S.family.members.some(m => m.id === S.me)) S.me = S.family.members[0].id;
-  S.children.forEach(c => { if (!c.adult && !S.family.members.some(m => m.kidId === c.id) && ageMonths(c) >= 36) S.family.members.push({id:"m_"+c.id, name:c.nick||c.name, role:"enfant", kidId:c.id, color:c.color}); });
+  S.children.forEach(c => { if (c.adult || isPrenatal(c)) return; const m = S.family.members.find(m => m.kidId === c.id);
+    if (!m) S.family.members.push({id:"m_"+c.id, name:c.nick||c.name, role:"enfant", kidId:c.id, color:c.color, avatar:c.avatar});
+    else if (!m.uid){ m.name = c.nick || c.name; m.color = c.color || m.color; if (c.avatar) m.avatar = c.avatar; } });
+  S.family.members = S.family.members.filter(m => !m.kidId || S.children.some(c => c.id === m.kidId && !c.adult));
 }
 function loadLocal(){
   try { const r = localStorage.getItem(KEY); if (r) return JSON.parse(r); } catch(e){}
