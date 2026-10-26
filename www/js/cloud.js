@@ -82,7 +82,7 @@ if (cfg && cfg.apiKey){
   }
   const rolesObj = () => Object.fromEntries(S.family.members.filter(m => m.uid).map(m => [m.uid, m.role === "enfant" ? "enfant" : "parent"]));
   const membersObj = () => Object.fromEntries(S.family.members.map(m => [m.id, m]));
-  const sharedSettings = () => ({features:S.settings.features, parental:{allow:S.settings.parental.allow, pin:S.settings.parental.pin}, appName:S.settings.appName});
+  const sharedSettings = () => ({features:S.settings.features, parental:{allow:S.settings.parental.allow, pin:S.settings.parental.pin}, appName:S.settings.appName, driveKeeper:S.settings.driveKeeper||null});
 
   /* ---------- envoi des changements (diff par document) ---------- */
   const J = o => JSON.stringify(o);
@@ -121,7 +121,12 @@ if (cfg && cfg.apiKey){
       Object.entries(S.avail||{}).forEach(([mid, map]) => { if (isParent || mid === S.me) put(`families/${fid}/avail/${mid}`, {map}); });
       // photos (image comprise, réduite)
       for (const p of S.photos){ const path = `families/${fid}/photos/${p.id}`, k = J(p); if (!force && last[path] === k) continue; if (!isParent && p.by !== S.me) continue; const data = await PhotoDB.get(p.id); if (!data) continue; last[path] = k; batch.push({path, data:{...p, data}}); }
-      Object.keys(last).filter(p => p.startsWith(`families/${fid}/photos/`) && !S.photos.some(x => p.endsWith("/"+x.id))).forEach(p => { delete last[p]; batch.push({path:p, del:true}); });
+      // images des souvenirs, spéciaux et histoires : même collection, marquées « blob » (pas dans l'album)
+      const blobIds = new Set();
+      S.memories.forEach(m => { if (isParent || m.by === S.me) [m.photoId, ...(m.photoIds||[])].filter(Boolean).forEach(id => blobIds.add(id)); });
+      (S.stories||[]).forEach(st => (st.chapters||[]).forEach(ch => ch.img && isParent && blobIds.add(ch.img)));
+      for (const id of blobIds){ const path = `families/${fid}/photos/${id}`, data = await PhotoDB.get(id); if (!data || data.length > 1000000) continue; const k = J({id, blob:true, h:data.length + data.slice(-24)}); if (!force && last[path] === k) continue; last[path] = k; batch.push({path, data:{id, blob:true, data}}); }
+      Object.keys(last).filter(p => p.startsWith(`families/${fid}/photos/`) && !S.photos.some(x => p.endsWith("/"+x.id)) && !blobIds.has(p.split("/").pop()) && !(last[p]||"").includes('"blob":true')).forEach(p => { delete last[p]; batch.push({path:p, del:true}); });
       for (let i = 0; i < batch.length; i += 400){
         const wb = writeBatch(db);
         batch.slice(i, i+400).forEach(b => { const r = doc(db, b.path); if (b.del) wb.delete(r); else wb.set(r, b.data, b.merge === "fields" ? {mergeFields:Object.keys(b.data)} : b.merge ? {merge:true} : undefined); });
@@ -143,7 +148,7 @@ if (cfg && cfg.apiKey){
       S.family.name = d.name || ""; S.family.photo = d.photo || null; const mems = Object.values(d.members || {});
       if (mems.length) S.family.members = mems;
       const mine = S.family.members.find(m => m.uid === C.user.uid); if (mine) S.me = mine.id;
-      if (d.shared){ S.settings.features = {...S.settings.features, ...d.shared.features}; if (d.shared.parental){ S.settings.parental.allow = {...S.settings.parental.allow, ...d.shared.parental.allow}; if (d.shared.parental.pin) S.settings.parental.pin = d.shared.parental.pin; } if (d.shared.appName && !S.settings.appNameLocal) S.settings.appName = d.shared.appName; }
+      if (d.shared){ S.settings.features = {...S.settings.features, ...d.shared.features}; if (d.shared.parental){ S.settings.parental.allow = {...S.settings.parental.allow, ...d.shared.parental.allow}; if (d.shared.parental.pin) S.settings.parental.pin = d.shared.parental.pin; } if (d.shared.appName && !S.settings.appNameLocal) S.settings.appName = d.shared.appName; if ("driveKeeper" in d.shared) S.settings.driveKeeper = d.shared.driveKeeper; }
       if (role === "enfant" && mine) mine.role = "enfant";
       last[`families/${fid}`] = J({name:S.family.name||"", members:membersObj(), shared:sharedSettings(), roles:rolesObj(), photo:S.family.photo||null});
       applyRemote();
@@ -172,8 +177,9 @@ if (cfg && cfg.apiKey){
     unsubs.push(onSnapshot(collection(fam, "photos"), async qs => {
       for (const ch of qs.docChanges()){
         const d = ch.doc.data();
-        if (ch.type === "removed"){ S.photos = S.photos.filter(p => p.id !== d.id); continue; }
+        if (ch.type === "removed"){ if (!d.blob) S.photos = S.photos.filter(p => p.id !== d.id); continue; }
         const {data, ...meta} = d; if (data) await PhotoDB.put(d.id, data);
+        if (d.blob){ if (data) last[`families/${fid}/photos/${d.id}`] = J({id:d.id, blob:true, h:data.length + data.slice(-24)}); continue; }
         const i = S.photos.findIndex(p => p.id === d.id); if (i >= 0) S.photos[i] = meta; else S.photos.push(meta);
         last[`families/${fid}/photos/${d.id}`] = J(meta);
       }
@@ -230,7 +236,10 @@ if (cfg && cfg.apiKey){
     }));
   }
   const myName = () => me()?.name || C.user.displayName || (C.user.email||"").split("@")[0];
-  C.groupCreate = async name => { const ref = doc(collection(db, "groups")); await setDoc(ref, {name, memberIds:[C.user.uid], members:{[C.user.uid]:{name:myName()}}, avail:{}, at:Date.now()}); return ref.id; };
+  C.groupCreate = async name => { const ref = doc(collection(db, "groups")); await setDoc(ref, {name, memberIds:[C.user.uid], members:{[C.user.uid]:{name:myName()}}, avail:{}, at:Date.now(), owner:C.user.uid}); return ref.id; };
+  C.groupLeave = async gid => { await updateDoc(doc(db, "groups", gid), {memberIds:F.arrayRemove(C.user.uid), [`members.${C.user.uid}`]:deleteField(), [`avail.${C.user.uid}`]:deleteField()}); S.groups = S.groups.filter(g => g.id !== gid); };
+  /* supprimer pour tout le monde : le groupe est vidé et marqué supprimé (il disparaît chez chacun) */
+  C.groupDelete = async gid => { await updateDoc(doc(db, "groups", gid), {memberIds:[], deleted:true, deletedBy:C.user.uid, joinCode:deleteField()}); S.groups = S.groups.filter(g => g.id !== gid); };
   C.groupInvite = async gid => { const code = newCode(); await setDoc(doc(db, "codes", code), {kind:"group", id:gid, by:C.user.uid, at:Date.now()}); return code; };
   C.groupJoin = async code => {
     const cs = await getDoc(doc(db, "codes", code.toUpperCase())); if (!cs.exists() || cs.data().kind !== "group") throw new Error(T("Code invalide"));
@@ -272,6 +281,10 @@ if (cfg && cfg.apiKey){
     if (!id){ const r = await (await fetch("https://www.googleapis.com/drive/v3/files", {method:"POST", headers:{Authorization:"Bearer "+tok, "Content-Type":"application/json"}, body:JSON.stringify({name, mimeType:"application/vnd.google-apps.folder", parents:[parent]})})).json(); id = r.id; }
     if (!id) throw new Error("Drive"); dirs[key] = id; save(); return id;
   }
+  /* partager le dossier « Tribe » avec un autre membre (même dossier pour les deux parents) */
+  C.driveShare = async email => { const tok = await driveToken(), folder = await driveFolder(tok);
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${folder}/permissions?sendNotificationEmail=true`, {method:"POST", headers:{Authorization:"Bearer "+tok, "Content-Type":"application/json"}, body:JSON.stringify({role:"writer", type:"user", emailAddress:email})});
+    if (!r.ok){ const d = await r.json().catch(() => ({})); throw new Error(d.error?.message || `Drive ${r.status}`); } return folder; };
   C.driveReady = () => !!C.googleToken && Date.now() - C.tokenAt < 50*60e3;
   C.driveDelete = async id => { if (!id) return; const tok = await driveToken();
     const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`, {method:"DELETE", headers:{Authorization:"Bearer "+tok}});

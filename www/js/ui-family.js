@@ -52,7 +52,9 @@ function agendaView(){
     return h + `<div class="card"><div class="card-h"><h2>${T("À venir")}</h2><button class="btn sm kid" data-act="eventForm">${icon("plus")}${T("Ajouter")}</button></div>${up.length?`<div class="list">${up.map(eventRow).join("")}</div>`:empty("cal",T("Rien de prévu."))}</div>`;
   }
   const base = UI.calMonth ? parseD(UI.calMonth) : new Date(today().getFullYear(), today().getMonth(), 1);
-  const from = addDays(base, -7), to = addDays(addMonths(base,1), 7), ev = allEvents(from, to);
+  const from = addDays(base, -7), to = addDays(addMonths(base,1), 7), cw = UI.calWho, cm = cw && member(cw);
+  const ev = allEvents(from, to).filter(e => !cm || (!(e.memberIds||[]).length && !(e.kidIds||[]).length) || (e.memberIds||[]).includes(cw) || (cm.kidId && (e.kidIds||[]).includes(cm.kidId)) || (e.common && famGoing(e).some(m => m.id === cw)));
+  h += S.family.members.length > 1 ? `<div class="pick chips-scroll" style="flex-wrap:nowrap;overflow-x:auto"><button data-act="calWho" data-v="" aria-pressed="${!cw}">${T("Tout le monde")}</button>${S.family.members.map(m => `<button data-act="calWho" data-v="${m.id}" aria-pressed="${cw===m.id}">${avatarOf(m,20)} ${esc(m.name)}</button>`).join("")}</div>` : "";
   const first = new Date(base.getFullYear(), base.getMonth(), 1), start = addDays(first, -((first.getDay()+6)%7));
   const sel = UI.calSel || iso(today());
   let cells = "";
@@ -71,7 +73,7 @@ function agendaView(){
     <div class="card c5"><div class="card-h"><h2 class="cap">${fmtD(sel,{weekday:"long",day:"numeric",month:"long"})}</h2></div>
       <div class="row" style="flex-wrap:wrap">${isKidUser() && feat("kidcal") ? `<button class="btn sm kid" data-act="kidEventForm" data-v="new:${sel}">${icon("plus")}${T("Mon activité")}</button>` : ""}${isKidUser()?"":`<button class="btn sm kid" data-act="eventForm" data-v="${sel}">${icon("plus")}${T("Événement")}</button>${aiBtn("aiScan","events",T("Lire une invitation (IA)"),"camera")}`}${feat("memories")?`<button class="btn sm ghost" data-act="memoryForm" data-v="${sel}">${icon("star")}${T("Souvenir")}</button>`:""}${feat("photos")&&allow("photos")?`<button class="btn sm ghost" data-act="photoDay" data-v="${sel}">${icon("camera")}${T("Photo")}</button>`:""}</div>
       ${selEv.length?`<div class="list">${selEv.map(eventRow).join("")}</div>`:`<p class="muted small">${T("Rien ce jour-là.")}</p>`}
-      ${feat("rewards") && S.tasks.some(t => taskDueOn(t, parseD(sel))) ? (() => { const rows = tasksForDay(parseD(sel), !isKidUser(), actor()); return rows ? `<div class="sep"></div><span class="eyebrow">${T("Défis de la journée · touchez pour cocher")}</span><div class="stack" style="gap:6px">${rows}</div>` : ""; })() : ""}</div></div>`;
+      ${feat("rewards") && S.tasks.some(t => taskDueOn(t, parseD(sel))) ? (() => { const rows = S.tasks.filter(t => taskDueOn(t, parseD(sel))).map(t => taskBlock(t, parseD(sel), !isKidUser(), actor(), cw || null)).join(""); return rows ? `<div class="sep"></div><span class="eyebrow">${T("Défis de la journée · touchez pour cocher")}</span><div class="stack" style="gap:6px">${rows}</div>` : ""; })() : ""}</div></div>`;
 }
 function eventForm(v){
   let e = {title:"", date:v && !v.startsWith("edit:") ? v : iso(today()), time:"", type:"famille", kidIds:[], memberIds:[], recur:"none", pinned:false, notes:""};
@@ -165,13 +167,13 @@ Object.assign(FORMS, { famEvent: f => { const id = f.dataset.id, d = {title:val(
     const mid = actorId(); S.avail = S.avail || {}; S.avail[mid] = {...(S.avail[mid]||{}), ["R:"+e.id]:true}; }
   closeSheet(); commit(ex ? T("Activité modifiée") : T("Proposée à la famille")); } });
 function availView(){
-  const editId = UI.availWho || S.me, editable = !isKidUser() || editId === S.me;
+  const editId = UI.availWho || S.me, tm = member(editId), editable = editId === S.me || (!isKidUser() && !(tm?.uid && tm.role !== "enfant"));
   const people = S.family.members, wk = AW(), map = effMap(S.avail[editId]);
   const best = bestSlots(people, p => effMap(S.avail[p.id]));
   const custom = k => people.some(p => (S.avail[p.id]||{})[`W:${k}|set`]);
   return famCommonCard() + `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Horaire type de la semaine")}</span><h2>${T("Mes moments libres")}</h2></div></div>
     <div class="pick">${people.map(p => `<button data-act="availWho" data-v="${p.id}" aria-pressed="${p.id===editId}">${esc(p.name)}</button>`).join("")}</div>
-    <p class="small muted">${T("Touchez les cases où {n} est libre. Chacun peut remplir les siennes depuis son téléphone.",{n:esc(member(editId)?.name||"")})}</p>
+    <p class="small muted">${editable ? T("Touchez les cases où {n} est libre. Chacun peut remplir les siennes depuis son téléphone.",{n:esc(member(editId)?.name||"")}) : T("Seul·e {n} peut modifier ses disponibilités, depuis son téléphone.",{n:esc(member(editId)?.name||"")})}</p>
     ${weekPicker(custom)}${availGrid(map, editable, `data-who="${editId}"`)}${wk!=="type" && (S.avail[editId]||{})[`W:${wk}|set`] && editable ? `<button class="btn sm ghost" data-act="availReset" data-v="${editId}">${T("Revenir à la semaine type pour cette semaine")}</button>`:""}</div>
     <div class="card"><div class="card-h"><h2>${T("Quand tout le monde est libre")}</h2></div>${heatGrid(people, p => effMap(S.avail[p.id]))}
     ${best.length?`<div class="banner ok">${icon("people")}<div class="small"><b>${T("Meilleurs moments :")}</b> ${best.map(b => `${WD()[b.d]} ${T(b.s).toLowerCase()} (${b.free}/${people.length})`).join(" · ")}</div></div>`:`<p class="small muted">${T("Remplissez les disponibilités de chacun pour trouver un moment commun.")}</p>`}
@@ -273,7 +275,7 @@ function taskForm(id){
   sheet(`<form class="stack" data-form="task" data-id="${id||""}" style="gap:14px">${sheetHead(id?T("Modifier le défi"):T("Nouveau défi"))}
     ${id?"":`<div class="field"><label>${T("Idées")}</label><div class="pick">${TASK_TPL.map((x,i)=>`<button type="button" data-act="taskTpl" data-v="${i}">${T(x.t)}</button>`).join("")}</div></div>`}
     ${fld("tk-title",T("Défi"),inp("tk-title",t.title,"required"))}
-    ${fld("tk-pts",T("Points"),numIn("tk-pts","",5,t.points))}
+    ${fld("tk-pts",T("Points"),numIn("tk-pts","",1,t.points))}
     <div class="field"><label>${T("Pour qui ?")}</label>${checks("tkwho",S.family.members.map(m=>[m.id,m.name]),t.assignees)}</div>
     <label class="switch"><input type="checkbox" id="tk-team" ${t.team?"checked":""}><span class="tg"></span><span class="grow"><b>${T("Défi d'équipe")}</b><br><span class="small muted">${T("Fait ensemble : chaque personne cochée reçoit les points en un seul geste.")}</span></span></label>
     <div class="field"><label>${T("Quand ?")}</label>${radios("tkrec",[["daily",T("Chaque jour")],["weekly",T("Certains jours")],["once",T("Une fois")]],t.recur)}</div>
@@ -287,7 +289,8 @@ function rewardForm(id){
   const r = S.rewards.find(x => x.id === id);
   sheet(`<form class="stack" data-form="reward" data-id="${r?.id||""}" style="gap:14px">${sheetHead(r ? T("Modifier la récompense") : T("Nouvelle récompense"))}
     ${r?"":`<div class="pick">${REWARD_TPL.map((x,i)=>`<button type="button" data-act="rewardTpl" data-v="${i}">${T(x.t)}</button>`).join("")}</div>`}
-    ${fld("rw-title",T("Récompense"),inp("rw-title",r?.title||"","required"))}${fld("rw-cost",r?.team?T("Points à rassembler"):T("Coût en points"),numIn("rw-cost","",5,r?.cost||50))}
+    ${fld("rw-title",T("Récompense"),inp("rw-title",r?.title||"","required"))}${fld("rw-cost",r?.team?T("Points à rassembler"):T("Coût en points"),numIn("rw-cost","",1,r?.cost||50))}
+    ${r?.team ? "" : `<div class="field"><label>${T("Pour qui ? (aucun coché = tout le monde)")}</label>${checks("rwfor", players().map(m => [m.id, m.name]), r?.for||[])}</div>`}
     <div class="row"><button class="btn kid grow" type="submit">${r?T("Enregistrer"):T("Ajouter")}</button>${r?`<button type="button" class="btn danger" data-act="delReward" data-v="${r.id}">${icon("trash")}</button>`:""}</div></form>`);
 }
 
@@ -320,7 +323,8 @@ function groupDetail(id){
     <div class="card"><div class="card-h"><h2>${T("Activités communes")}</h2><button class="btn sm kid" data-act="groupEvent" data-v="${id}">${icon("plus")}${T("Proposer")}</button></div>
     ${(g.events||[]).filter(e=>e.date>=iso(today())).sort(evSort).map(e => `<div class="taskrow"><div class="ic" style="background:var(--teal-bg);color:var(--teal-ink)">${icon("cal")}</div><div class="grow"><b>${esc(e.title)}</b><div class="tiny muted">${fmtD(e.date,{weekday:"long",day:"numeric",month:"long"})}${e.time?" · "+e.time:""}</div>${e.place?`<div class="small">${placeLink(e.place)}</div>`:""}${e.notes?`<div class="small muted">${esc(e.notes)}</div>`:""}<div class="tiny">${T("Présents")} : ${Object.values(e.rsvp||{}).filter(r=>r.ok).map(r=>esc(r.name)).join(", ")||"—"}</div></div><button class="btn sm ${e.rsvp?.[Cloud.user.uid]?.ok?"kid":"ghost"}" data-act="groupRsvp" data-v="${id}|${e.id}">${e.rsvp?.[Cloud.user.uid]?.ok?T("J'y serai"):T("Je viens")}</button><button class="icon-btn flat" data-act="groupEvent" data-v="${id}|${e.id}" aria-label="${T("Modifier")}">${icon("edit")}</button></div>`).join("") || `<p class="small muted">${T("Aucune activité prévue.")}</p>`}</div>
     <div class="card"><div class="card-h"><h2>${T("Mes disponibilités pour ce groupe")}</h2></div>${weekPicker(gcustom)}${availGrid(myAvail, true, `data-group="${id}"`)}
-    <h3>${T("Quand le groupe est libre")}</h3>${heatGrid(people, p => effMap((g.avail||{})[p.id]))}</div>`;
+    <h3>${T("Quand le groupe est libre")}</h3>${heatGrid(people, p => effMap((g.avail||{})[p.id]))}</div>
+    <div class="row" style="flex-wrap:wrap"><button class="btn line" data-act="groupLeave" data-v="${id}">${icon("left")}${T("Quitter le groupe")}</button>${!g.owner || g.owner === Cloud.user.uid ? `<button class="btn danger" data-act="groupDelete" data-v="${id}">${icon("trash")}${T("Supprimer le groupe pour tous")}</button>` : ""}</div>`;
 }
 
 /* ======== RAPPORT POUR LE MÉDECIN ======== */

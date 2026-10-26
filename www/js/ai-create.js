@@ -49,17 +49,17 @@ function createPane(){
 
 /* ---------- histoires ---------- */
 const STORY_SCHEMA = {type:"OBJECT", properties:{title:{type:"STRING"}, chapterTitle:{type:"STRING"}, summary:{type:"STRING"},
-  characters:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, desc:{type:"STRING"}, kind:{type:"STRING", enum:["enfant","adulte","aine","animal","creature","robot"]}}, required:["name","desc","kind"]}},
+  characters:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, desc:{type:"STRING"}, kind:{type:"STRING", enum:["enfant","adulte","aine","animal","creature","robot"]}, gender:{type:"STRING", enum:["fille","garcon","neutre"]}}, required:["name","desc","kind"]}},
   segments:{type:"ARRAY", items:{type:"OBJECT", properties:{speaker:{type:"STRING"}, text:{type:"STRING"}}, required:["speaker","text"]}}}, required:["title","chapterTitle","summary","characters","segments"]};
 /* niveau de lecture : Gemini adapte vocabulaire, phrases et intrigue */
 const READ_LEVELS = [["", "Selon l'âge de l'enfant"], ["2-3", "Tout-petits (2-3 ans) : mots simples, répétitions"], ["4-5", "4-5 ans : phrases courtes, album illustré"], ["6-7", "6-7 ans : premiers lecteurs"], ["8-9", "8-9 ans : petit roman"], ["10-12", "10-12 ans : roman jeunesse"], ["13+", "Ados : roman pour adolescents"]];
 const lvlSelect = (id, sel) => `<select class="inp" id="${id}">${READ_LEVELS.map(([v, l]) => `<option value="${v}" ${v===sel?"selected":""}>${T(l)}</option>`).join("")}</select>`;
-const LVL_HINT = {"2-3":"livre pour tout-petits de 2-3 ans : phrases de 3 à 6 mots, mots très concrets du quotidien, beaucoup de répétitions et d'onomatopées, aucune ambiguïté",
-  "4-5":"album pour 4-5 ans : phrases courtes, vocabulaire simple avec un ou deux mots nouveaux expliqués par le contexte, structure répétitive, émotions nommées",
-  "6-7":"livre pour premiers lecteurs de 6-7 ans : phrases simples et courtes, mots faciles à décoder, dialogues fréquents, un seul fil d'intrigue",
-  "8-9":"petit roman pour 8-9 ans : phrases variées, vocabulaire plus riche, un peu de suspense, humour",
-  "10-12":"roman jeunesse pour 10-12 ans : vocabulaire riche, phrases complexes, personnages nuancés, intrigue avec rebondissements",
-  "13+":"roman pour adolescents : style littéraire, thèmes plus matures (amitié, identité, courage), dialogues naturels"};
+const LVL_HINT = {"2-3":"livre pour tout-petits de 2-3 ans. Phrases de 3 à 6 mots. Uniquement des mots du quotidien d'un enfant de 2 ans (maman, dodo, chat, balle, manger, gros, petit). Beaucoup de répétitions et d'onomatopées (boum, miaou). Aucun mot abstrait, aucune métaphore, aucun passé simple.",
+  "4-5":"album pour 4-5 ans. Phrases de 5 à 10 mots, une idée par phrase. Vocabulaire concret qu'un enfant de maternelle comprend seul ; au plus un mot nouveau, expliqué tout de suite par la phrase suivante. Présent ou passé composé (pas de passé simple). Pas de métaphores, pas de mots comme « majestueux, scintillant, mystérieux, s'émerveiller, contempler, murmurer ».",
+  "6-7":"livre pour premiers lecteurs de 6-7 ans. Phrases courtes (moins de 12 mots), mots faciles à lire et fréquents, dialogues simples. Passé composé ou présent. Évite les adjectifs recherchés et les tournures littéraires.",
+  "8-9":"petit roman pour 8-9 ans. Phrases variées mais claires (moins de 18 mots), vocabulaire courant avec quelques mots nouveaux compréhensibles par le contexte, un peu de suspense et d'humour.",
+  "10-12":"roman jeunesse pour 10-12 ans : vocabulaire riche mais naturel, phrases complexes possibles, personnages nuancés, intrigue avec rebondissements.",
+  "13+":"roman pour adolescents : style littéraire, thèmes plus matures (amitié, identité, courage), dialogues naturels."};
 const lvlOfAge = m => m < 48 ? "2-3" : m < 72 ? "4-5" : m < 96 ? "6-7" : m < 120 ? "8-9" : m < 156 ? "10-12" : "13+";
 function storyOpts(){
   const lib = (S.stories||[]).flatMap(s => s.characters), picked = checked("st-chars").map(id => lib.find(x => x.id === id)).filter(Boolean);
@@ -87,22 +87,39 @@ function storyGen(story, plan, direction, over = {}){
   const title = story ? T("{t} · chapitre {n}",{t:story.title, n}) : T("Nouvelle histoire");
   return aiJob("story", title, async () => {
     const prev = story ? `Histoire existante « ${story.title} ». Personnages (garde leurs noms, caractères et façons de parler) : ${story.characters.filter(x => x.id !== "narr").map(x => `${x.name} — ${x.desc}`).join(" ; ")}.\nRésumé des chapitres précédents :\n${story.chapters.map(ch => `${ch.n}. ${ch.title} : ${ch.summary}`).join("\n")}\nFin du dernier chapitre : ${story.chapters.at(-1).segs.slice(-3).map(s => s.t).join(" ")}\nÉcris le chapitre ${n}, qui continue l'histoire. ${direction ? `Direction voulue : ${direction}.` : ""}` : `Plan : ${plan || "à inventer"}`;
-    const r = await gemini({tier:"fast", json:STORY_SCHEMA, temperature:0.85, timeout:90000, contents:[{role:"user", parts:[{text:`Écris une histoire du soir pour ${kidLine(c)} (rythme apaisant, fin calme). Niveau du texte : ${LVL_HINT[o.level || lvlOfAge(c && !isPrenatal(c) ? ageMonths(c) : 48)]}. Respecte strictement ce niveau de langue. ${optsText(o)}\n${prev}\nLongueur : environ ${words} mots. Découpe le texte en segments : la narration avec speaker « Narrateur », chaque réplique d'un personnage dans un segment séparé avec son nom exact comme speaker (sans tiret ni guillemets, ni « dit-il » dans la réplique). Liste dans characters tous les personnages qui parlent (pas le narrateur), avec une description courte et leur type. summary : 2 phrases qui résument ce chapitre. En ${LANG==="en"?"anglais":"français"}.`}]}]});
+    const lv = o.level || lvlOfAge(c && !isPrenatal(c) ? ageMonths(c) : 48);
+    const r = await gemini({tier:"fast", json:STORY_SCHEMA, temperature:0.7, timeout:90000, system:`Tu es un auteur de livres jeunesse spécialiste du niveau ${lv} ans. RÈGLE ABSOLUE : ${LVL_HINT[lv]} Avant de répondre, relis chaque phrase : si un enfant de ${lv.split("-")[0].replace("+","")} ans ne comprendrait pas un mot sans aide, remplace-le par un mot plus simple. La simplicité du vocabulaire passe avant le style.`, contents:[{role:"user", parts:[{text:`Écris une histoire du soir pour ${kidLine(c)} (rythme apaisant, fin calme). Niveau du texte : ${LVL_HINT[lv]} ${optsText(o)}\n${prev}\nLongueur : environ ${words} mots. Découpe le texte en segments : la narration avec speaker « Narrateur », chaque réplique d'un personnage dans un segment séparé avec son nom exact comme speaker (sans tiret ni guillemets, ni « dit-il » dans la réplique). Liste dans characters tous les personnages qui parlent (pas le narrateur), avec une description courte, leur type et leur genre (fille, garcon ou neutre). summary : 2 phrases qui résument ce chapitre. En ${LANG==="en"?"anglais":"français"}.`}]}]});
     const out = parseJSON(r.text);
-    const st = story || {id:uid(), kid:c?.id||null, title:out.title, opts:o, characters:[{id:"narr", name:T("Narrateur"), desc:"", kind:"narrateur", voice:autoVoice("narrateur", 0)}], chapters:[], fav:false, at:Date.now(), engine:"device"};
-    if (!story){ (o.chars||[]).forEach((ch,i) => st.characters.push({id:uid(), name:ch.name, desc:ch.desc, kind:ch.kind||"enfant", voice:ch.voice || autoVoice(ch.kind, i+1)})); }
-    (out.characters||[]).forEach(ch => { if (!st.characters.some(x => x.name.toLowerCase() === ch.name.toLowerCase())) st.characters.push({id:uid(), name:ch.name, desc:ch.desc, kind:ch.kind, voice:autoVoice(ch.kind, st.characters.length)}); });
+    const st = story || {id:uid(), kid:c?.id||null, title:out.title, opts:o, characters:[{id:"narr", name:T("Narrateur"), desc:"", kind:"narrateur", gender:"fille", voice:autoVoice("narrateur", 0, "fille")}], chapters:[], fav:false, at:Date.now(), engine:"device"};
+    if (!story){ (o.chars||[]).forEach((ch,i) => st.characters.push({id:uid(), name:ch.name, desc:ch.desc, kind:ch.kind||"enfant", gender:ch.gender, voice:ch.voice || autoVoice(ch.kind, i+1, ch.gender || guessGender(ch.name, ch.desc))})); }
+    (out.characters||[]).forEach(ch => { if (!st.characters.some(x => x.name.toLowerCase() === ch.name.toLowerCase())) { const g = ch.gender && ch.gender !== "neutre" ? ch.gender : guessGender(ch.name, ch.desc); st.characters.push({id:uid(), name:ch.name, desc:ch.desc, kind:ch.kind, gender:g, voice:autoVoice(ch.kind, st.characters.length, g)}); } });
     const idOf = name => { name = String(name||"").trim(); if (!name || /narra/i.test(name)) return "narr";
-      let ch = st.characters.find(x => x.name.toLowerCase() === name.toLowerCase()); if (!ch){ ch = {id:uid(), name, desc:name === o.hero ? T("le héros") : "", kind:"enfant", voice:autoVoice("enfant", st.characters.length)}; st.characters.push(ch); } return ch.id; };
+      let ch = st.characters.find(x => x.name.toLowerCase() === name.toLowerCase()); if (!ch){ { const g = name === o.hero && c && !isPrenatal(c) ? (c.sex === "F" ? "fille" : "garcon") : guessGender(name); ch = {id:uid(), name, desc:name === o.hero ? T("le héros") : "", kind:"enfant", gender:g, voice:autoVoice("enfant", st.characters.length, g)}; } st.characters.push(ch); } return ch.id; };
     st.chapters.push({n, title:out.chapterTitle, summary:out.summary, segs:(out.segments||[]).map(s => ({c:idOf(s.speaker), t:s.text})), at:Date.now(), direction:direction||""});
     S.stories = S.stories || []; if (!story) S.stories.unshift(st);
     const e = aiHist("story", `${st.title} · ${T("chapitre {n}",{n})}`, st.chapters.at(-1).segs.map(s => s.t).join("\n\n"), {kid:st.kid, storyId:st.id}); save(); driveQ("story", st.id);
     return {histId:e.id, open:() => storyOpen(st.id)};
   }, {kid:c?.id, open:() => storyOpen((story||S.stories[0]).id)});
 }
-const GV = {narrateur:["Sulafat","Achernar","Vindemiatrix"], enfant:["Leda","Puck","Laomedeia","Zephyr"], adulte:["Charon","Kore","Iapetus","Achird"], aine:["Gacrux","Sadaltager"], animal:["Fenrir","Sadachbia","Autonoe"], creature:["Algenib","Enceladus","Umbriel"], robot:["Schedar","Rasalgethi"]};
-const PITCH = {narrateur:1, enfant:1.35, adulte:0.95, aine:0.8, animal:1.2, creature:0.7, robot:0.85};
-function autoVoice(kind = "enfant", i = 0){ const list = GV[kind] || GV.enfant; return {gv:list[i % list.length], pitch:PITCH[kind] ?? 1, rate:kind === "narrateur" ? 0.92 : 1, dv:""}; }
+/* voix Gemini selon le type ET le genre du personnage (Kore, Leda… féminines ; Puck, Charon… masculines) */
+const GV = {narrateur:{f:["Sulafat","Achernar","Vindemiatrix"], m:["Iapetus","Achird"]},
+  enfant:{f:["Leda","Laomedeia","Zephyr","Aoede"], m:["Puck","Fenrir","Orus"]}, adulte:{f:["Kore","Despina","Callirrhoe"], m:["Charon","Iapetus","Alnilam"]},
+  aine:{f:["Gacrux","Pulcherrima"], m:["Sadaltager","Algieba"]}, animal:{f:["Autonoe","Erinome"], m:["Sadachbia","Fenrir"]},
+  creature:{f:["Erinome","Umbriel"], m:["Algenib","Enceladus"]}, robot:{f:["Schedar","Despina"], m:["Rasalgethi","Schedar"]}};
+const PITCH = {narrateur:{f:1.05, m:0.95}, enfant:{f:1.5, m:1.3}, adulte:{f:1.1, m:0.85}, aine:{f:0.95, m:0.75}, animal:{f:1.3, m:1.1}, creature:{f:0.85, m:0.65}, robot:{f:0.95, m:0.8}};
+/* genre deviné d'après le prénom si Gemini ne l'a pas donné (prénoms en -a, -e, -ie, -ine, -elle… = féminin) */
+const FEM = /^(léa|lea|emma|chloé|chloe|zoé|zoe|alice|rose|jade|lou|inès|ines|manon|camille|sarah|eva|ève|eve|nora|mia|lily|anna|julie|marie|sophie|clara|olivia|charlotte|florence|béatrice|maman|mamie|grand-maman|reine|princesse|fée|madame|mme|tante|sœur|soeur|grenouille|tortue|souris|chouette|girafe|licorne)\b/i;
+const MASC = /^(léo|leo|louis|lucas|noah|nathan|hugo|arthur|jules|thomas|william|liam|félix|felix|gabriel|adam|théo|theo|paul|jacques|papa|papi|grand-papa|roi|prince|monsieur|m\.|oncle|frère|frere|loup|ours|lion|renard|dragon|hibou|chat|chien|robot)\b/i;
+function guessGender(name = "", desc = ""){
+  const n = String(name).trim().toLowerCase(), d = String(desc).toLowerCase();
+  if (FEM.test(n) || /\b(une|elle|fille|petite|maman|reine|princesse|sœur|grand-mère|tante)\b/.test(d)) return "fille";
+  if (MASC.test(n) || /\b(un|il|garçon|garcon|petit|papa|roi|prince|frère|grand-père|oncle)\b/.test(d)) return "garcon";
+  return /(a|e|ie|ine|elle|ette)$/.test(n.split(" ")[0]) ? "fille" : "garcon";
+}
+function autoVoice(kind = "enfant", i = 0, gender = "garcon"){
+  const g = gender === "fille" ? "f" : gender === "neutre" ? (i % 2 ? "f" : "m") : "m", set = GV[kind] || GV.enfant, list = set[g] || set.m;
+  return {gv:list[i % list.length], pitch:(PITCH[kind] || PITCH.enfant)[g], rate:kind === "narrateur" ? 0.92 : 1, dv:"", g};
+}
 const CH_COLORS = ["lilac","peach","mint","sky","butter","rose","teal","coral"];
 const chColor = (st, id) => id === "narr" ? "surface2" : CH_COLORS[st.characters.findIndex(x => x.id === id) % CH_COLORS.length];
 
@@ -115,15 +132,16 @@ function storiesPane(){
 }
 function storyOpen(id){
   const s = (S.stories||[]).find(x => x.id === id); if (!s) return;
+  s.characters.forEach((x, i) => { if (x.id === "narr" || x.voice?.custom || x.voice?.g) return; x.gender = x.gender || guessGender(x.name, x.desc); x.voice = autoVoice(x.kind, i, x.gender); });
   UI.storyId = id;
   const playing = PL.story === id && PL.on;
   sheet(`${sheetHead(esc(s.title))}<div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ghost" data-act="storyFav" data-v="${id}">${icon("star")}${s.fav?T("Favori ✓"):T("Favori")}</button>
       <div class="seg" style="width:auto"><button data-act="storyEngine" data-v="device" aria-pressed="${s.engine!=="gemini"}">${T("Voix de l'appareil")}</button><button data-act="storyEngine" data-v="gemini" aria-pressed="${s.engine==="gemini"}">${T("Voix Gemini")}</button></div></div>
     <p class="tiny muted">${s.engine==="gemini" ? T("Voix naturelles générées par Gemini (quelques secondes par réplique, utilise votre clé).") : T("Voix intégrées au téléphone : instantanées et gratuites. Réglez la voix de chaque personnage ci-dessous.")}</p>
     <div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.map(x => `<button class="chip ${chColor(s,x.id)}" data-act="charForm" data-v="${id}|${x.id}">${icon("sliders").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${esc(x.name)}</button>`).join("")}</div>
-    ${s.chapters.map((ch, ci) => `<div class="chapter"><div class="row between"><h3>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h3><button class="btn sm kid" data-act="storyPlay" data-v="${id}|${ci}">${icon(playing && PL.ch === ci ? "pause" : "play")}${playing && PL.ch === ci ? T("Arrêter") : T("Écouter")}</button></div>
-      ${ch.img ? `<img class="story-img" data-stimg="${ch.img}" alt="${esc(ch.title)}">` : ""}<div class="row" style="gap:6px"><button class="btn sm ghost" data-act="storyImg" data-v="${id}|${ci}">${icon("camera")}${ch.img?T("Nouvelle image"):T("Illustrer ce chapitre")}</button></div>
-      ${ch.segs.map((sg, si) => `<p class="seg-line ${sg.c==="narr"?"narr":""}" id="sg-${ci}-${si}">${sg.c!=="narr"?`<b class="who" style="color:var(--${chColor(s,sg.c)}-ink)">${esc(s.characters.find(x=>x.id===sg.c)?.name||"")}</b> `:""}${esc(sg.t)}</p>`).join("")}</div>`).join("")}
+    ${s.chapters.map((ch, ci) => `<div class="chapter"><div class="row between"><h3>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h3><div class="row" style="gap:4px;flex-wrap:nowrap">${playing && PL.ch === ci ? `<button class="btn sm kid" data-act="storyPause">${icon("pause")}${T("Pause")}</button><button class="btn sm ghost" data-act="storyStop" data-v="${id}" aria-label="${T("Arrêter")}">${icon("x")}</button>` : s.pos?.ch === ci && s.pos.i > 0 ? `<button class="btn sm kid" data-act="storyPlayFrom" data-v="${id}|${ci}|${s.pos.i}">${icon("play")}${T("Reprendre")}</button><button class="btn sm ghost" data-act="storyPlayFrom" data-v="${id}|${ci}|0" aria-label="${T("Rejouer depuis le début")}">${icon("replay")}</button>` : `<button class="btn sm kid" data-act="storyPlayFrom" data-v="${id}|${ci}|0">${icon("play")}${T("Écouter")}</button>`}</div></div>
+      ${ch.img ? `<img class="story-img" data-stimg="${ch.img}" alt="${esc(ch.title)}">` : ""}<div class="row" style="gap:6px"><button class="btn sm ghost" data-act="storyImg" data-v="${id}|${ci}">${icon("camera")}${ch.img?T("Nouvelle image"):T("Illustrer ce chapitre")}</button><button class="btn sm ghost" data-act="storySimplify" data-v="${id}|${ci}">${icon("spark")}${T("Mots plus simples")}</button></div>
+      ${ch.segs.map((sg, si) => `<p class="seg-line ${sg.c==="narr"?"narr":""} ${s.pos?.ch===ci && s.pos.i===si && !playing?"mark":""}" id="sg-${ci}-${si}" data-act="storyPlayFrom" data-v="${id}|${ci}|${si}" title="${T("Lire à partir d'ici")}">${sg.c!=="narr"?`<b class="who" style="color:var(--${chColor(s,sg.c)}-ink)">${esc(s.characters.find(x=>x.id===sg.c)?.name||"")}</b> `:""}${esc(sg.t)}</p>`).join("")}</div>`).join("")}
     <div class="card tint"><h3>${T("Chapitre suivant")}</h3><div class="stack" style="gap:10px">${fld("st-dir",T("Où va l'histoire ? (facultatif)"),inp("st-dir","",`placeholder="${T("Ex. : ils trouvent une carte au trésor")}"`))}
       <div class="row" style="flex-wrap:wrap"><button class="btn ghost" data-act="storyNextIdeas" data-v="${id}">${icon("bulb")}${T("Proposer des suites")}</button><button class="btn kid" data-act="storyNext" data-v="${id}">${icon("spark")}${T("Écrire le chapitre {n}",{n:s.chapters.length+1})}</button></div><div id="nextIdeas"></div></div></div>
     <div class="row"><button class="btn ghost" data-act="storyShare" data-v="${id}">${icon("share")}${T("Partager")}</button>${feat("memories")?`<button class="btn ghost" data-act="storyKeep" data-v="${id}">${icon("star")}${T("Garder dans les souvenirs")}</button>`:""}<button class="btn danger" data-act="storyDel" data-v="${id}">${icon("trash")}</button></div>`, "wide");
@@ -149,7 +167,7 @@ function storyNextRun(id, surprise){
   const over = surprise ? {} : {moods:checked("sn-mood"), len:+radio("sn-len") || s.opts?.len || 3, level:val("sn-lvl")}, img = !!$("#sn-img")?.checked;
   closeSheet(); const n = s.chapters.length; if (!surprise){ s.opts = {...(s.opts||{}), ...over}; save(); }
   const p = storyGen(s, null, dir, over);
-  if (img) Promise.resolve(p).then(() => { const t = setInterval(() => { if (s.chapters.length > n){ clearInterval(t); storyImage(id, n, true); } }, 1500); setTimeout(() => clearInterval(t), 180000); });
+  if (img) Promise.resolve(p).then(() => { const t = setInterval(() => { if (s.chapters.length > n){ clearInterval(t); S.settings.ai.imgPaidOnly ? toast(T("Chapitre prêt : touchez « Illustrer ce chapitre » pour créer l'image avec l'app Gemini")) : storyImage(id, n, true); } }, 1500); setTimeout(() => clearInterval(t), 180000); });
 }
 /* ---------- images d'histoire (modèle image de Gemini) ---------- */
 async function imageModels(){
@@ -158,7 +176,7 @@ async function imageModels(){
   try { const d = await (await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {headers:{"x-goog-api-key":aiKey()}})).json();
     list = (d.models||[]).filter(m => /image/i.test(m.name) && /gemini/i.test(m.name) && (m.supportedGenerationMethods||[]).includes("generateContent")).map(m => m.name.replace(/^models\//, ""))
       .sort((a, b) => (parseFloat(b.match(/(\d+(\.\d+)?)/)?.[1])||0) - (parseFloat(a.match(/(\d+(\.\d+)?)/)?.[1])||0)); } catch(e){}
-  list = [...new Set([...list, "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"])];
+  list = [...new Set(["gemini-3.1-flash-lite-image", "gemini-3.1-flash-image", ...list, "gemini-nano-banana-2.1", "gemini-2.5-flash-image"])];
   S.settings.ai.imgModels = {at:Date.now(), list}; save(); return list;
 }
 async function storyLooks(s){
@@ -173,9 +191,7 @@ function storyImage(sid, ci, quiet){
   return aiJob("story", T("Image · {t}",{t:ch.title}), async () => {
     await storyLooks(s);
     const prevCh = s.chapters.slice(0, +ci).reverse().find(x => x.img) || s.chapters.find((x, i) => i !== +ci && x.img), ref = prevCh ? await PhotoDB.get(prevCh.img) : null;
-    const who = s.characters.filter(x => x.id !== "narr" && ch.segs.some(sg => sg.c === x.id) || x.desc === T("le héros")).filter(x => x.look);
-    const cast = (who.length ? who : s.characters.filter(x => x.id !== "narr" && x.look)).slice(0, 5);
-    const prompt = `${s.style}. One single illustration for the chapter "${ch.title}" of the bedtime story "${s.title}". Scene: ${ch.summary}. Characters (draw them EXACTLY like this, same look in every picture): ${cast.map(x => `${x.name}: ${x.look}`).join(" | ")}. ${ref ? "Keep the characters' appearance and the art style identical to the reference image provided." : ""} No text, no letters, no words in the image. Child-friendly, calm.`;
+    const prompt = storyImgPrompt(s, ch, !!ref);
     const parts = [...(ref ? [{inline_data:{mime_type:"image/jpeg", data:ref.split(",")[1]}}] : []), {text:prompt}];
     let lastErr;
     for (const model of await imageModels()){
@@ -190,8 +206,30 @@ function storyImage(sid, ci, quiet){
         return {open:() => storyOpen(sid)};
       } catch(e){ lastErr = e; AI_LAST_ERR = `${model} : ${e.message}`.slice(0, 300); if (/API_KEY_INVALID|PERMISSION_DENIED/i.test(e.message)) break; }
     }
-    throw new Error(T("Image impossible : {e}",{e:lastErr?.message||"?"}));
+    const paid = /quota|limit: ?0|billing|exceeded|RESOURCE_EXHAUSTED|not available|free tier|not found|NOT_FOUND/i.test(lastErr?.message||"");
+    if (paid) S.settings.ai.imgPaidOnly = true, save();
+    throw new Error(paid ? T("La création d'images par l'API Gemini demande une clé avec facturation activée (pas de version gratuite). Touchez « Illustrer » puis « Copier le prompt » pour la créer gratuitement dans l'app Gemini.") : T("Image impossible : {e}",{e:lastErr?.message||"?"}));
   }, {kid:s.kid, open:() => storyOpen(sid)});
+}
+/* description de l'image (anglais : meilleurs résultats) ; aussi copiable pour l'app Gemini */
+function storyImgPrompt(s, ch, withRef){
+  const who = s.characters.filter(x => x.id !== "narr" && x.look && ch.segs.some(sg => sg.c === x.id));
+  const cast = (who.length ? who : s.characters.filter(x => x.id !== "narr" && x.look)).slice(0, 5);
+  return `${s.style || "soft watercolor children's picture book illustration, warm gentle light, rounded friendly shapes"}. One single illustration for the chapter "${ch.title}" of the bedtime story "${s.title}". Scene: ${ch.summary} Characters (draw them EXACTLY like this, same look in every picture): ${cast.map(x => `${x.name}: ${x.look}`).join(" | ")}. ${withRef ? "Keep the characters' appearance and the art style identical to the reference image provided." : ""} No text, no letters, no words in the image. Child-friendly, calm, square format.`;
+}
+function storyImgSheet(sid, ci){
+  const s = S.stories.find(x => x.id === sid), ch = s?.chapters[+ci]; if (!ch) return;
+  const prev = s.chapters.slice(0, +ci).reverse().find(x => x.img) || s.chapters.find((x, i) => i !== +ci && x.img);
+  sheet(`${sheetHead(T("Illustrer · {t}",{t:esc(ch.title)}))}
+    <div class="card tint" style="padding:12px 14px"><h3>${T("Gratuit : avec l'app Gemini")}</h3>
+      <ol class="small" style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px"><li>${T("Copiez le prompt (il décrit la scène et l'apparence exacte des personnages).")}</li><li>${T("Ouvrez Gemini, choisissez « Créer une image », collez le prompt.")}${prev?` ${T("Pour garder les mêmes personnages, joignez aussi l'image du chapitre précédent (bouton ci-dessous pour l'enregistrer).")}`:""}</li><li>${T("Enregistrez l'image, puis touchez « Ajouter l'image créée ».")}</li></ol>
+      <div id="imgPrompt" class="small" style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;max-height:140px;overflow:auto"><span class="spin"></span> ${T("Préparation du prompt…")}</div>
+      <div class="row" style="flex-wrap:wrap"><button class="btn sm kid" data-act="storyImgCopy">${icon("note")}${T("Copier le prompt")}</button><a class="btn sm ghost" href="https://gemini.google.com/app" target="_blank" rel="noopener">${icon("spark")}${T("Ouvrir Gemini")}</a>${prev?`<button class="btn sm ghost" data-act="storyImgSaveRef" data-v="${prev.img}">${icon("share")}${T("Image de référence")}</button>`:""}</div>
+      <button class="btn kid" data-act="storyImgImport" data-v="${sid}|${ci}">${icon("image")}${T("Ajouter l'image créée")}</button></div>
+    <div class="card" style="padding:12px 14px"><h3>${T("Directement ici (clé payante)")}</h3><p class="small muted">${T("La création d'images par l'API Gemini n'a pas de version gratuite : il faut activer la facturation sur votre clé (environ 3 à 7 ¢ par image).")}</p>
+      <button class="btn sm ghost" data-act="storyImgGen" data-v="${sid}|${ci}">${icon("spark")}${T("Essayer quand même")}</button></div>`);
+  UI.imgPromptTxt = "";
+  storyLooks(s).catch(() => {}).finally(() => { UI.imgPromptTxt = storyImgPrompt(s, ch, !!prev); const el = $("#imgPrompt"); if (el) el.textContent = UI.imgPromptTxt; });
 }
 async function storyNextIdeas(id){
   const s = S.stories.find(x => x.id === id), box = $("#nextIdeas");
@@ -204,7 +242,7 @@ async function storyNextIdeas(id){
 }
 function charForm(v){
   const [sid, cid] = v.split("|"), s = S.stories.find(x => x.id === sid), ch = s?.characters.find(x => x.id === cid); if (!ch) return;
-  const vc = ch.voice || autoVoice(ch.kind); stopPlay();
+  const vc = ch.voice || autoVoice(ch.kind, 0, ch.gender); stopPlay();
   TTS.voices().then(list => { const sel = $("#cv-dv"); if (sel) sel.innerHTML = `<option value="">${T("Automatique")}</option>` + list.map(x => `<option value="${esc(x.id)}" ${x.id===vc.dv?"selected":""}>${esc(x.name)} (${esc(x.lang)})</option>`).join(""); });
   sheet(`<form class="stack" data-form="charSave" data-id="${v}" style="gap:12px">${sheetHead(esc(ch.name))}
     ${cid==="narr"?"":`${fld("cv-name",T("Nom"),inp("cv-name",ch.name,"required"))}${fld("cv-desc",T("Description"),inp("cv-desc",ch.desc||""))}`}
@@ -234,7 +272,10 @@ const TTS = {
     }
     const pref = list.filter(x => (x.lang||"").toLowerCase().startsWith(lang)); this._cache = pref.length ? pref : list; return this._cache;
   },
+  async voiceFor(g){ const list = await this.voices(); const fem = v => /x-\w\w[ac](-|$)|female|femme|amélie|amelie|audrey|aurélie|julie|chantal|marie|samantha|karen|zira|hortense/i.test(v.name), masc = v => /x-\w\w[bd](-|$)|male|homme|thomas|nicolas|daniel|alex|paul|david|mark|henri/i.test(v.name) && !/female/i.test(v.name);
+    const pick = list.filter(g === "f" ? fem : masc); return pick.length ? pick[0].id : ""; },
   async speakDevice(text, vc = {}){
+    if ((vc.dv === "" || vc.dv == null) && vc.g){ const id = await this.voiceFor(vc.g).catch(() => ""); if (id !== "") vc = {...vc, dv:id}; }
     const lang = LANG === "en" ? "en-CA" : "fr-CA", p = this.plugin();
     if (p){ const opt = {text, lang, rate:vc.rate ?? 1, pitch:vc.pitch ?? 1, volume:1, category:"playback"}; if (vc.dv !== "" && vc.dv != null) opt.voice = +vc.dv; return p.speak(opt); }
     if (!("speechSynthesis" in window)) throw new Error(T("La synthèse vocale n'est pas disponible ici"));
@@ -279,12 +320,12 @@ async function geminiTTS(text, voice, style){
 /* lecteur : enchaîne les répliques avec la voix de chaque personnage */
 const PL = {on:false, story:null, ch:0, i:0, audio:null, run:0};
 function stopPlay(){ PL.on = false; PL.run++; TTS.stopDevice(); if (PL.audio){ PL.audio.pause(); PL.audio = null; } $$(".seg-line.now").forEach(e => e.classList.remove("now")); }
-async function playChapter(sid, ci){
+async function playChapter(sid, ci, from = 0){
   stopPlay(); const s = S.stories.find(x => x.id === sid), ch = s?.chapters[ci]; if (!ch) return;
-  Object.assign(PL, {on:true, story:sid, ch:ci, i:0}); const run = ++PL.run; storyOpenKeepScroll(sid);
+  Object.assign(PL, {on:true, story:sid, ch:ci, i:from}); const run = ++PL.run; storyOpenKeepScroll(sid);
   const vcOf = sg => (s.characters.find(x => x.id === sg.c) || s.characters[0]).voice || {};
-  for (let i = 0; i < ch.segs.length && PL.on && PL.run === run; i++){
-    PL.i = i; $$(".seg-line.now").forEach(e => e.classList.remove("now")); const el = $(`#sg-${ci}-${i}`); if (el){ el.classList.add("now"); el.scrollIntoView({block:"center", behavior:"smooth"}); }
+  for (let i = from; i < ch.segs.length && PL.on && PL.run === run; i++){
+    PL.i = i; s.pos = {ch:ci, i};  $$(".seg-line.now").forEach(e => e.classList.remove("now")); const el = $(`#sg-${ci}-${i}`); if (el){ el.classList.add("now"); el.scrollIntoView({block:"center", behavior:"smooth"}); }
     const sg = ch.segs[i], vc = vcOf(sg);
     try {
       if (s.engine === "gemini"){
@@ -294,8 +335,10 @@ async function playChapter(sid, ci){
       } else await TTS.speakDevice(sg.t, vc);
     } catch(e){ toast(e.message); break; }
   }
-  if (PL.run === run){ PL.on = false; $$(".seg-line.now").forEach(e => e.classList.remove("now")); storyOpenKeepScroll(sid); }
+  if (PL.run === run){ PL.on = false; if (s.pos?.ch === ci && s.pos.i >= ch.segs.length - 1) s.pos = null; save(); $$(".seg-line.now").forEach(e => e.classList.remove("now")); storyOpenKeepScroll(sid); }
 }
+/* pause : on garde la réplique en cours pour reprendre là où on était (même plus tard) */
+function pausePlay(){ const s = S.stories.find(x => x.id === PL.story); if (s) s.pos = {ch:PL.ch, i:PL.i}; stopPlay(); save(); if (s) storyOpenKeepScroll(s.id); }
 function storyOpenKeepScroll(sid){ const sh = $("#layer .sheet"), top = sh?.scrollTop; if (UI.storyId === sid && sh){ storyOpen(sid); const n = $("#layer .sheet"); if (n) n.scrollTop = top; } }
 
 /* ---------- recettes ---------- */
@@ -335,11 +378,27 @@ Object.assign(ACT, {
   storyOpen: v => storyOpen(v), stMode: v => { UI.stMode = v; render(); }, stFav: () => { UI.stFav = !UI.stFav; render(); },
   storyFav: v => { const s = S.stories.find(x => x.id === v); s.fav = !s.fav; save(); storyOpenKeepScroll(v); },
   storyEngine: v => { const s = S.stories.find(x => x.id === UI.storyId); s.engine = v; save(); stopPlay(); storyOpenKeepScroll(s.id); },
+  storyPause: () => pausePlay(),
+  storySimplify: v => { const [sid, ci] = v.split("|"), s = S.stories.find(x => x.id === sid), ch = s?.chapters[+ci]; if (!ch) return; const c = kidById(s.kid), lv = s.opts?.level || lvlOfAge(c && !isPrenatal(c) ? ageMonths(c) : 48);
+    aiJob("story", T("Simplifier · {t}",{t:ch.title}), async () => {
+      const schema = {type:"OBJECT", properties:{texts:{type:"ARRAY", items:{type:"STRING"}}}, required:["texts"]};
+      const r = await gemini({tier:"fast", json:schema, temperature:0.3, system:`Tu réécris des textes pour enfants. RÈGLE : ${LVL_HINT[lv]}`, contents:[{role:"user", parts:[{text:`Réécris chacun de ces ${ch.segs.length} passages avec des mots beaucoup plus simples pour un enfant de ${lv} ans, sans changer l'histoire, le sens ni les noms. Garde exactement le même nombre d'éléments, dans le même ordre. En ${LANG==="en"?"anglais":"français"}.\n${JSON.stringify(ch.segs.map(sg => sg.t))}`}]}]});
+      const t = parseJSON(r.text).texts || []; if (t.length !== ch.segs.length) throw new Error(T("Réponse incomplète, réessayez"));
+      ch.segs.forEach((sg, i) => { if (t[i]) sg.t = t[i]; }); save(); driveQ("story", sid); return {open:() => storyOpen(sid)};
+    }, {kid:s.kid, open:() => storyOpen(sid)}); },
+  storyStop: v => { const s = S.stories.find(x => x.id === v); if (s) s.pos = null; stopPlay(); save(); storyOpenKeepScroll(v); },
+  storyPlayFrom: v => { const [sid, ci, i] = v.split("|"); playChapter(sid, +ci, +i || 0); },
   storyPlay: v => { const [sid, ci] = v.split("|"); if (PL.on && PL.story === sid && PL.ch === +ci){ stopPlay(); storyOpenKeepScroll(sid); } else playChapter(sid, +ci); },
   storyNext: v => { const s = S.stories.find(x => x.id === v); storyGen(s, null, val("st-dir")); },
   storyNextIdeas: v => storyNextIdeas(v), storyDir: v => { const i = $("#sn-dir") || $("#st-dir"); if (i){ i.value = v; i.focus(); } },
   storyNextSheet: v => storyNextSheet(v), storySurprise: v => storyNextRun(v, true),
-  storyImg: v => { const [sid, ci] = v.split("|"); storyImage(sid, +ci); },
+  storyImg: v => { const [sid, ci] = v.split("|"); storyImgSheet(sid, +ci); },
+  storyImgGen: v => { const [sid, ci] = v.split("|"); closeSheet(); storyImage(sid, +ci); },
+  storyImgCopy: async () => { const t = UI.imgPromptTxt || $("#imgPrompt")?.textContent || ""; try { await navigator.clipboard.writeText(t); toast(T("Prompt copié : collez-le dans Gemini")); } catch(e){ Native.share({title:T("Prompt d'image"), text:t}); } },
+  storyImgSaveRef: async v => { const d = await PhotoDB.get(v); if (d) Native.share({title:T("Image de référence"), dataUrl:d, filename:"reference.jpg"}); },
+  storyImgImport: async v => { const [sid, ci] = v.split("|"), s = S.stories.find(x => x.id === sid), ch = s?.chapters[+ci]; if (!ch) return;
+    const d = await Native.takePhoto({source:"photos"}); if (!d) return; const small = await shrinkImage(d, 1024, 0.85);
+    if (ch.img) await PhotoDB.del(ch.img).catch(() => {}); ch.img = "stimg-" + uid(); await PhotoDB.put(ch.img, small); ch.imgModel = "gemini-app"; save(); driveQ("story", sid); storyOpen(sid); toast(T("Image ajoutée au chapitre")); },
   storyShare: v => { const s = S.stories.find(x => x.id === v); Native.share({title:s.title, text:`${s.title}\n\n${s.chapters.map(ch => `${T("Chapitre {n}",{n:ch.n})} · ${ch.title}\n\n${ch.segs.map(sg => (sg.c!=="narr"?`${s.characters.find(x=>x.id===sg.c)?.name} : `:"") + sg.t).join("\n")}`).join("\n\n")}`}); },
   storyKeep: v => { const s = S.stories.find(x => x.id === v); S.memories.push({id:uid(), kind:"story", date:iso(today()), title:s.title, text:s.chapters.map(ch => `## ${ch.title}\n${ch.segs.map(sg => sg.t).join("\n")}`).join("\n\n"), kidIds:s.kid?[s.kid]:[]}); save(); driveQ("mem", S.memories.at(-1).id); toast(T("Souvenir enregistré")); },
   storyDel: v => { if (!confirmDel()) return; stopPlay(); (S.stories.find(x => x.id === v)?.chapters||[]).forEach(ch => ch.img && PhotoDB.del(ch.img).catch(() => {})); driveQDel(S.stories.find(x => x.id === v)?.driveIds); S.stories = S.stories.filter(x => x.id !== v); closeSheet(); commit(); },
@@ -369,7 +428,7 @@ Object.assign(FORMS, {
     aiJob(P[1], P[0], async () => { const r = await gemini({system:AI_SYSTEM() + "\n" + kidContext(c), search:P[3], contents:[{role:"user", parts:[{text:P[2]}]}]}); const e = aiHist(P[1], P[0], r.text, {sources:r.sources, kid:c?.id||null}); return {histId:e.id}; }, {kid:c?.id});
   },
   charSave: f => { const [sid, cid] = f.dataset.id.split("|"), s = S.stories.find(x => x.id === sid), ch = s.characters.find(x => x.id === cid);
-    if (cid !== "narr"){ ch.name = val("cv-name") || ch.name; ch.desc = val("cv-desc"); } ch.fav = $("#cv-fav").checked; ch.voice = readVoice(); save(); toast(T("Voix enregistrée")); storyOpen(sid); },
+    if (cid !== "narr"){ ch.name = val("cv-name") || ch.name; ch.desc = val("cv-desc"); } ch.fav = $("#cv-fav").checked; ch.voice = {...readVoice(), custom:true}; save(); toast(T("Voix enregistrée")); storyOpen(sid); },
 });
 Object.assign(CHANGE, { rcQ: t => { UI.rcQ = t.value; render(); } });
 Object.assign(FORMS, { storyNextGo: f => storyNextRun(f.dataset.id, false) });

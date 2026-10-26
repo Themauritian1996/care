@@ -535,3 +535,6 @@ details.msinfo summary{cursor:pointer;color:var(--kid-ink);font-weight:700;margi
 .bdg .be{font-size:1.7rem;line-height:1}.bdg b{font-size:.82rem}.bdg small{font-size:.7rem;color:var(--muted)}
 .photo-filter{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.photo-filter select{flex:1 1 160px;width:auto}.photo-filter details{flex:1 1 100%}.photo-filter summary{cursor:pointer;color:var(--kid-ink);font-weight:700}
 .chips-scroll button,.pick.chips-scroll button{white-space:nowrap;flex:0 0 auto}
+.bonus-grid{display:grid;grid-template-columns:1fr;gap:6px}.bonus-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.bonus-row .inp{width:84px;flex:0 0 auto}
+.seg-line{cursor:pointer}.seg-line.mark{box-shadow:inset 3px 0 0 var(--butter-ink);background:var(--butter-bg)}
+.pick.chips-scroll button{display:inline-flex;flex-direction:row;align-items:center;gap:6px}

@@ -57,6 +57,7 @@ document.addEventListener("keydown", e => {
 
 /* ======== ACTIONS ======== */
 Object.assign(ACT, {
+  calWho: v => { UI.calWho = v || null; render(); },
   photoFReset: () => { UI.photoF = {}; render(); },
   sportToggle: v => { const [cid, aid, ds] = v.split("|"), c = kidById(cid); c.sportSkip = c.sportSkip || {}; const k = aid+"|"+ds; if (c.sportSkip[k]) delete c.sportSkip[k]; else c.sportSkip[k] = true; save(); if ($("#layer .sheet")) dayDetail(ds); else render(); },
 
@@ -181,7 +182,7 @@ Object.assign(ACT, {
   availWho: v => { UI.availWho = v; render(); },
   availToggle: async (v, b) => {
     if (b.dataset.group){ const g = S.groups.find(x => x.id === b.dataset.group); g.avail = g.avail || {}; const map = g.avail[Cloud.user.uid] = toggleAvail(g.avail[Cloud.user.uid], v); render(); await Cloud.groupAvail(g.id, map); return; }
-    const who = b.dataset.who; if (isKidUser() && who !== S.me) return; S.avail[who] = toggleAvail(S.avail[who], v); commit();
+    const who = b.dataset.who, wm = member(who); if (who !== S.me && (isKidUser() || (wm?.uid && wm.role !== "enfant"))) return; S.avail[who] = toggleAvail(S.avail[who], v); commit();
   },
   planBest: v => { const wk = AW(); const d = wk === "type" ? addDays(today(), ((+v - today().getDay()) + 7) % 7 || 7) : addDays(parseD(wk), (+v + 6) % 7); famEventForm(null, iso(d)); },
   availWeek: v => { UI.availWeek = v; render(); },
@@ -219,6 +220,7 @@ Object.assign(ACT, {
   approve: v => { const x = S.completions.find(c => c.id === v); x.status = "ok"; commit(T("Validé")); confetti(); },
   refuse: v => { const x = S.completions.find(c => c.id === v); x.status = "refuse"; commit(); },
   redeemOk: v => { S.redemptions.find(x => x.id === v).status = "ok"; commit(); },
+  redeemCancel: v => { const x = S.redemptions.find(y => y.id === v); if (!x || !confirm(T("Annuler cet échange ? Les {n} points sont rendus.",{n:x.cost}))) return; x.status = "refuse"; x.cancel = true; commit(T("Échange annulé : points rendus")); },
   redeemNo: v => { S.redemptions.find(x => x.id === v).status = "refuse"; commit(); },
 
   /* groupes */
@@ -231,6 +233,8 @@ Object.assign(ACT, {
   groupEventDel: async v => { if (!confirmDel()) return; const [gid, eid] = v.split("|"); await Cloud.groupEventDel(gid, eid); const g = S.groups.find(x => x.id === gid); if (g) g.events = (g.events||[]).filter(x => x.id !== eid); closeSheet(); render(); toast(T("Activité retirée")); },
   groupEdit: v => { const g = S.groups.find(x => x.id === v); if (!g) return;
     sheet(`<form class="stack" data-form="groupEdit" data-g="${v}" style="gap:14px">${sheetHead(T("Personnaliser le groupe"))}${fld("gx-n",T("Nom du groupe"),inp("gx-n",g.name,"required"))}<div class="field"><label>${T("Icône (si pas de photo)")}</label>${emojiPick("gxemo", g.emoji||"")}</div><button type="button" class="btn ghost" data-act="groupPhoto" data-v="${v}">${icon("camera")}${g.photo?T("Changer la photo"):T("Ajouter une photo")}</button>${g.photo?`<button type="button" class="btn line" data-act="groupPhotoDel" data-v="${v}">${T("Retirer la photo")}</button>`:""}<button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`); },
+  groupLeave: async v => { if (!confirm(T("Quitter ce groupe ? Vous pourrez y revenir avec un nouveau code d'invitation."))) return; try { await Cloud.groupLeave(v); UI.groupOpen = null; render(); toast(T("Vous avez quitté le groupe")); } catch(e){ toast(e.message); } },
+  groupDelete: async v => { if (!confirm(T("Supprimer ce groupe pour tous les membres ? Les messages et activités ne seront plus visibles."))) return; try { await Cloud.groupDelete(v); UI.groupOpen = null; render(); toast(T("Groupe supprimé")); } catch(e){ toast(e.message); } },
   groupPhotoDel: async v => { const g = S.groups.find(x => x.id === v); g.photo = null; await Cloud.groupPhoto(v, null); closeSheet(); render(); },
   groupRsvp: async v => { const [g, e] = v.split("|"), ev = S.groups.find(x => x.id === g)?.events?.find(x => x.id === e); await Cloud.groupRsvp(g, e, !ev?.rsvp?.[Cloud.user.uid]?.ok); },
 });
@@ -342,9 +346,9 @@ Object.assign(FORMS, {
     const toDrive = $("#m-drive")?.checked !== false; closeSheet(); commit(T("Souvenir enregistré"));
     if (toDrive) driveQ("mem", id);
   },
-  task: f => { const id = f.dataset.id; const d = {title:val("tk-title"), points:numOf("tk-pts")||5, assignees:checked("tkwho"), team:!!$("#tk-team")?.checked, times:[0,1,2,3].map(i => val("tk-h"+i)).filter(Boolean), perDay:Math.max(1, Math.min(8, +val("tk-per")||1)), recur:radio("tkrec")||"daily", days:checked("tkdays").map(Number), date:val("tk-date"), icon:radio("tkicon")||"star"};
+  task: f => { const id = f.dataset.id; const d = {title:val("tk-title"), points:Math.max(1, Math.round(numOf("tk-pts")||1)), assignees:checked("tkwho"), team:!!$("#tk-team")?.checked, times:[0,1,2,3].map(i => val("tk-h"+i)).filter(Boolean), perDay:Math.max(1, Math.min(8, +val("tk-per")||1)), recur:radio("tkrec")||"daily", days:checked("tkdays").map(Number), date:val("tk-date"), icon:radio("tkicon")||"star"};
     if (!d.assignees.length) return toast(T("Choisissez au moins une personne")); if (id) Object.assign(S.tasks.find(t => t.id === id), d); else S.tasks.push({id:uid(), ...d}); closeSheet(); commit(T("Défi enregistré")); },
-  reward: f => { const d = {title:val("rw-title"), cost:numOf("rw-cost")||50}; if (f.dataset.id) Object.assign(S.rewards.find(r => r.id === f.dataset.id), d); else S.rewards.push({id:uid(), ...d}); closeSheet(); commit(f.dataset.id ? T("Modifié") : T("Récompense ajoutée")); },
+  reward: f => { const d = {title:val("rw-title"), cost:Math.max(1, Math.round(numOf("rw-cost")||1))}; if ($("input[name=rwfor]")) d.for = checked("rwfor"); if (f.dataset.id) Object.assign(S.rewards.find(r => r.id === f.dataset.id), d); else S.rewards.push({id:uid(), ...d}); closeSheet(); commit(f.dataset.id ? T("Modifié") : T("Récompense ajoutée")); },
   chat: async f => { const t = $("#chat-in").value.trim(); if (!t) return; $("#chat-in").value = ""; await Cloud.send(f.dataset.ch, t); },
   groupNew: async () => { const id = await Cloud.groupCreate(val("gn")); closeSheet(); UI.groupOpen = id; toast(T("Groupe créé")); },
   joinGroup: async () => { await Cloud.groupJoin(val("jg-code")); toast(T("Vous avez rejoint le groupe")); },
