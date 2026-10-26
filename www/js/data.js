@@ -175,18 +175,39 @@ function guide(m){
 }
 
 /* ---------- dents de lait : position sur le schéma (arcade) ---------- */
+/* dents de lait : numérotation FDI (quadrants 5 haut droite, 6 haut gauche, 7 bas gauche, 8 bas droite ; 1 = incisive centrale … 5 = 2e molaire) */
 const TEETH = [
-  {id:"ui", n:"Incisives centrales du haut", age:"8-12 mois", jaw:"u", pos:[0]},
-  {id:"ul", n:"Incisives latérales du haut", age:"9-13 mois", jaw:"u", pos:[1]},
-  {id:"uc", n:"Canines du haut", age:"16-22 mois", jaw:"u", pos:[2]},
-  {id:"um1", n:"Premières molaires du haut", age:"13-19 mois", jaw:"u", pos:[3]},
-  {id:"um2", n:"Deuxièmes molaires du haut", age:"25-33 mois", jaw:"u", pos:[4]},
-  {id:"li", n:"Incisives centrales du bas", age:"6-10 mois", jaw:"l", pos:[0]},
-  {id:"ll", n:"Incisives latérales du bas", age:"10-16 mois", jaw:"l", pos:[1]},
-  {id:"lc", n:"Canines du bas", age:"17-23 mois", jaw:"l", pos:[2]},
-  {id:"lm1", n:"Premières molaires du bas", age:"14-18 mois", jaw:"l", pos:[3]},
-  {id:"lm2", n:"Deuxièmes molaires du bas", age:"23-31 mois", jaw:"l", pos:[4]},
+  {id:"ui", k:1, n:"Incisives centrales du haut", age:"8-12 mois", lost:"6-7 ans", jaw:"u", pos:[0]},
+  {id:"ul", k:2, n:"Incisives latérales du haut", age:"9-13 mois", lost:"7-8 ans", jaw:"u", pos:[1]},
+  {id:"uc", k:3, n:"Canines du haut", age:"16-22 mois", lost:"10-12 ans", jaw:"u", pos:[2]},
+  {id:"um1", k:4, n:"Premières molaires du haut", age:"13-19 mois", lost:"9-11 ans", jaw:"u", pos:[3]},
+  {id:"um2", k:5, n:"Deuxièmes molaires du haut", age:"25-33 mois", lost:"10-12 ans", jaw:"u", pos:[4]},
+  {id:"li", k:1, n:"Incisives centrales du bas", age:"6-10 mois", lost:"6-7 ans", jaw:"l", pos:[0]},
+  {id:"ll", k:2, n:"Incisives latérales du bas", age:"10-16 mois", lost:"7-8 ans", jaw:"l", pos:[1]},
+  {id:"lc", k:3, n:"Canines du bas", age:"17-23 mois", lost:"9-12 ans", jaw:"l", pos:[2]},
+  {id:"lm1", k:4, n:"Premières molaires du bas", age:"14-18 mois", lost:"9-11 ans", jaw:"l", pos:[3]},
+  {id:"lm2", k:5, n:"Deuxièmes molaires du bas", age:"23-31 mois", lost:"10-12 ans", jaw:"l", pos:[4]},
 ];
+/* dents permanentes (adultes) : FDI quadrants 1 haut droite, 2 haut gauche, 3 bas gauche, 4 bas droite ; 1 à 8 */
+const PERM_TEETH = [
+  {k:1, jaw:"u", n:"Incisives centrales du haut", age:"7-8 ans"},
+  {k:2, jaw:"u", n:"Incisives latérales du haut", age:"8-9 ans"},
+  {k:3, jaw:"u", n:"Canines du haut", age:"11-12 ans"},
+  {k:4, jaw:"u", n:"Premières prémolaires du haut", age:"10-11 ans"},
+  {k:5, jaw:"u", n:"Deuxièmes prémolaires du haut", age:"10-12 ans"},
+  {k:6, jaw:"u", n:"Premières molaires du haut", age:"6-7 ans"},
+  {k:7, jaw:"u", n:"Deuxièmes molaires du haut", age:"12-13 ans"},
+  {k:8, jaw:"u", n:"Troisièmes molaires du haut (dents de sagesse)", age:"17-21 ans"},
+  {k:1, jaw:"l", n:"Incisives centrales du bas", age:"6-7 ans"},
+  {k:2, jaw:"l", n:"Incisives latérales du bas", age:"7-8 ans"},
+  {k:3, jaw:"l", n:"Canines du bas", age:"9-10 ans"},
+  {k:4, jaw:"l", n:"Premières prémolaires du bas", age:"10-12 ans"},
+  {k:5, jaw:"l", n:"Deuxièmes prémolaires du bas", age:"11-12 ans"},
+  {k:6, jaw:"l", n:"Premières molaires du bas", age:"6-7 ans"},
+  {k:7, jaw:"l", n:"Deuxièmes molaires du bas", age:"11-13 ans"},
+  {k:8, jaw:"l", n:"Troisièmes molaires du bas (dents de sagesse)", age:"17-21 ans"},
+];
+const fdi = (perm, jaw, sd, k) => `${perm ? (jaw === "u" ? (sd === "R" ? 1 : 2) : (sd === "L" ? 3 : 4)) : (jaw === "u" ? (sd === "R" ? 5 : 6) : (sd === "L" ? 7 : 8))}${k}`;
 const TEETH_TIPS = [
   "Dès la première dent : brossez deux fois par jour avec un grain de riz de dentifrice fluoré, puis un petit pois dès 3 ans.",
   "Poussée dentaire : un anneau de dentition froid (pas congelé) ou un doigt propre sur la gencive soulagent. Pas de gel anesthésiant ni de collier d'ambre.",

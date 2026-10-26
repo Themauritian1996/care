@@ -7,7 +7,18 @@ const Native = (() => {
   const P = name => isApp ? C.Plugins?.[name] : null;
 
   /* Photo : appareil photo ou galerie. Repli web : champ fichier avec capture. */
+  /* choix appareil photo / galerie : petite fenêtre maison, plus jolie que celle du système */
+  function pickSource(){
+    return new Promise(res => {
+      const el = document.createElement("div"); el.className = "pk-scrim";
+      el.innerHTML = `<div class="pk" role="dialog" aria-modal="true"><div class="sheet-grab"></div><h3>${T("Ajouter une photo")}</h3><div class="pk-grid"><button type="button" data-pk="camera"><span class="pk-ic cam">${icon("camera")}</span><b>${T("Prendre une photo")}</b><small>${T("Appareil photo")}</small></button><button type="button" data-pk="photos"><span class="pk-ic gal">${icon("image")}</span><b>${T("Galerie")}</b><small>${T("Choisir une photo existante")}</small></button></div><button type="button" class="btn line" data-pk="">${T("Annuler")}</button></div>`;
+      const done = v => { el.classList.add("out"); setTimeout(() => el.remove(), 180); res(v); };
+      el.addEventListener("click", e => { const b = e.target.closest("[data-pk]"); if (b) return done(b.dataset.pk || null); if (e.target === el) done(null); });
+      document.body.appendChild(el);
+    });
+  }
   async function takePhoto({source = "prompt"} = {}){
+    if (source === "prompt"){ source = await pickSource(); if (!source) return null; }
     const cam = P("Camera");
     if (cam){
       try {

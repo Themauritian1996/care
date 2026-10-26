@@ -231,6 +231,8 @@ if (cfg && cfg.apiKey){
     const cs = await getDoc(doc(db, "codes", code.toUpperCase())); if (!cs.exists() || cs.data().kind !== "group") throw new Error(T("Code invalide"));
     await updateDoc(doc(db, "groups", cs.data().id), {memberIds:arrayUnion(C.user.uid), [`members.${C.user.uid}`]:{name:myName()}, joinCode:code.toUpperCase()});
   };
+  C.groupUpdate = async (gid, data) => { await updateDoc(doc(db, "groups", gid), data); };
+  C.groupEventDel = async (gid, eid) => { await deleteDoc(doc(db, "groups", gid, "events", eid)); };
   C.groupEvent = async (gid, e) => { await setDoc(doc(db, "groups", gid, "events", e.id), e); };
   C.groupRsvp = async (gid, eid, ok) => { await updateDoc(doc(db, "groups", gid, "events", eid), {[`rsvp.${C.user.uid}`]:{ok, name:myName()}}); };
   C.groupPhoto = async (gid, photo) => { await updateDoc(doc(db, "groups", gid), {photo}); };
@@ -269,15 +271,15 @@ if (cfg && cfg.apiKey){
   C.driveDelete = async id => { if (!id) return; const tok = await driveToken();
     const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`, {method:"DELETE", headers:{Authorization:"Bearer "+tok}});
     if (!r.ok && r.status !== 404 && r.status !== 403){ if (r.status === 401) C.googleToken = null; throw new Error(`Drive ${r.status}`); } };
-  C.driveUpload = async (name, mime, base64, description = "", path = []) => {
+  C.driveUpload = async (name, mime, base64, description = "", path = [], asMime = null) => {
     const tok = await driveToken(); if (!tok) throw new Error(T("Connexion Google requise"));
     let folder = await driveFolder(tok); for (const p of path.filter(Boolean)) folder = await driveSub(tok, folder, String(p).replace(/[\/]/g, "-").slice(0, 100));
     const bnd = "tribe" + Date.now();
-    const meta = {name, parents:[folder], description};
+    const meta = {name, parents:[folder], description}; if (asMime) meta.mimeType = asMime;
     const body = `--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${bnd}\r\nContent-Type: ${mime}\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64}\r\n--${bnd}--`;
     const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {method:"POST", headers:{Authorization:"Bearer "+tok, "Content-Type":`multipart/related; boundary=${bnd}`}, body});
     const d = await r.json();
-    if (!r.ok){ if (r.status === 401) C.googleToken = null; if (r.status === 404 && !path.retried){ S.settings.driveFolder = null; S.settings.driveDirs = {}; save(); path.retried = true; return C.driveUpload(name, mime, base64, description, path); }
+    if (!r.ok){ if (r.status === 401) C.googleToken = null; if (r.status === 404 && !path.retried){ S.settings.driveFolder = null; S.settings.driveDirs = {}; save(); path.retried = true; return C.driveUpload(name, mime, base64, description, path, asMime); }
       const msg = d.error?.message || `Drive ${r.status}`; S.settings.driveErr = /has not been used|disabled|accessNotConfigured/i.test(msg) ? T("L'API Google Drive n'est pas activée dans le projet Firebase. Ouvrez console.cloud.google.com/apis/library/drive.googleapis.com?project=tribe-26d85 et touchez « Activer ».") : msg; save(); throw new Error(S.settings.driveErr); }
     if (S.settings.driveErr){ S.settings.driveErr = null; save(); }
     return d;

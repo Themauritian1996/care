@@ -328,6 +328,7 @@ Object.assign(ACT, {
   mealItemAdd: async () => { const name = val("ma-add"); if (!name) return; const M = UI.mealLog, fav = (child()?.foodFav||[]).find(f => f.name === name);
     const it = {name, group:fav?.group||"autres", qty:fav?.qty||"", b:fav?.nut||null, f:1}; M.items.push(it); mealSync(); mealDone();
     if (!it.b && aiKey()){ try { const fake = {data:{items:[{name, qty:it.qty}]}}; await nutEstimate(kidById(Object.keys(M.ids)[0]), fake); it.b = fake.data.items[0].nut; if (it.b?.kcal) it.group = it.group; mealSync(); if ($("#layer .sheet")) mealDone(); } catch(e){} } },
+  aiAskQuick: v => aiAsk(v), aiMealPhoto: () => aiMealPhoto(),
   mealUndo: () => { const M = UI.mealLog; Object.entries(M.ids).forEach(([kid, id]) => { const c = kidById(kid); if (c) c.logs = c.logs.filter(x => x.id !== id); }); closeSheet(); commit(T("Repas retiré")); },
   aiReview: () => { S.settings.ai.topics = checked("aitopics"); S.settings.ai.freq = radio("aifreq") || S.settings.ai.freq; save(); return aiReview(UI.aiKid); },
   aiReviewSave: () => { const A = S.settings.ai; A.topics = checked("aitopics"); A.freq = radio("aifreq") || A.freq; A.reviewDay = +val("ai-rday"); A.reviewTime = val("ai-rtime") || "19:00";

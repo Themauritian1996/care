@@ -57,6 +57,9 @@ document.addEventListener("keydown", e => {
 
 /* ======== ACTIONS ======== */
 Object.assign(ACT, {
+  photoFReset: () => { UI.photoF = {}; render(); },
+  sportToggle: v => { const [cid, aid, ds] = v.split("|"), c = kidById(cid); c.sportSkip = c.sportSkip || {}; const k = aid+"|"+ds; if (c.sportSkip[k]) delete c.sportSkip[k]; else c.sportSkip[k] = true; save(); if ($("#layer .sheet")) dayDetail(ds); else render(); },
+
   go: v => { if (v === "kid" && !S.children.length) return kidForm(); go(v); },
   openKid: v => { S.active = v; UI.kidTab = null; save(); go("kid"); },
   kid: v => { S.active = v; UI.zoom = null; UI.range = null; UI.kidTab = null; commit(); },
@@ -113,8 +116,12 @@ Object.assign(ACT, {
 
   /* santé */
   vaxForm: v => vaxForm(v), delVax: v => { delete child().vaccines[v]; closeSheet(); commit(T("Retiré")); },
-  tooth: v => { if (needParent()) return; const c = child(), base = v.slice(0,-1); if (c.teeth[base]){ c.teeth[base+"L"] = c.teeth[base]; c.teeth[base+"R"] = c.teeth[base]; delete c.teeth[base]; } if (c.teeth[v]) delete c.teeth[v]; else c.teeth[v] = iso(today()); commit(); },
-  msMode: v => { UI.msMode = v; render(); }, msAll: () => { UI.msAll = !UI.msAll; render(); },
+  tooth: v => { if (needParent()) return; const c = child();
+    if (v[0] === "P"){ const k = v.slice(1); c.permTeeth = c.permTeeth || {}; if (c.permTeeth[k]) delete c.permTeeth[k]; else c.permTeeth[k] = iso(today()); return commit(); }
+    const base = v.slice(0,-1); c.teethLost = c.teethLost || {}; if (c.teeth[base]){ c.teeth[base+"L"] = c.teeth[base]; c.teeth[base+"R"] = c.teeth[base]; delete c.teeth[base]; }
+    if (c.teethLost[v]){ delete c.teethLost[v]; delete c.teeth[v]; } else if (c.teeth[v]) c.teethLost[v] = iso(today()); else c.teeth[v] = iso(today()); commit(); },
+  dentMode: v => { UI.dentMode = v; render(); },
+  msMode: v => { UI.msMode = v; render(); }, msAll: () => { UI.msAll = !UI.msAll; UI.msBand = UI.msAll ? "all" : "auto"; render(); }, msBand: v => { UI.msBand = v; UI.msAll = v === "all"; render(); },
   ms: v => { const c = child(); if (c.milestones[v]){ delete c.milestones[v]; commit(); } else msDateSheet(v); },
   tipCat: v => { const c = child(); c.hideTips = c.hideTips.includes(v) ? c.hideTips.filter(x => x !== v) : [...c.hideTips, v]; commit(); },
   pregCheck: v => { const c = child(); const ck = c.prenatal.checks = c.prenatal.checks || {}; if (ck[v]) delete ck[v]; else ck[v] = iso(today()); commit(); },
@@ -212,7 +219,12 @@ Object.assign(ACT, {
   groupOpen: v => { UI.groupOpen = v; render(); }, groupClose: () => { UI.groupOpen = null; render(); },
   groupChat: v => { UI.groupOpen = null; $("#main").innerHTML = topbar() + chatView(v); afterRender(); },
   groupInvite: async v => { const code = await Cloud.groupInvite(v); $("#groupInviteOut").innerHTML = `<div class="banner ok">${icon("key")}<div><div class="phone">${code}</div><button class="btn sm ghost" data-act="shareText" data-v="${esc(T("Rejoins le groupe dans {app} avec le code {c}",{app:appName(), c:code}))}">${icon("share")}${T("Envoyer")}</button></div></div>`; },
-  groupEvent: v => sheet(`<form class="stack" data-form="groupEvent" data-g="${v}" style="gap:14px">${sheetHead(T("Proposer une activité"))}${fld("ge-t",T("Activité"),`<input class="inp" id="ge-t" required placeholder="${T("Glissade au parc")}">`)}<div class="fgrid">${fld("ge-d",T("Date"),`<input class="inp" id="ge-d" type="date" value="${iso(addDays(today(),7))}" required>`)}${fld("ge-h",T("Heure"),`<input class="inp" id="ge-h" type="time">`)}</div>${fld("ge-p",T("Lieu"),addrInput("ge-p",""))}<button class="btn kid" type="submit">${T("Proposer")}</button></form>`),
+  groupEvent: v => { const [gid, eid] = v.split("|"), e = eid ? S.groups.find(x => x.id === gid)?.events?.find(x => x.id === eid) : null;
+    sheet(`<form class="stack" data-form="groupEvent" data-g="${gid}" data-id="${eid||""}" style="gap:14px">${sheetHead(e ? T("Modifier l'activité") : T("Proposer une activité"))}${fld("ge-t",T("Activité"),`<input class="inp" id="ge-t" required value="${esc(e?.title||"")}" placeholder="${T("Glissade au parc")}">`)}<div class="fgrid">${fld("ge-d",T("Date"),`<input class="inp" id="ge-d" type="date" value="${e?.date||iso(addDays(today(),7))}" required>`)}${fld("ge-h",T("Heure"),`<input class="inp" id="ge-h" type="time" value="${e?.time||""}">`)}</div>${fld("ge-p",T("Lieu"),addrInput("ge-p",e?.place||""))}${fld("ge-n",T("Détails (facultatif)"),`<textarea class="inp" id="ge-n" rows="2">${esc(e?.notes||"")}</textarea>`)}<div class="row"><button class="btn kid grow" type="submit">${e ? T("Enregistrer") : T("Proposer")}</button>${e?`<button type="button" class="btn danger" data-act="groupEventDel" data-v="${gid}|${eid}">${icon("trash")}</button>`:""}</div></form>`); },
+  groupEventDel: async v => { if (!confirmDel()) return; const [gid, eid] = v.split("|"); await Cloud.groupEventDel(gid, eid); const g = S.groups.find(x => x.id === gid); if (g) g.events = (g.events||[]).filter(x => x.id !== eid); closeSheet(); render(); toast(T("Activité retirée")); },
+  groupEdit: v => { const g = S.groups.find(x => x.id === v); if (!g) return;
+    sheet(`<form class="stack" data-form="groupEdit" data-g="${v}" style="gap:14px">${sheetHead(T("Personnaliser le groupe"))}${fld("gx-n",T("Nom du groupe"),inp("gx-n",g.name,"required"))}<div class="field"><label>${T("Icône (si pas de photo)")}</label>${emojiPick("gxemo", g.emoji||"")}</div><button type="button" class="btn ghost" data-act="groupPhoto" data-v="${v}">${icon("camera")}${g.photo?T("Changer la photo"):T("Ajouter une photo")}</button>${g.photo?`<button type="button" class="btn line" data-act="groupPhotoDel" data-v="${v}">${T("Retirer la photo")}</button>`:""}<button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`); },
+  groupPhotoDel: async v => { const g = S.groups.find(x => x.id === v); g.photo = null; await Cloud.groupPhoto(v, null); closeSheet(); render(); },
   groupRsvp: async v => { const [g, e] = v.split("|"), ev = S.groups.find(x => x.id === g)?.events?.find(x => x.id === e); await Cloud.groupRsvp(g, e, !ev?.rsvp?.[Cloud.user.uid]?.ok); },
 });
 function memoryToDrive(m, verbose){
@@ -223,6 +235,10 @@ function memoryToDrive(m, verbose){
 
 /* ======== CHANGEMENTS ======== */
 Object.assign(CHANGE, {
+  photoMonth: t => { UI.photoF.m = t.value; render(); }, photoKid: t => { UI.photoF.kid = t.value; render(); },
+  photoFrom: t => { UI.photoF.from = t.value; render(); }, photoTo: t => { UI.photoF.to = t.value; render(); },
+  famEmoji: t => { S.family.emoji = t.value; save(); render(); familySheet(); },
+  grpEmoji: async t => { const g = S.groups.find(x => x.id === t.dataset.g); if (!g) return; g.emoji = t.value; await Cloud.groupUpdate(g.id, {emoji:t.value}); render(); },
   setBg: t => { S.settings.bg = t.value; commit(); },
   setBgCustom: t => { S.settings.bg = t.value; commit(); },
   feature: t => { S.settings.features[t.dataset.k] = t.checked; commit(); },
@@ -292,7 +308,6 @@ Object.assign(FORMS, {
     if (!d.name) return toast(T("Nom requis")); if (id) Object.assign(c.trackers.find(x => x.id === id), d); else c.trackers.push({id:uid(), ...d}); closeSheet(); commit(T("Suivi enregistré")); },
   activity: f => { const days = checked("days").map(Number); if (!days.length) return toast(T("Choisissez au moins un jour")); const c = child(), d = {name:val("a-name"), days, time:val("a-time"), place:val("a-place"), dur:numOf("a-dur")||0, auto:$("#a-auto").checked};
     if (f.dataset.id) Object.assign(c.activities.find(x => x.id === f.dataset.id), d); else c.activities.push({id:uid(), since:iso(today()), ...d}); closeSheet(); commit(f.dataset.id ? T("Modifié") : T("Activité ajoutée")); },
-  sportToggle: v => { const [cid, aid, ds] = v.split("|"), c = kidById(cid); c.sportSkip = c.sportSkip || {}; const k = aid+"|"+ds; if (c.sportSkip[k]) delete c.sportSkip[k]; else c.sportSkip[k] = true; save(); if ($("#layer .sheet")) dayDetail(ds); else render(); },
   growth: f => { const c = child(), w = Math.round(toMetric("weight", numOf("g-w"))*1000)/1000 || 0, h = Math.round(toMetric("height", numOf("g-h"))*10)/10 || 0, oc = Math.round(toMetric("ofc", numOf("g-c"))*10)/10 || 0;
     if (!w && !h && !oc) return toast(T("Entrez au moins une mesure")); if (parseD(val("g-date")) < parseD(c.dob)) return toast(T("La date est avant la naissance"));
     const d = {date:val("g-date"), weight:w||null, height:h||null, ofc:oc||null};
@@ -326,7 +341,11 @@ Object.assign(FORMS, {
   chat: async f => { const t = $("#chat-in").value.trim(); if (!t) return; $("#chat-in").value = ""; await Cloud.send(f.dataset.ch, t); },
   groupNew: async () => { const id = await Cloud.groupCreate(val("gn")); closeSheet(); UI.groupOpen = id; toast(T("Groupe créé")); },
   joinGroup: async () => { await Cloud.groupJoin(val("jg-code")); toast(T("Vous avez rejoint le groupe")); },
-  groupEvent: async f => { await Cloud.groupEvent(f.dataset.g, {id:uid(), title:val("ge-t"), date:val("ge-d"), time:val("ge-h"), place:val("ge-p"), by:Cloud.user.uid, rsvp:{[Cloud.user.uid]:{ok:true, name:me()?.name||""}}}); closeSheet(); toast(T("Activité proposée")); },
+  groupEvent: async f => { const gid = f.dataset.g, eid = f.dataset.id, g = S.groups.find(x => x.id === gid), ex = eid ? g?.events?.find(x => x.id === eid) : null;
+    const d = {title:val("ge-t"), date:val("ge-d"), time:val("ge-h"), place:val("ge-p"), notes:val("ge-n")};
+    const e = ex ? {...ex, ...d, editedBy:Cloud.user.uid} : {id:uid(), ...d, by:Cloud.user.uid, rsvp:{[Cloud.user.uid]:{ok:true, name:me()?.name||""}}};
+    await Cloud.groupEvent(gid, e); if (ex) Object.assign(ex, d); closeSheet(); render(); toast(ex ? T("Activité modifiée") : T("Activité proposée")); },
+  groupEdit: async f => { const gid = f.dataset.g, g = S.groups.find(x => x.id === gid), d = {name:val("gx-n") || g.name, emoji:radio("gxemo") || ""}; Object.assign(g, d); await Cloud.groupUpdate(gid, d); closeSheet(); render(); toast(T("Groupe mis à jour")); },
 });
 
 /* ======== DONNÉES D'EXEMPLE ======== */

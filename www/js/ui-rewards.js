@@ -36,6 +36,41 @@ function pointsLog(mid){
   return L.sort((a,b) => a.date === b.date ? b.at - a.at : (a.date < b.date ? 1 : -1));
 }
 
+/* points personnalisables, niveaux avec titres, badges d'assiduité */
+const ptsIc = () => S.settings.pts?.emoji || "⭐";
+const LEVEL_TITLES = [
+  {e:"🌱", t:"Petite pousse"}, {e:"🧭", t:"Explorateur"}, {e:"🎒", t:"Aventurier"}, {e:"🛠️", t:"Débrouillard"}, {e:"🏅", t:"Champion"},
+  {e:"🦸", t:"Héros du quotidien"}, {e:"⚓", t:"Capitaine"}, {e:"🦉", t:"Sage"}, {e:"🌟", t:"Légende"}, {e:"👑", t:"Grand chef de la tribu"}];
+const BADGES = [
+  {k:"first", e:"🎈", t:"Premier défi", d:"Réussir un premier défi"},
+  {k:"s3", e:"🔥", t:"En feu", d:"Au moins un défi 3 jours de suite"},
+  {k:"s7", e:"📅", t:"Assidu", d:"Au moins un défi 7 jours de suite"},
+  {k:"s14", e:"🚀", t:"Inarrêtable", d:"Au moins un défi 14 jours de suite"},
+  {k:"s30", e:"🏆", t:"Marathonien", d:"Au moins un défi 30 jours de suite"},
+  {k:"c10", e:"✅", t:"Bon départ", d:"10 défis réussis"},
+  {k:"c50", e:"💪", t:"Pro des défis", d:"50 défis réussis"},
+  {k:"c100", e:"💯", t:"Centurion", d:"100 défis réussis"},
+  {k:"week", e:"⚡", t:"Super semaine", d:"100 points ou plus en une semaine"},
+  {k:"team", e:"🤝", t:"Esprit d'équipe", d:"Un défi d'équipe ou des points mis dans un objectif commun"},
+  {k:"gift", e:"💝", t:"Cœur généreux", d:"Offrir des points à quelqu'un"},
+  {k:"l5", e:"🏅", t:"Niveau 5", d:"Atteindre le niveau 5"},
+  {k:"l10", e:"👑", t:"Sommet", d:"Atteindre le niveau 10"}];
+function badgesOf(mid){
+  const ok = S.completions.filter(x => x.memberId === mid && x.status === "ok"), days = [...new Set(ok.map(x => x.date))].sort();
+  let best = 0, run = 0, prev = null; days.forEach(d => { run = prev && (parseD(d) - parseD(prev)) / DAY < 1.5 ? run + 1 : 1; best = Math.max(best, run); prev = d; });
+  const wk = {}; ok.forEach(x => { const d = parseD(x.date), k = iso(addDays(d, -((d.getDay()+6)%7))); wk[k] = (wk[k]||0) + (x.points||0); });
+  const lvl = levelOf(pointsOf(mid).earned).lvl, n = ok.length;
+  const team = ok.some(x => x.team) || S.redemptions.some(x => rKind(x) === "team" && x.memberId === mid && x.status !== "refuse"), gift = S.redemptions.some(x => rKind(x) === "gift" && x.memberId === mid && x.status !== "refuse");
+  const got = {first:n >= 1, s3:best >= 3, s7:best >= 7, s14:best >= 14, s30:best >= 30, c10:n >= 10, c50:n >= 50, c100:n >= 100, week:Object.values(wk).some(v => v >= 100), team, gift, l5:lvl >= 5, l10:lvl >= 10};
+  return BADGES.map(b => ({...b, got:!!got[b.k], streak:best}));
+}
+function levelsLegend(people){
+  return `<div class="stack" style="gap:10px;margin-top:10px"><span class="eyebrow">${T("Niveaux")}</span><div class="list">${LEVEL_TITLES.map((L, i) => { const from = LEVELS[i] ?? 0, who = people.filter(p => levelOf(pointsOf(p.id).earned).lvl >= i + 1);
+      return `<div class="li"><div class="ic" style="font-size:1.3rem;background:var(--surface2)">${L.e}</div><div class="grow"><div class="li-title">${T("Niveau {n}",{n:i+1})} · ${T(L.t)}</div><div class="tiny muted">${i === 0 ? T("Dès le départ") : T("À partir de {n} points",{n:from})}</div></div><div class="row" style="gap:2px">${who.map(p => avatarOf(p, 22)).join("")}</div></div>`; }).join("")}</div>
+    <span class="eyebrow">${T("Badges")}</span><div class="badge-grid">${BADGES.map(b => { const who = people.filter(p => badgesOf(p.id).find(x => x.k === b.k)?.got);
+      return `<div class="bdg ${who.length?"on":""}"><span class="be">${b.e}</span><b>${T(b.t)}</b><small>${T(b.d)}</small>${who.length?`<div class="row" style="gap:2px;justify-content:center">${who.map(p => avatarOf(p, 20)).join("")}</div>`:""}</div>`; }).join("")}</div>
+    <p class="tiny muted">${T("Les niveaux comptent tout ce qui a été gagné depuis le début : dépenser ne fait pas perdre de niveau.")}</p></div>`;
+}
 function defisView(){
   const parent = !isKidUser(), viewer = actor();
   const tabs = [["jour",T("Aujourd'hui")],["recomp",T("Récompenses")],["equipe",T("Équipe")],["histo",T("Historique")]];
@@ -46,7 +81,10 @@ function defisView(){
     if (kids.length) h += `<div class="card tint"><div class="card-h"><h3>${T("C'est qui ?")}</h3></div><div class="pick">${kids.map(k => `<button data-act="kidAs" data-v="${k.id}" aria-pressed="${k.id===viewer.id}">${avatarOf(k,22)} ${esc(k.name)}</button>`).join("")}</div></div>`; }
   const people = parent ? players() : [viewer];
   h += `<div class="grid">${(people.length ? people : [viewer]).map(p => { const P = pointsOf(p.id), L = levelOf(P.earned);
-    return `<button class="card c4" data-act="histOf" data-v="${p.id}" style="border:0;text-align:left;cursor:pointer;color:inherit;background:linear-gradient(160deg,var(--${p.color||"peach"}-bg),var(--surface))"><div class="row">${avatarOf(p,44)}<div class="grow"><b>${esc(p.name)}</b><div class="tiny muted">${T("Niveau {n}",{n:L.lvl})} · ${T("{n} pts cette semaine",{n:P.week})}</div></div><div style="text-align:right"><div class="points" style="color:var(--${p.color||"peach"}-ink)">${P.balance}</div><span class="tiny muted">${T("à dépenser")}</span></div></div><div class="levelbar"><i style="width:${clamp((P.earned-L.from)/(L.to-L.from)*100,2,100).toFixed(0)}%"></i></div><span class="tiny muted">${T("{n} points avant le niveau suivant",{n:Math.max(0,Math.round(L.to-P.earned))})} · ${T("Voir l'historique")}</span></button>`; }).join("")}</div>`;
+    const LT = LEVEL_TITLES[Math.min(L.lvl, LEVEL_TITLES.length) - 1], B = badgesOf(p.id).filter(b => b.got);
+    return `<button class="card c4" data-act="histOf" data-v="${p.id}" style="border:0;text-align:left;cursor:pointer;color:inherit;background:linear-gradient(160deg,var(--${p.color||"peach"}-bg),var(--surface))"><div class="row">${avatarOf(p,44)}<div class="grow" style="min-width:0"><b>${esc(p.name)}</b><div class="tiny muted">${LT.e} ${T("Niveau {n}",{n:L.lvl})} · ${T(LT.t)}</div><div class="tiny muted">${T("{n} pts cette semaine",{n:P.week})}</div></div><div style="text-align:right"><div class="points" style="color:var(--${p.color||"peach"}-ink)">${ptsIc()} ${P.balance}</div><span class="tiny muted">${T("à dépenser")}</span></div></div><div class="levelbar"><i style="width:${clamp((P.earned-L.from)/(L.to-L.from)*100,2,100).toFixed(0)}%"></i></div><span class="tiny muted">${L.lvl >= LEVELS.length ? T("Niveau maximal atteint !") : T("{n} points avant le niveau suivant",{n:Math.max(0,Math.round(L.to-P.earned))})} · ${T("Voir l'historique")}</span>${B.length ? `<div class="badges-row">${B.map(b => `<span title="${esc(T(b.t))}">${b.e}</span>`).join("")}</div>` : ""}</button>`; }).join("")}</div>
+  <details class="card lexcard"><summary><b>${icon("star")} ${T("Légende : niveaux et badges")}</b></summary>${levelsLegend(people.length ? people : [viewer])}</details>
+  ${parent ? `<button class="btn sm ghost" data-act="ptsForm" style="align-self:flex-start">${icon("sliders")}${T("Personnaliser les points (nom et icône)")}</button>` : ""}`;
   h += `<div class="seg">${tabs.map(([id,l]) => `<button data-act="defTab" data-v="${id}" aria-pressed="${UI.defTab===id}">${l}</button>`).join("")}</div>`;
   return h + ({jour:defisJour, recomp:defisRecomp, equipe:defisEquipe, histo:defisHisto}[UI.defTab])(parent, viewer);
 }
@@ -165,6 +203,12 @@ function addRedemption(o){ S.redemptions.push({id:uid(), date:iso(today()), at:D
 
 Object.assign(ACT, {
   defTab: v => { UI.defTab = v; UI.histSel = null; render(); },
+  ptsForm: () => { const P = S.settings.pts || {};
+    sheet(`<form class="stack" data-form="ptsForm" style="gap:14px">${sheetHead(T("Personnaliser les points"))}<p class="small muted">${T("Donnez un nom qui motive votre tribu : étoiles, pièces d'or, glands, cristaux…")}</p>
+      <div class="fgrid">${fld("pt-name",T("Nom (pluriel)"),inp("pt-name",P.name||"",`placeholder="${T("étoiles")}"`))}${fld("pt-short",T("Abréviation (facultatif)"),inp("pt-short",P.short||"",`placeholder="${T("ét.")}"`))}</div>
+      <div class="field"><label>${T("Icône")}</label><div class="emopick">${["⭐","🪙","💎","🌰","🍀","🔥","🎟️","🧩","🍪","🚀","🌈","❤️"].map(e => `<label><input type="radio" name="ptemo" value="${e}" ${(P.emoji||"⭐")===e?"checked":""}><span>${e}</span></label>`).join("")}</div></div>
+      <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${P.name?`<button type="button" class="btn line" data-act="ptsReset">${T("Revenir à « points »")}</button>`:""}</div></form>`); },
+  ptsReset: () => { S.settings.pts = {emoji:S.settings.pts?.emoji}; save(); closeSheet(); render(); },
   histOf: v => { UI.defTab = "histo"; UI.histWho = v; UI.histSel = null; render(); },
   histWho: v => { UI.histWho = v; render(); }, histDay: v => { UI.histSel = v || null; render(); },
   histNav: v => { const b = UI.histMonth ? parseD(UI.histMonth) : new Date(today().getFullYear(), today().getMonth(), 1); UI.histMonth = iso(addMonths(b, +v)); UI.histSel = null; render(); },
@@ -192,3 +236,4 @@ Object.assign(FORMS, {
     addRedemption({kind:"gift", memberId:from, toId:to, cost:n, note:val("g-why")}); closeSheet(); commit(T("{a} a donné {n} points à {b}",{a:member(from)?.name||"", n, b:member(to)?.name||""})); confetti(); },
   teamGoal: () => { S.rewards.push({id:uid(), title:val("tg-title"), cost:numOf("tg-cost")||300, team:true}); closeSheet(); commit(T("Objectif d'équipe créé")); },
 });
+Object.assign(FORMS, { ptsForm: () => { const name = val("pt-name").trim(); S.settings.pts = {name, short:val("pt-short").trim() || "", emoji:radio("ptemo") || "⭐"}; if (!name) delete S.settings.pts.name; save(); closeSheet(); render(); toast(T("Enregistré")); } });

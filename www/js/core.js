@@ -80,7 +80,7 @@ function growthPoints(c, meas, chrono=false){
     let x = meas === "bmi" ? (g.weight && g.height ? g.weight / Math.pow(g.height/100, 2) : null) : g[meas];
     x = x ? Number(x) : null; if (!x) return null;
     const m = effAge(c, parseD(g.date), chrono);
-    return { date:g.date, m, x, z: zScore(meas, c.sex, m, x) };
+    return { id:g.id, date:g.date, m, x, z: zScore(meas, c.sex, m, x) };
   }).filter(Boolean).sort((a,b) => a.m - b.m);
 }
 function growthAlerts(c){
@@ -197,7 +197,7 @@ function loadLocal(){
 let saveT;
 function save(){
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){ toast(T("Stockage plein : exportez vos données ou retirez des photos")); }
-  clearTimeout(saveT); saveT = setTimeout(() => { try { window.Cloud?.push?.(); } catch(e){} try { scheduleNotifications(); } catch(e){} }, 600);
+  clearTimeout(saveT); saveT = setTimeout(() => { try { window.Cloud?.push?.(); } catch(e){} try { scheduleNotifications(); } catch(e){} try { typeof driveWatch === "function" && driveWatch(); } catch(e){} }, 600);
 }
 const child = () => S.children.find(c => c.id === S.active) || S.children[0];
 const kidById = id => S.children.find(c => c.id === id);

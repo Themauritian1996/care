@@ -6,6 +6,8 @@ let LANG = "fr";
 const EN = {}; // rempli par i18n-en.js
 function T(s, vars){
   let out = (LANG === "en" && EN[s]) ? EN[s] : s;
+  const P = typeof S !== "undefined" && S?.settings?.pts;
+  if (P?.name && /\b(points|pts)\b/.test(out) && !/vérification|checkpoint/i.test(s)) out = out.replace(/\bpoints\b/g, P.name).replace(/\bpts\b/g, P.short || P.name);
   if (vars) out = out.replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? m);
   return out;
 }

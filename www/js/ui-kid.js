@@ -329,10 +329,8 @@ function allergenCard(c){
   const log = c.allergensLog || {};
   return `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Introduction des allergènes")}</span><h2>${T("Exposition régulière")}</h2></div><span class="chip mint num">${ALLERGENS.filter(a=>(log[a]||[]).length).length}/${ALLERGENS.length}</span></div>
   <p class="small muted">${T("Une fois introduit sans réaction, gardez l'aliment au menu quelques fois par semaine. Urticaire étendue, vomissements répétés ou difficulté à respirer : 911.")}</p>
-  <div class="tbl"><table><thead><tr><th>${T("Aliment")}</th><th>${T("Fois")}</th><th>${T("Dernière")}</th><th></th></tr></thead><tbody>
-  ${ALLERGENS.map(a => { const L = (log[a]||[]).slice().sort(); const last = L[L.length-1]; const stale = last && (today()-parseD(last))/DAY > 10;
-    return `<tr><td style="font-weight:600">${T(a)}</td><td><span class="kbd-num">${L.length}</span></td><td class="small" style="color:var(--${stale?"butter-ink":"muted"})">${last?fmtD(last,{day:"numeric",month:"short"})+(stale?" · "+T("à redonner"):""):"—"}</td><td><button class="btn sm ghost" data-act="allergen" data-v="${esc(a)}">+ ${T("Aujourd'hui")}</button></td></tr>`; }).join("")}
-  </tbody></table></div></div>`;
+  <div class="list">${ALLERGENS.map(a => { const L = (log[a]||[]).slice().sort(); const last = L[L.length-1]; const stale = last && (today()-parseD(last))/DAY > 10;
+    return `<div class="li"><div class="ic" style="background:var(--${L.length?"mint":"surface2"}-bg, var(--surface2));color:var(--${L.length?"mint":"muted"}-ink, var(--muted));font-weight:800">${L.length}</div><div class="grow"><div class="li-title">${T(a)}</div><div class="small" style="color:var(--${stale?"butter-ink":"muted"})">${last?T("Dernière fois : {d}",{d:fmtD(last,{day:"numeric",month:"short"})})+(stale?" · "+T("à redonner"):""):T("Pas encore introduit")}</div></div><button class="btn sm ghost" data-act="allergen" data-v="${esc(a)}" style="white-space:nowrap">+ ${T("Aujourd'hui")}</button></div>`; }).join("")}</div></div>`;
 }
 
 /* ======== CROISSANCE ======== */
@@ -352,7 +350,8 @@ function croissance(c){
     ${correction(c)>0?`<div class="seg"><button data-act="chrono" data-v="0" aria-pressed="${!UI.chrono}">${T("Âge corrigé")}</button><button data-act="chrono" data-v="1" aria-pressed="${UI.chrono}">${T("Chronologique")}</button></div>`:""}</div>
     <div class="row between"><div class="seg" id="rangeSeg"></div><div class="chart-tools"><button class="icon-btn" data-act="zoom" data-v="in" aria-label="${T("Zoom avant")}">${icon("zoomin")}</button><button class="icon-btn" data-act="zoom" data-v="out" aria-label="${T("Zoom arrière")}">${icon("zoomout")}</button><button class="icon-btn" data-act="zoom" data-v="left" aria-label="${T("Plus tôt")}">${icon("left")}</button><button class="icon-btn" data-act="zoom" data-v="right" aria-label="${T("Plus tard")}">${icon("right")}</button><button class="icon-btn" data-act="chartFull" aria-label="${T("Agrandir")}">${icon("expand")}</button></div></div>
     <div class="chart-wrap" id="chart"></div>
-    <div class="legend"><span><i style="background:var(--soft)"></i>3e · 97e</span><span><i style="background:var(--soft);opacity:.6"></i>15e · 85e</span><span><i style="background:var(--muted)"></i>50e</span><span><i style="background:var(--kid);height:8px;width:8px;border-radius:50%"></i>${esc(c.nick||c.name)}</span><span>${T("Glissez pour déplacer · pincez pour zoomer")}</span></div>
+    <div class="legend"><span><i style="background:var(--soft)"></i>3e · 97e</span><span><i style="background:var(--soft);opacity:.6"></i>15e · 85e</span><span><i style="background:var(--muted)"></i>50e</span><span><i style="background:var(--kid);height:8px;width:8px;border-radius:50%"></i>${esc(c.nick||c.name)}</span></div><p class="tiny muted" style="margin:0">${T("Glissez pour déplacer · pincez pour zoomer · touchez un point pour voir la mesure")}</p>
+    <details class="lex"><summary class="small">${T("Lexique")}</summary><ul class="small"><li>${T("<b>P</b> = percentile : P75 veut dire que 75 % des enfants du même âge et du même sexe ont une valeur plus basse.")}</li><li>${T("<b>50e</b> = médiane ; la zone colorée va du 15e au 85e percentile ; les lignes pleines extérieures sont le 3e et le 97e.")}</li><li>${T("<b>z</b> = écart-type par rapport à la médiane (0 = médiane ; ±1,88 = 3e / 97e percentile).")}</li><li>${T("<b>IMC</b> = indice de masse corporelle (poids ÷ taille²). <b>PC</b> = périmètre crânien.")}</li><li>${T("Ce qui compte surtout : que la courbe suive son couloir dans le temps.")}</li></ul></details>
     ${alerts.map(a => a.out ? `<div class="banner warn">${icon("info")}<div>${a.last.z<0?T("La dernière mesure est sous le 3e percentile."):T("La dernière mesure est au-dessus du 97e percentile.")} ${T("Ce n'est pas forcément anormal ; montrez la courbe au médecin.")}</div></div>`
       : `<div class="banner warn">${icon("info")}<div><b>${T("Changement de couloir.")}</b> ${T("Depuis le {d}, la courbe a franchi {n} lignes de percentiles. À montrer au médecin à la prochaine visite.",{d:fmtD(a.from.date), n:a.n})}</div></div>`).join("")}
   </div>`;
@@ -367,7 +366,7 @@ function croissance(c){
   else h += `<div class="list">${G.map(g => {
     const am = effAge(c, parseD(g.date)), b = bmiOf(g);
     const chip = (key, v, dp) => { if (!v) return ""; const z = zScore(key, c.sex, am, v); return `<span class="gchip"><small>${T(MEAS[key].label)}</small><b>${fmtNum(cvM(key,v),dpM(key,dp))} ${muM(key)}</b>${z!=null?`<em>P${pctLabel(z)}</em>`:""}</span>`; };
-    return `<div class="li" ${isKidUser()?"":`data-act="growthForm" data-v="${g.id}" style="cursor:pointer"`}><div class="grow"><div class="li-title">${fmtD(g.date)} <span class="small muted">· ${ageLabel(ageMonths(c, parseD(g.date)))}</span></div><div class="gchips">${chip("weight",Number(g.weight),2)}${chip("height",Number(g.height),1)}${mod(c,"ofc")?chip("ofc",Number(g.ofc),1):""}${chip("bmi",b,1)}</div></div>${isKidUser()?"":icon("edit").replace("<svg",'<svg style="width:18px;height:18px;color:var(--soft)"')}</div>`; }).join("")}</div>`;
+    return `<div class="li" data-growth-row="${g.id}" ${isKidUser()?"":`data-act="growthForm" data-v="${g.id}" style="cursor:pointer"`}><div class="grow"><div class="li-title">${fmtD(g.date)} <span class="small muted">· ${ageLabel(ageMonths(c, parseD(g.date)))}</span></div><div class="gchips">${chip("weight",Number(g.weight),2)}${chip("height",Number(g.height),1)}${mod(c,"ofc")?chip("ofc",Number(g.ofc),1):""}${chip("bmi",b,1)}</div></div>${isKidUser()?"":icon("edit").replace("<svg",'<svg style="width:18px;height:18px;color:var(--soft)"')}</div>`; }).join("")}</div>`;
   return h + `<p class="tiny muted">${T("Normes OMS de croissance (0-5 ans) et référence OMS 2007 (5-19 ans), recommandées au Canada.")}</p></div>`;
 }
 function ranges(k){
@@ -408,7 +407,7 @@ function drawChart(c, sel, big=false){
   if (pts.length){
     s += `<path d="M${pts.map(p=>`${X(p.m).toFixed(1)},${Y(p.x).toFixed(1)}`).join("L")}" fill="none" stroke="var(--kid-ink)" stroke-width="2.5" stroke-linejoin="round"/>`;
     pts.forEach((p,i) => { const last = i === pts.length-1;
-      s += `<circle cx="${X(p.m)}" cy="${Y(p.x)}" r="${last?7:5}" fill="var(--kid)" stroke="var(--surface)" stroke-width="2.5"><title>${fmtD(p.date)} · ${fmtNum(cvM(k,p.x), dpM(k,MEAS[k].dp))} ${muM(k)}${p.z!=null?` · P${pctLabel(p.z)}`:""}</title></circle>`;
+      s += `<circle cx="${X(p.m)}" cy="${Y(p.x)}" r="16" fill="transparent" data-gid="${p.id}" style="cursor:pointer"/><circle cx="${X(p.m)}" cy="${Y(p.x)}" r="${last?7:5}" fill="var(--kid)" stroke="var(--surface)" stroke-width="2.5" pointer-events="none"><title>${fmtD(p.date)} · ${fmtNum(cvM(k,p.x), dpM(k,MEAS[k].dp))} ${muM(k)}${p.z!=null?` · P${pctLabel(p.z)}`:""}</title></circle>`;
       if (last || big) s += `<text x="${Math.min(X(p.m)+10, W-P.r-70)}" y="${Y(p.x)-12}" font-size="${big?11:12}" font-weight="700" fill="var(--kid-ink)">${fmtNum(cvM(k,p.x), dpM(k,MEAS[k].dp))}${p.z!=null?` · P${pctLabel(p.z)}`:""}</text>`; });
   } else s += `<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="var(--muted)">${T("Aucune mesure dans cette période")}</text>`;
   el.innerHTML = s + `<text x="${P.l}" y="${P.t-6}" font-size="11" fill="var(--muted)">${muM(k)}</text></svg>`;
@@ -426,9 +425,17 @@ function bindChartPan(sel, c){
   el.addEventListener("pointermove", e => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
     if (pinch && pts.size >= 2){ const k = pinch.d / dist(), span = (pinch.z.b - pinch.z.a) * k, anchor = pinch.z.a + (pinch.z.b - pinch.z.a) * pinch.f; apply({a:anchor - span*pinch.f, b:anchor + span*(1-pinch.f)}); return; }
     if (!start) return; const dx = e.clientX - start.x; if (Math.abs(dx) < 6) return; const span = start.z.b - start.z.a; apply({a:start.z.a - dx/start.w*span, b:start.z.b - dx/start.w*span}); });
-  const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) start = null; };
+  let down = null; el.addEventListener("pointerdown", e => { down = {x:e.clientX, y:e.clientY, t:Date.now(), id:e.target.closest?.("[data-gid]")?.dataset.gid}; }, true);
+  const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) start = null;
+    if (down?.id && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 10 && Date.now() - down.t < 600){ const gid = down.id; down = null; growthJump(gid); } };
   el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
   el.addEventListener("wheel", e => { e.preventDefault(); const z = cur(), mid = (z.a+z.b)/2, half = (z.b-z.a)/2 * (e.deltaY > 0 ? 1.2 : 0.83); apply({a:mid-half, b:mid+half}); }, {passive:false});
+}
+/* toucher un point de la courbe : aller à cette mesure dans l'historique */
+function growthJump(gid){
+  if ($("#layer .sheet")) closeSheet();
+  const row = $(`[data-growth-row="${gid}"]`); if (!row) return growthForm(gid);
+  row.scrollIntoView({behavior:"smooth", block:"center"}); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash");
 }
 function drawProjection(c){
   const el = $("#proj"); if (!el) return;
@@ -499,32 +506,40 @@ function dossier(c){
   return `<div class="grid"><div class="card c6"><div class="card-h"><h2>${T("Dossier santé")}</h2>${isKidUser()?"":`<button class="btn sm ghost" data-act="kidForm" data-v="${c.id}">${icon("edit")}${T("Modifier")}</button>`}</div>
     ${c.allergies?`<div class="banner alert">${icon("alert")}<div><b>${T("Allergies :")}</b> ${esc(c.allergies)}</div></div>`:""}
     <div class="list">${f(T("Allergies"),c.allergies)}${f(T("Problèmes de santé"),c.conditions)}${f(T("Médicaments réguliers"),c.meds)}${f(T("Médecin ou IPS"),c.doctor)}${f(T("Pharmacie"),c.pharmacy)}${f(T("Naissance"),`${fmtD(c.dob)} · ${c.gaW} ${T("SA")} ${c.gaD||0} ${T("j")}`)}</div></div>
-    <div class="card c6"><div class="card-h"><h2>${T("Rapport pour la visite")}</h2>${icon("doc")}</div><p class="small muted">${T("Un résumé clair pour le médecin ou l'IPS : croissance et percentiles, vaccins, développement, habitudes, fièvre et médicaments récents. En PDF, à partager ou à envoyer par courriel.")}</p><button class="btn kid" data-act="report">${T("Préparer le rapport")}</button></div></div>`;
+    <div class="card c6"><div class="card-h"><h2>${T("Rapport pour la visite")}</h2>${icon("doc")}</div><p class="small muted">${T("Un résumé clair pour le médecin ou l'IPS : croissance et percentiles, vaccins, développement, habitudes, fièvre et médicaments récents. En PDF, à partager ou à envoyer par courriel.")}</p><button class="btn kid" data-act="report">${T("Préparer le rapport")}</button>
+      ${Cloud.canDrive?.() ? `<div class="sep"></div><p class="small muted">${T("Document « Suivi de {n} » dans Google Drive (dossier Tribe / Suivi), mis à jour automatiquement : croissance, vaccins, jalons, dents, habitudes par mois et notes.",{n:esc(c.nick||c.name)})}</p><div class="row" style="flex-wrap:wrap"><button class="btn sm ghost" data-act="driveSuiviNow" data-v="${c.id}">${icon("drive")}${T("Mettre à jour maintenant")}</button>${S.settings.driveSuivi?.[c.id]?.id ? `<a class="btn sm line" href="https://docs.google.com/document/d/${esc(S.settings.driveSuivi[c.id].id)}/edit" target="_blank" rel="noopener">${T("Ouvrir le document")}</a>` : ""}</div>` : ""}</div></div>`;
 }
-/* dents : schéma cliquable des deux arcades */
+/* dents : schéma cliquable des deux arcades, dents de lait et permanentes, numérotation FDI */
 function dents(c){
-  const has = (id, sd) => !!(c.teeth[id] || c.teeth[id+sd]);
-  const n = TEETH.reduce((s,t)=>s+(has(t.id,"L")?1:0)+(has(t.id,"R")?1:0),0);
+  c.teethLost = c.teethLost || {}; c.permTeeth = c.permTeeth || {};
+  const m = ageMonths(c), perm = (UI.dentMode || (m >= 72 ? "perm" : "lait")) === "perm";
+  const has = (id, sd) => !!(c.teeth[id] || c.teeth[id+sd]), lost = (id, sd) => !!c.teethLost[id+sd];
+  const list = perm ? PERM_TEETH : TEETH, total = perm ? 32 : 20;
+  const keyOf = (t, sd) => perm ? fdi(true, t.jaw, sd, t.k) : t.id + sd;
+  const state = (t, sd) => perm ? (c.permTeeth[keyOf(t, sd)] ? "on" : "") : lost(t.id, sd) ? "lost" : has(t.id, sd) ? "on" : "";
+  const n = list.reduce((s, t) => s + ["L","R"].filter(sd => state(t, sd) === "on").length, 0), nl = perm ? 0 : TEETH.reduce((s, t) => s + ["L","R"].filter(sd => lost(t.id, sd)).length, 0);
   const jaw = upper => {
-    const list = TEETH.filter(t => t.jaw === (upper?"u":"l")); let g = "";
-    const cx = 180, cy = upper ? 150 : 20, rx = 135, ry = 115;
-    list.forEach(t => [-1,1].forEach(side => {
-      const i = t.pos[0], ang = (upper ? -1 : 1) * (Math.PI/2) + side * (0.17 + i*0.29) * (upper?-1:1);
-      const x = cx + Math.cos(ang)*rx*(upper?1:1)*(side), y = cy + (upper?-1:1)*Math.abs(Math.sin(ang))*ry;
-      const px = cx + side*Math.sin(0.17 + i*0.29)*rx, py = upper ? cy - Math.cos(0.17 + i*0.29)*ry : cy + Math.cos(0.17 + i*0.29)*ry;
-      const sd = side < 0 ? "R" : "L", on = has(t.id, sd), w = i >= 3 ? 30 : i === 2 ? 22 : 20, hh = i >= 3 ? 30 : 26;
-      g += `<g class="t" tabindex="0" role="button" aria-pressed="${on}" aria-label="${esc(T(t.n))} ${sd==="L"?T("gauche"):T("droite")}" data-act="tooth" data-v="${t.id+sd}"><path d="M${px-w/2} ${py-hh/2+6}q0-6 6-6h${w-12}q6 0 6 6v${hh-12}q0 6-${w/2} 8q-${w/2}-2-${w/2}-8z" fill="${on?"var(--mint)":"var(--surface)"}" stroke="${on?"var(--mint-ink)":"var(--soft)"}" stroke-width="2"/></g>`;
+    const L = list.filter(t => t.jaw === (upper ? "u" : "l")), cnt = L.length, cx = 180, cy = upper ? 150 : 20, rx = perm ? 152 : 140, ry = perm ? 124 : 118;
+    const a0 = perm ? 0.09 : 0.17, st = perm ? 0.178 : 0.29; let g = "";
+    L.forEach((t, i) => [-1, 1].forEach(side => {
+      const ang = a0 + i * st, px = cx + side * Math.sin(ang) * rx, py = upper ? cy - Math.cos(ang) * ry : cy + Math.cos(ang) * ry;
+      const sd = side < 0 ? "R" : "L", stt = state(t, sd), molar = perm ? t.k >= 6 : t.k >= 4;
+      const w = perm ? (molar ? 24 : t.k >= 4 ? 19 : t.k === 3 ? 17 : 16) : (molar ? 30 : t.k === 3 ? 22 : 20), hh = perm ? (molar ? 24 : 22) : (molar ? 30 : 26);
+      const fill = stt === "on" ? "var(--mint)" : stt === "lost" ? "var(--surface2)" : "var(--surface)", stroke = stt === "on" ? "var(--mint-ink)" : "var(--soft)";
+      g += `<g class="t" tabindex="0" role="button" aria-pressed="${stt === "on"}" aria-label="${esc(T(t.n))} ${sd==="L"?T("gauche"):T("droite")} (${fdi(perm, t.jaw, sd, t.k)})" data-act="tooth" data-v="${perm ? "P" + keyOf(t, sd) : keyOf(t, sd)}"><path d="M${px-w/2} ${py-hh/2+6}q0-6 6-6h${w-12}q6 0 6 6v${hh-12}q0 6-${w/2} 8q-${w/2}-2-${w/2}-8z" fill="${fill}" stroke="${stroke}" stroke-width="2" ${stt==="lost"?'stroke-dasharray="3 3"':""}/><text x="${px}" y="${py+4}" text-anchor="middle" font-size="${perm?9:10}" font-weight="700" fill="${stt==="on"?"var(--mint-ink)":"var(--muted)"}" pointer-events="none">${fdi(perm, t.jaw, sd, t.k)}</text></g>`;
     }));
     return g;
   };
-  return `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Dents de lait")}</span><h2>${T("{n} dents sur 20",{n})}</h2></div>${icon("tooth")}</div>
-    <p class="small muted">${T("Touchez une dent sur le schéma quand elle perce (vue de face : la gauche de l'enfant est à droite de l'écran).")}</p>
+  const chip = (t, sd) => { const st = state(t, sd), lbl = `${fdi(perm, t.jaw, sd, t.k)}`; return st === "on" ? `<span class="chip mint">${lbl} ✓</span>` : st === "lost" ? `<span class="chip">${lbl} ${T("tombée")}</span>` : `<span class="chip muted-chip">${lbl}</span>`; };
+  const rows = [...list].sort((a, b) => parseFloat(a.age) - parseFloat(b.age) || (a.jaw < b.jaw ? 1 : -1));
+  return `<div class="card"><div class="seg"><button data-act="dentMode" data-v="lait" aria-pressed="${!perm}">${T("Dents de lait (20)")}</button><button data-act="dentMode" data-v="perm" aria-pressed="${perm}">${T("Dents permanentes (32)")}</button></div>
+    <div class="card-h"><div><span class="eyebrow">${perm ? T("Dents permanentes") : T("Dents de lait")}</span><h2>${T("{n} dents sur {t}",{n, t:total})}${nl ? ` <small class="muted">· ${T("{n} tombée(s)",{n:nl})}</small>` : ""}</h2></div>${icon("tooth")}</div>
+    <p class="small muted">${perm ? T("Touchez une dent quand elle sort.") : T("Touchez une dent : 1re fois = sortie, 2e fois = tombée, 3e fois = effacer.")} ${T("Vue de face : la gauche de l'enfant est à droite de l'écran. Numéros FDI, ceux qu'utilisent les dentistes.")}</p>
     <div class="jaw"><svg viewBox="0 0 360 330" aria-label="${T("Schéma des dents")}"><text x="180" y="18" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="700">${T("Haut")}</text><g transform="translate(0,30)">${jaw(true)}</g><text x="180" y="182" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="700">${T("Bas")}</text><g transform="translate(0,160)">${jaw(false)}</g></svg></div>
-    <div class="tbl"><table><thead><tr><th>${T("Dent")}</th><th>${T("Âge habituel")}</th><th>${T("Sortie")}</th></tr></thead><tbody>${[...TEETH].sort((a,b)=>parseInt(a.age)-parseInt(b.age)).map(t => `<tr><td>${T(t.n)}</td><td class="small">${T(t.age)}</td><td>${["R","L"].map(sd => has(t.id,sd)?`<span class="chip mint">${sd==="L"?T("G"):T("D")}</span>`:"").join(" ")||"—"}</td></tr>`).join("")}</tbody></table></div></div>
+    <div class="list">${rows.map(t => `<div class="li"><div class="grow"><div class="li-title">${T(t.n)}</div><div class="small muted">${T("Sortie : {a}",{a:T(t.age)})}${t.lost ? ` · ${T("Chute : {a}",{a:T(t.lost)})}` : ""}</div></div><div class="row" style="gap:4px;flex-wrap:nowrap">${chip(t, "R")}${chip(t, "L")}</div></div>`).join("")}</div>
+    <details class="lex"><summary class="small">${T("Lexique")}</summary><ul class="small"><li>${T("<b>Numéros FDI</b> : le 1er chiffre est le quadrant (lait : 5 haut droite, 6 haut gauche, 7 bas gauche, 8 bas droite ; permanentes : 1 à 4 dans le même ordre), le 2e la dent en partant du centre.")}</li><li>${T("Les premières molaires permanentes (16, 26, 36, 46) sortent vers 6 ans derrière les dents de lait, sans qu'aucune dent ne tombe.")}</li><li>${T("Les âges sont des moyennes : quelques mois d'écart sont normaux.")}</li></ul></details></div>
     <div class="card"><h3>${T("Conseils pour les dents")}</h3><ul class="small" style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px">${TEETH_TIPS.map(t=>`<li>${T(t)}</li>`).join("")}</ul></div>`;
 }
-
-/* ======== DÉVELOPPEMENT ======== */
 const AGIR_TOT = "https://www.quebec.ca/famille-et-soutien-aux-personnes/enfance/developpement-des-enfants/outils-ressources-developpement-enfants/programme-agir-tot-depister-tot-pour-mieux-repondre-aux-besoins-des-enfants";
 function dev(c){
   const m = ageMonths(c), em = effAge(c);
@@ -538,6 +553,8 @@ function dev(c){
     ${domainSummary(c, em)}</div>`;
   const talk = MS.filter(it => msLevel(c, it, em).id === "parler");
   if (talk.length) h += `<div class="banner soft">${icon("info")}<div><b>${T("À mentionner calmement à la prochaine visite")}</b> ${T("(rien d'urgent ; souvent l'enfant y arrive peu après) :")}<ul>${talk.map(it=>`<li>${esc(T(it.t))}</li>`).join("")}</ul></div></div>`;
+  const band = UI.msBand || "auto";
+  h += `<div class="card" style="padding:12px 14px"><span class="eyebrow">${T("Filtrer par âge")}</span><div class="pick chips-scroll" style="flex-wrap:nowrap;overflow-x:auto"><button data-act="msBand" data-v="auto" aria-pressed="${band==="auto"}">${T("Autour de maintenant")}</button>${BANDS.map(b => `<button data-act="msBand" data-v="${b}" aria-pressed="${String(band)===String(b)}">${bandLabel(b)}</button>`).join("")}<button data-act="msBand" data-v="all" aria-pressed="${band==="all"}">${T("Tous")}</button></div></div>`;
   h += UI.msMode === "detail" ? msDetail(c, em) : msConcise(c, em);
   h += `<div class="card"><h3>${T("Signes à surveiller à tout âge")}</h3><ul class="small" style="margin:0;padding-left:18px">${GENERAL_FLAGS.map(f=>`<li>${T(f)}</li>`).join("")}</ul></div>`;
   h += `<div class="card tint"><h3>${T("Une inquiétude ?")}</h3><p class="small">${T("Le programme Agir tôt offre dépistage et services aux 0-5 ans, sans attendre un diagnostic. Communiquez avec votre CLSC, ou demandez au médecin ou à l'éducatrice de vous y diriger.")}</p><a class="btn sm kid" style="align-self:flex-start" href="${AGIR_TOT}" target="_blank" rel="noopener">${T("Programme Agir tôt")}</a></div>`;
@@ -551,19 +568,22 @@ function domainSummary(c, em){
 function msRow(c, it, em){
   const on = !!c.milestones[it.k], L = msLevel(c, it, em);
   return `<div class="ms"><button class="check" role="checkbox" aria-checked="${on}" aria-label="${esc(T(it.t))}" data-act="ms" data-v="${esc(it.k)}">${on?icon("check"):""}</button><div class="grow"><div class="row between" style="gap:6px"><span class="dom" style="color:var(--${DOMAINS[it.d].color}-ink)">${T(DOMAINS[it.d].label)}</span>${L.id!=="tot"?`<span class="chip ${L.c}">${L.l}</span>`:""}</div><div>${esc(T(it.t))}</div>
-    <div class="tiny muted">${on ? T("Observé le {d}",{d:fmtD(c.milestones[it.k])}) : `${T("Habituellement")} ${rangeTxt(it)} · ${T("médiane")} ${mLabel(it.m50)}`}</div>${!on && (L.id==="obs"||L.id==="parler") ? `<div class="tiny" style="color:var(--${L.c}-ink)">${L.tip}</div>`:""}</div></div>`;
+    <div class="tiny muted">${on ? `${T("Observé le {d}",{d:fmtD(c.milestones[it.k])})} · ` : ""}${T("Habituellement")} ${rangeTxt(it)} · ${T("médiane")} ${mLabel(it.m50)}</div>${!on && (L.id==="obs"||L.id==="parler") ? `<div class="tiny" style="color:var(--${L.c}-ink)">${L.tip}</div>`:""}${msInfo(it)}</div></div>`;
 }
+/* détails d'un jalon (plages usuelles) */
+const msInfo = it => `<details class="msinfo"><summary class="tiny">${T("Plages usuelles")}</summary><div class="tiny"><div>${T("La plupart des enfants (25e → 90e percentile) : {r}",{r:rangeTxt(it)})}</div><div>${T("Médiane (la moitié des enfants) : {m}",{m:mLabel(it.m50)})}</div>${it.al?`<div>${T("À mentionner au médecin si pas acquis vers {a}",{a:mLabel(it.al)})}</div>`:""}<div class="muted">${T(DOMAINS[it.d].label)}</div></div></details>`;
 function msConcise(c, em){
-  const cur = BANDS.find(b => b >= em) || 72, idx = BANDS.indexOf(cur);
-  const show = UI.msAll ? BANDS : BANDS.slice(Math.max(0, idx-1), idx+2);
+  const cur = BANDS.find(b => b >= em) || 72, idx = BANDS.indexOf(cur), band = UI.msBand || "auto";
+  const show = band === "all" || UI.msAll ? BANDS : band !== "auto" ? [+band] : BANDS.slice(Math.max(0, idx-1), idx+2);
   return show.map(b => { const items = MS.filter(it => bandOf(it) === b); if (!items.length) return "";
     const done = items.filter(it => c.milestones[it.k]).length;
     return `<div class="card" ${b===cur?'style="outline:2px solid var(--kid)"':""}><div class="card-h"><h2>${T("D'ici {a}",{a:bandLabel(b)})}</h2><div class="row">${b===cur?`<span class="chip peach">${T("Maintenant")}</span>`:""}<span class="chip mint num">${done}/${items.length}</span></div></div><div>${items.map(it => msRow(c,it,em)).join("")}</div></div>`; }).join("")
     + `<button class="btn ghost" data-act="msAll">${UI.msAll?T("Voir seulement autour de l'âge actuel"):T("Voir tous les âges (2 mois à 6 ans)")}</button>`;
 }
 function msDetail(c, em){
-  let items = UI.msAll ? MS : MS.filter(it => it.a <= em + 12 && it.b >= em - 10); if (!items.length) items = MS;
-  const a0 = UI.msAll ? 0 : Math.max(0, Math.floor(Math.min(...items.map(i=>i.a)))), b0 = UI.msAll ? 72 : Math.ceil(Math.max(...items.map(i=>i.al||i.b), em + 2));
+  const band = UI.msBand || "auto", all = band === "all" || UI.msAll;
+  let items = all ? MS : band !== "auto" ? MS.filter(it => bandOf(it) === +band) : MS.filter(it => it.a <= em + 12 && it.b >= em - 10); if (!items.length) items = MS;
+  const a0 = all ? 0 : Math.max(0, Math.floor(Math.min(...items.map(i=>i.a)))), b0 = all ? 72 : Math.ceil(Math.max(...items.map(i=>i.al||i.b), band === "auto" ? em + 2 : 0));
   const X = m => clamp((m - a0)/(b0 - a0)*100, 0, 100), step = (b0-a0) <= 18 ? 3 : (b0-a0) <= 36 ? 6 : 12;
   const ticks = []; for (let t = Math.ceil(a0/step)*step; t <= b0; t += step) ticks.push(t);
   const axis = `<div class="axis">${ticks.map(t=>`<span style="left:${X(t)}%">${t<24?t+" "+T("m"):t/12+" "+T("a")}</span>`).join("")}</div>`;
@@ -574,7 +594,7 @@ function msDetail(c, em){
           return `<div class="tl-row"><button class="check" role="checkbox" aria-checked="${on}" aria-label="${esc(T(it.t))}" data-act="ms" data-v="${esc(it.k)}">${on?icon("check"):""}</button>
             <div style="min-width:0"><div class="row between" style="gap:6px"><span style="font-weight:600">${esc(T(it.t))}</span><span class="tiny muted num">${rangeTxt(it)}</span></div>
             <div class="track"><div class="bar" style="left:${X(it.a)}%;width:${Math.max(1.5, X(it.b)-X(it.a))}%;background:${col};opacity:${on?1:.75}"></div><div class="med" style="left:calc(${X(it.m50)}% - 1px)"></div>${it.al && it.al<=b0?`<div class="flag" style="left:calc(${X(it.al)}% - 1px)"></div>`:""}<div class="now" style="left:calc(${X(em)}% - 1px)"></div></div>
-            ${on?`<div class="tiny muted">${T("Observé le {d}",{d:fmtD(c.milestones[it.k])})}</div>`:L.tip&&L.id!=="tot"?`<div class="tiny muted">${L.tip}</div>`:""}</div></div>`; }).join("")}</div>`; }).join("")
+            ${on?`<div class="tiny muted">${T("Observé le {d}",{d:fmtD(c.milestones[it.k])})}</div>`:L.tip&&L.id!=="tot"?`<div class="tiny muted">${L.tip}</div>`:""}${msInfo(it)}</div></div>`; }).join("")}</div>`; }).join("")
     + `<button class="btn ghost" data-act="msAll">${UI.msAll?T("Voir seulement autour de l'âge actuel"):T("Voir toute la période 0-6 ans")}</button>
     <p class="tiny muted">${T("Motricité globale : fenêtres d'acquisition de l'OMS (2006). Autres sphères : plages inspirées du Denver II, du CDC et de la grille Rourke. Indicatif, ne remplace pas une évaluation.")}</p>`;
 }

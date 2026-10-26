@@ -26,6 +26,7 @@ function createPane(){
       ${fld("st-msg",T("Ce qu'on veut transmettre (facultatif)"),inp("st-msg","",`placeholder="${T("Le courage, partager, s'endormir calme…")}"`))}
       <div class="field"><label>${T("Ambiance")}</label>${checks("st-mood", MOODS.map(x => [x, T(x)]), ["Doux"])}</div>
       <div class="field"><label>${T("Longueur")}</label>${radios("st-len",[["3",T("3 minutes")],["6",T("6 minutes")],["10",T("10 minutes")]],"3")}</div>
+      ${fld("st-lvl",T("Niveau du livre (vocabulaire et style)"),lvlSelect("st-lvl",""))}
       ${lib.length ? `<div class="field"><label>${T("Reprendre des personnages")}</label>${checks("st-chars", lib.map(ch => [ch.id, `${ch.name} (${ch.story})`]), [])}</div>` : ""}
       ${fld("st-new",T("Nouveaux personnages (facultatif)"),inp("st-new","",`placeholder="${T("Ex. : Zara, une renarde qui adore les énigmes")}"`))}
       <div class="row" style="flex-wrap:wrap"><button type="button" class="btn ghost" data-act="storyIdeas">${icon("bulb")}${T("Proposer 3 idées d'abord")}</button><button class="btn kid" type="submit">${icon("spark")}${T("Écrire directement")}</button></div>
@@ -50,9 +51,19 @@ function createPane(){
 const STORY_SCHEMA = {type:"OBJECT", properties:{title:{type:"STRING"}, chapterTitle:{type:"STRING"}, summary:{type:"STRING"},
   characters:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, desc:{type:"STRING"}, kind:{type:"STRING", enum:["enfant","adulte","aine","animal","creature","robot"]}}, required:["name","desc","kind"]}},
   segments:{type:"ARRAY", items:{type:"OBJECT", properties:{speaker:{type:"STRING"}, text:{type:"STRING"}}, required:["speaker","text"]}}}, required:["title","chapterTitle","summary","characters","segments"]};
+/* niveau de lecture : Gemini adapte vocabulaire, phrases et intrigue */
+const READ_LEVELS = [["", "Selon l'âge de l'enfant"], ["2-3", "Tout-petits (2-3 ans) : mots simples, répétitions"], ["4-5", "4-5 ans : phrases courtes, album illustré"], ["6-7", "6-7 ans : premiers lecteurs"], ["8-9", "8-9 ans : petit roman"], ["10-12", "10-12 ans : roman jeunesse"], ["13+", "Ados : roman pour adolescents"]];
+const lvlSelect = (id, sel) => `<select class="inp" id="${id}">${READ_LEVELS.map(([v, l]) => `<option value="${v}" ${v===sel?"selected":""}>${T(l)}</option>`).join("")}</select>`;
+const LVL_HINT = {"2-3":"livre pour tout-petits de 2-3 ans : phrases de 3 à 6 mots, mots très concrets du quotidien, beaucoup de répétitions et d'onomatopées, aucune ambiguïté",
+  "4-5":"album pour 4-5 ans : phrases courtes, vocabulaire simple avec un ou deux mots nouveaux expliqués par le contexte, structure répétitive, émotions nommées",
+  "6-7":"livre pour premiers lecteurs de 6-7 ans : phrases simples et courtes, mots faciles à décoder, dialogues fréquents, un seul fil d'intrigue",
+  "8-9":"petit roman pour 8-9 ans : phrases variées, vocabulaire plus riche, un peu de suspense, humour",
+  "10-12":"roman jeunesse pour 10-12 ans : vocabulaire riche, phrases complexes, personnages nuancés, intrigue avec rebondissements",
+  "13+":"roman pour adolescents : style littéraire, thèmes plus matures (amitié, identité, courage), dialogues naturels"};
+const lvlOfAge = m => m < 48 ? "2-3" : m < 72 ? "4-5" : m < 96 ? "6-7" : m < 120 ? "8-9" : m < 156 ? "10-12" : "13+";
 function storyOpts(){
   const lib = (S.stories||[]).flatMap(s => s.characters), picked = checked("st-chars").map(id => lib.find(x => x.id === id)).filter(Boolean);
-  return {hero:val("st-hero"), place:val("st-place"), theme:val("st-theme"), msg:val("st-msg"), moods:checked("st-mood"), len:+radio("st-len")||3, newChars:val("st-new"), chars:picked.map(x => ({name:x.name, desc:x.desc, kind:x.kind, voice:x.voice}))};
+  return {hero:val("st-hero"), place:val("st-place"), theme:val("st-theme"), msg:val("st-msg"), moods:checked("st-mood"), len:+radio("st-len")||3, level:val("st-lvl"), newChars:val("st-new"), chars:picked.map(x => ({name:x.name, desc:x.desc, kind:x.kind, voice:x.voice}))};
 }
 const optsText = o => `Héros : ${o.hero||"au choix"}. Lieu : ${o.place||"au choix"}. Thème : ${o.theme||"au choix"}. Message : ${o.msg||"au choix"}. Ambiance : ${(o.moods||[]).join(", ")||"douce"}. Personnages à reprendre : ${o.chars?.map(c => `${c.name} (${c.desc})`).join("; ")||"aucun"}. Nouveaux personnages souhaités : ${o.newChars||"au choix"}.`;
 async function storyIdeas(){
@@ -76,7 +87,7 @@ function storyGen(story, plan, direction, over = {}){
   const title = story ? T("{t} · chapitre {n}",{t:story.title, n}) : T("Nouvelle histoire");
   return aiJob("story", title, async () => {
     const prev = story ? `Histoire existante « ${story.title} ». Personnages (garde leurs noms, caractères et façons de parler) : ${story.characters.filter(x => x.id !== "narr").map(x => `${x.name} — ${x.desc}`).join(" ; ")}.\nRésumé des chapitres précédents :\n${story.chapters.map(ch => `${ch.n}. ${ch.title} : ${ch.summary}`).join("\n")}\nFin du dernier chapitre : ${story.chapters.at(-1).segs.slice(-3).map(s => s.t).join(" ")}\nÉcris le chapitre ${n}, qui continue l'histoire. ${direction ? `Direction voulue : ${direction}.` : ""}` : `Plan : ${plan || "à inventer"}`;
-    const r = await gemini({tier:"fast", json:STORY_SCHEMA, temperature:0.85, timeout:90000, contents:[{role:"user", parts:[{text:`Écris une histoire du soir pour ${kidLine(c)} (vocabulaire adapté à l'âge, rythme apaisant, fin calme). ${optsText(o)}\n${prev}\nLongueur : environ ${words} mots. Découpe le texte en segments : la narration avec speaker « Narrateur », chaque réplique d'un personnage dans un segment séparé avec son nom exact comme speaker (sans tiret ni guillemets, ni « dit-il » dans la réplique). Liste dans characters tous les personnages qui parlent (pas le narrateur), avec une description courte et leur type. summary : 2 phrases qui résument ce chapitre. En ${LANG==="en"?"anglais":"français"}.`}]}]});
+    const r = await gemini({tier:"fast", json:STORY_SCHEMA, temperature:0.85, timeout:90000, contents:[{role:"user", parts:[{text:`Écris une histoire du soir pour ${kidLine(c)} (rythme apaisant, fin calme). Niveau du texte : ${LVL_HINT[o.level || lvlOfAge(c && !isPrenatal(c) ? ageMonths(c) : 48)]}. Respecte strictement ce niveau de langue. ${optsText(o)}\n${prev}\nLongueur : environ ${words} mots. Découpe le texte en segments : la narration avec speaker « Narrateur », chaque réplique d'un personnage dans un segment séparé avec son nom exact comme speaker (sans tiret ni guillemets, ni « dit-il » dans la réplique). Liste dans characters tous les personnages qui parlent (pas le narrateur), avec une description courte et leur type. summary : 2 phrases qui résument ce chapitre. En ${LANG==="en"?"anglais":"français"}.`}]}]});
     const out = parseJSON(r.text);
     const st = story || {id:uid(), kid:c?.id||null, title:out.title, opts:o, characters:[{id:"narr", name:T("Narrateur"), desc:"", kind:"narrateur", voice:autoVoice("narrateur", 0)}], chapters:[], fav:false, at:Date.now(), engine:"device"};
     if (!story){ (o.chars||[]).forEach((ch,i) => st.characters.push({id:uid(), name:ch.name, desc:ch.desc, kind:ch.kind||"enfant", voice:ch.voice || autoVoice(ch.kind, i+1)})); }
@@ -85,7 +96,7 @@ function storyGen(story, plan, direction, over = {}){
       let ch = st.characters.find(x => x.name.toLowerCase() === name.toLowerCase()); if (!ch){ ch = {id:uid(), name, desc:name === o.hero ? T("le héros") : "", kind:"enfant", voice:autoVoice("enfant", st.characters.length)}; st.characters.push(ch); } return ch.id; };
     st.chapters.push({n, title:out.chapterTitle, summary:out.summary, segs:(out.segments||[]).map(s => ({c:idOf(s.speaker), t:s.text})), at:Date.now(), direction:direction||""});
     S.stories = S.stories || []; if (!story) S.stories.unshift(st);
-    const e = aiHist("story", `${st.title} · ${T("chapitre {n}",{n})}`, st.chapters.at(-1).segs.map(s => s.t).join("\n\n"), {kid:st.kid, storyId:st.id}); save();
+    const e = aiHist("story", `${st.title} · ${T("chapitre {n}",{n})}`, st.chapters.at(-1).segs.map(s => s.t).join("\n\n"), {kid:st.kid, storyId:st.id}); save(); driveQ("story", st.id);
     return {histId:e.id, open:() => storyOpen(st.id)};
   }, {kid:c?.id, open:() => storyOpen((story||S.stories[0]).id)});
 }
@@ -128,14 +139,15 @@ function storyNextSheet(id){
     ${fld("sn-new",T("Nouveau personnage (facultatif)"),inp("sn-new","",`placeholder="${T("Ex. : un hibou qui a peur du noir")}"`))}
     <div class="field"><label>${T("Ambiance")}</label>${checks("sn-mood", MOODS.map(x => [x, T(x)]), o.moods?.length ? o.moods : ["Doux"])}</div>
     <div class="field"><label>${T("Longueur")}</label>${radios("sn-len",[["3",T("3 minutes")],["6",T("6 minutes")],["10",T("10 minutes")]], String(o.len||3))}</div>
+    ${fld("sn-lvl",T("Niveau du livre (vocabulaire et style)"),lvlSelect("sn-lvl", o.level||""))}
     <label class="switch"><input type="checkbox" id="sn-img"><span class="tg"></span><span class="grow">${T("Illustrer le chapitre (image)")}</span></label>
     <div class="row" style="flex-wrap:wrap"><button type="button" class="btn ghost" data-act="storySurprise" data-v="${id}">${icon("auto")}${T("Surprise !")}</button><button class="btn kid grow" type="submit">${icon("spark")}${T("Écrire le chapitre {n}",{n:s.chapters.length+1})}</button></div></form>`);
 }
 function storyNextRun(id, surprise){
   const s = S.stories.find(x => x.id === id); if (!s) return;
   const dir = surprise ? T("surprends-nous : une suite inattendue mais douce") : [val("sn-dir"), val("sn-new") ? `introduis ce nouveau personnage : ${val("sn-new")}` : ""].filter(Boolean).join(" ; ");
-  const over = surprise ? {} : {moods:checked("sn-mood"), len:+radio("sn-len") || s.opts?.len || 3}, img = !!$("#sn-img")?.checked;
-  closeSheet(); const n = s.chapters.length;
+  const over = surprise ? {} : {moods:checked("sn-mood"), len:+radio("sn-len") || s.opts?.len || 3, level:val("sn-lvl")}, img = !!$("#sn-img")?.checked;
+  closeSheet(); const n = s.chapters.length; if (!surprise){ s.opts = {...(s.opts||{}), ...over}; save(); }
   const p = storyGen(s, null, dir, over);
   if (img) Promise.resolve(p).then(() => { const t = setInterval(() => { if (s.chapters.length > n){ clearInterval(t); storyImage(id, n, true); } }, 1500); setTimeout(() => clearInterval(t), 180000); });
 }
@@ -174,7 +186,7 @@ function storyImage(sid, ci, quiet){
         if (!id2?.data) throw new Error(d.candidates?.[0]?.finishReason || T("pas d'image"));
         const small = await shrinkImage(`data:${id2.mimeType||id2.mime_type||"image/png"};base64,${id2.data}`, 1024, 0.85);
         if (ch.img) await PhotoDB.del(ch.img).catch(() => {});
-        ch.img = "stimg-" + uid(); await PhotoDB.put(ch.img, small); ch.imgModel = model; save();
+        ch.img = "stimg-" + uid(); await PhotoDB.put(ch.img, small); ch.imgModel = model; save(); driveQ("story", sid);
         return {open:() => storyOpen(sid)};
       } catch(e){ lastErr = e; AI_LAST_ERR = `${model} : ${e.message}`.slice(0, 300); if (/API_KEY_INVALID|PERMISSION_DENIED/i.test(e.message)) break; }
     }
@@ -330,7 +342,7 @@ Object.assign(ACT, {
   storyImg: v => { const [sid, ci] = v.split("|"); storyImage(sid, +ci); },
   storyShare: v => { const s = S.stories.find(x => x.id === v); Native.share({title:s.title, text:`${s.title}\n\n${s.chapters.map(ch => `${T("Chapitre {n}",{n:ch.n})} · ${ch.title}\n\n${ch.segs.map(sg => (sg.c!=="narr"?`${s.characters.find(x=>x.id===sg.c)?.name} : `:"") + sg.t).join("\n")}`).join("\n\n")}`}); },
   storyKeep: v => { const s = S.stories.find(x => x.id === v); S.memories.push({id:uid(), kind:"story", date:iso(today()), title:s.title, text:s.chapters.map(ch => `## ${ch.title}\n${ch.segs.map(sg => sg.t).join("\n")}`).join("\n\n"), kidIds:s.kid?[s.kid]:[]}); save(); driveQ("mem", S.memories.at(-1).id); toast(T("Souvenir enregistré")); },
-  storyDel: v => { if (!confirmDel()) return; stopPlay(); (S.stories.find(x => x.id === v)?.chapters||[]).forEach(ch => ch.img && PhotoDB.del(ch.img).catch(() => {})); S.stories = S.stories.filter(x => x.id !== v); closeSheet(); commit(); },
+  storyDel: v => { if (!confirmDel()) return; stopPlay(); (S.stories.find(x => x.id === v)?.chapters||[]).forEach(ch => ch.img && PhotoDB.del(ch.img).catch(() => {})); driveQDel(S.stories.find(x => x.id === v)?.driveIds); S.stories = S.stories.filter(x => x.id !== v); closeSheet(); commit(); },
   charForm: v => charForm(v),
   charTest: async v => { const vc = readVoice(), txt = LANG === "en" ? "Hello! Here is my voice for the story." : "Bonjour ! Voici ma voix pour l'histoire."; stopPlay();
     try { if (v === "gemini"){ toast(T("Génération de la voix…")); const url = await TTS.gemini(txt, vc); const a = new Audio(url); PL.audio = a; a.play(); } else await TTS.speakDevice(txt, vc); } catch(e){ toast(e.message); } },
