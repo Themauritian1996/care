@@ -19,6 +19,7 @@ const DRIVE_KINDS = [
   ["speciaux", "Souvenirs spéciaux", "Premières fois, lettres ouvertes, voyages, créations…"],
   ["histoires", "Histoires", "Chaque histoire avec ses chapitres et ses images"],
   ["suivi", "Suivi de chaque enfant", "Un document par enfant mis à jour : croissance, vaccins, jalons, dents, habitudes par mois, notes, fièvre et médicaments"],
+  ["backup", "Sauvegarde hebdomadaire", "Un fichier avec toutes les données de l'app (sans les photos), chaque semaine ; les 8 dernières sont gardées"],
 ];
 /* une seule personne de la famille garde la copie (pas de doublons) ; elle peut partager le dossier avec l'autre parent */
 const driveKeeperOk = () => !S.settings.driveKeeper || S.settings.driveKeeper === Cloud.user?.uid;
@@ -112,6 +113,11 @@ async function driveUpOne(x){
     const path = ["Histoires", safeName(s.title)], ids = [(await upDoc(s.title, storyDoc(s), T("Histoire"), path)).id];
     for (const c of s.chapters) if (c.img){ const d = await PhotoDB.get(c.img); if (d) ids.push((await Cloud.driveUpload(`${T("Chapitre")} ${c.n}.jpg`, d.startsWith("data:image/png") ? "image/png" : "image/jpeg", d.split(",")[1], c.title, path)).id); }
     s.driveIds = ids.filter(Boolean);
+  } else if (x.kind === "backup"){
+    const snap = JSON.parse(JSON.stringify({...S, exportedAt:new Date().toISOString(), app:appName()})); delete snap.driveQueue; if (snap.settings?.parental) delete snap.settings.parental.pin;
+    const r = await Cloud.driveUpload(`Sauvegarde-${iso(today())}.json`, "application/json", b64txt(JSON.stringify(snap)), T("Sauvegarde automatique de Tribe"), ["Sauvegardes"]);
+    const list = [{id:r.id, at:Date.now()}, ...(S.settings.driveBackups||[])]; S.settings.driveBackups = list.slice(0, 8); S.settings.driveBackupAt = Date.now();
+    for (const o of list.slice(8)) await Cloud.driveDelete(o.id).catch(() => {});
   } else if (x.kind === "suivi"){
     const c = kidById(x.id); if (!c || isPrenatal(c)) return;
     S.settings.driveSuivi = S.settings.driveSuivi || {}; const old = S.settings.driveSuivi[c.id];
@@ -146,6 +152,7 @@ function driveWatch(){
       if (driveWants("photos")) S.photos.filter(p => !p.driveIds?.length && p.date >= iso(new Date(since))).forEach(p => add("photo", p.id));
       S.memories.filter(m => !m.driveIds?.length && !lockedMem(m) && driveWants(memKind(m)) && m.date >= iso(new Date(since - 365*DAY))).forEach(m => add("mem", m.id));
       if (drivePending()) { save(); driveFlush(); } }
+    if (driveWants("backup") && Date.now() - (S.settings.driveBackupAt||0) > 7*DAY && !(S.driveQueue||[]).some(x => x.kind === "backup") && S.children.length) driveQ("backup", "all");
     if (!driveWants("suivi")) return; const D = S.settings.driveSuivi || {};
     S.children.filter(c => !isPrenatal(c)).forEach(c => { const h = suiviHash(c); if (D[c.id]?.h !== h && !(S.driveQueue||[]).some(x => x.kind === "suivi" && x.id === c.id)) driveQ("suivi", c.id); }); }, 120000);
 }
@@ -165,12 +172,14 @@ const driveSettings = () => { const parents = S.family.members.filter(m => m.uid
     <div class="pick">${parents.map(m => `<button data-act="driveKeeper" data-v="${m.uid}" aria-pressed="${keeper===m.uid}">${avatarOf(m,20)} ${esc(m.name)}${m.uid===mine?` (${T("moi")})`:""}</button>`).join("")}<button data-act="driveKeeper" data-v="" aria-pressed="${!keeper}">${T("Chacun son Drive")}</button></div>
     ${keeper && keeper !== mine ? `<p class="small">${T("La copie est faite par {n}. Demandez-lui de partager le dossier avec vous (bouton ci-dessous sur son téléphone).",{n:esc(parents.find(m => m.uid===keeper)?.name||"")})}</p>` : ""}
     ${keeper === mine ? `<div class="row" style="flex-wrap:wrap">${parents.filter(m => m.uid !== mine && m.email).map(m => `<button class="btn sm ghost" data-act="driveShareWith" data-v="${esc(m.email)}">${icon("share")}${T("Partager le dossier avec {n}",{n:esc(m.name)})}</button>`).join("")}</div>` : ""}</div>` : ""}
+  <div class="row" style="flex-wrap:wrap"><button class="btn sm ghost" data-act="driveBackupNow">${icon("db")}${T("Sauvegarder maintenant")}</button><span class="tiny muted">${S.settings.driveBackupAt ? T("Dernière sauvegarde : {d}",{d:fmtD(new Date(S.settings.driveBackupAt),{day:"numeric",month:"long"})}) : T("Aucune sauvegarde pour l'instant")}</span></div>
   <div class="field"><label>${T("Copier automatiquement")}</label><div class="list">${DRIVE_KINDS.map(([k, l, d]) => `<label class="switch"><input type="checkbox" data-change="driveKind" data-k="${k}" ${(S.settings.driveSync?.[k] ?? true)?"checked":""} ${S.settings.driveAuto===false?"disabled":""}><span class="tg"></span><span class="grow"><b>${T(l)}</b><span class="tiny muted" style="display:block">${T(d)}</span></span></label>`).join("")}</div></div>`; };
 Object.assign(ACT, {
   driveKeeper: v => { S.settings.driveKeeper = v || null; S.settings.driveKeeperSince = Date.now() - 30*DAY; commit(v ? T("Copie Drive confiée à un seul compte") : T("Chacun garde sa copie")); },
   driveShareWith: async v => { try { toast(T("Partage du dossier…")); await Cloud.driveShare(v); toast(T("Dossier « Tribe » partagé avec {e} : il apparaîtra dans « Partagés avec moi » de son Drive.",{e:v})); } catch(e){ toast(T("Google Drive : {e}",{e:e.message})); } },
   driveSync: () => driveFlush(true),
   driveAll: () => driveBackfill(),
+  driveBackupNow: () => { driveQ("backup", "all", true); driveFlush(true); },
   driveSuiviNow: v => { driveQ("suivi", v || child()?.id, true); driveFlush(true); },
 });
 Object.assign(CHANGE, {

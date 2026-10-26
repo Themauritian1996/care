@@ -3,3 +3,5 @@ android/
 *.apk
 *.keystore
 *.jks
+# captures de test
+/*.png

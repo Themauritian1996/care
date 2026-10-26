@@ -2,7 +2,7 @@
    L'ambiance (décor, illustration, typo) change selon le stade de l'enfant via [data-stage]. */
 :root{
   --bg:#F6F4FB; --surface:#FFFFFF; --surface2:#F0EDF8; --line:#E4DFF0;
-  --ink:#2A2340; --muted:#736B8A; --soft:#A39BB8;
+  --ink:#2A2340; --muted:#675E80; --soft:#8E86A4;
   --peach:#FF9E7A; --peach-ink:#B24A22; --peach-bg:#FFEDE5;
   --mint:#62C9A4; --mint-ink:#1E7A58; --mint-bg:#E2F6EE;
   --butter:#FFD36E; --butter-ink:#8A6200; --butter-bg:#FFF5D9;
@@ -11,7 +11,7 @@
   --rose:#F47FA3; --rose-ink:#A3264F; --rose-bg:#FDE6EE;
   --teal:#4CC3C9; --teal-ink:#11696D; --teal-bg:#DFF5F6;
   --coral:#FF8C8C; --coral-ink:#A8322F; --coral-bg:#FFE7E5;
-  --danger:#E0465E; --danger-bg:#FDE7EA;
+  --danger:#E0465E; --danger-ink:#B3223F; --danger-bg:#FDE7EA;
   --kid:var(--peach); --kid-bg:var(--peach-bg); --kid-ink:var(--peach-ink);
   --shadow:0 1px 2px rgba(42,35,64,.06),0 8px 24px -12px rgba(42,35,64,.18);
   --glass:rgba(255,255,255,.86);
@@ -26,14 +26,14 @@
   --peach-ink:#FFB89E; --peach-bg:#3A2A2A; --mint-ink:#8EE3C2; --mint-bg:#1E3530; --butter-ink:#FFD98A; --butter-bg:#38311F;
   --sky-ink:#A9D0FB; --sky-bg:#1F2D40; --lilac-ink:#C9BBFA; --lilac-bg:#2D2645; --rose-ink:#F9A9C2; --rose-bg:#3B2230;
   --teal-ink:#8BE3E7; --teal-bg:#18363A; --coral-ink:#FFB3B0; --coral-bg:#3D2424;
-  --danger:#FF7186; --danger-bg:#3D2027; --glass:rgba(34,30,46,.88); --deco-op:.25;
+  --danger:#FF7186; --danger-ink:#FF7186; --danger-bg:#3D2027; --glass:rgba(34,30,46,.88); --deco-op:.25;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -14px rgba(0,0,0,.6); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#17141F; --surface:#221E2E; --surface2:#2B2639; --line:#383148; --ink:#F3F0FA; --muted:#B0A8C6; --soft:#7F7896;
   --peach-ink:#FFB89E; --peach-bg:#3A2A2A; --mint-ink:#8EE3C2; --mint-bg:#1E3530; --butter-ink:#FFD98A; --butter-bg:#38311F;
   --sky-ink:#A9D0FB; --sky-bg:#1F2D40; --lilac-ink:#C9BBFA; --lilac-bg:#2D2645; --rose-ink:#F9A9C2; --rose-bg:#3B2230;
   --teal-ink:#8BE3E7; --teal-bg:#18363A; --coral-ink:#FFB3B0; --coral-bg:#3D2424;
-  --danger:#FF7186; --danger-bg:#3D2027; --glass:rgba(34,30,46,.88); --deco-op:.25;
+  --danger:#FF7186; --danger-ink:#FF7186; --danger-bg:#3D2027; --glass:rgba(34,30,46,.88); --deco-op:.25;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -14px rgba(0,0,0,.6); color-scheme:dark}
 :root[data-stage="ado"]{ --display:"Outfit","Segoe UI",system-ui,sans-serif; --r-lg:16px; --r-md:12px }
 :root[data-stage="scol"]{ --r-lg:18px }
@@ -116,7 +116,7 @@ img.avatar{object-fit:cover}
 .chip.butter{background:var(--butter-bg);color:var(--butter-ink)}.chip.sky{background:var(--sky-bg);color:var(--sky-ink)}
 .chip.lilac{background:var(--lilac-bg);color:var(--lilac-ink)}.chip.rose{background:var(--rose-bg);color:var(--rose-ink)}
 .chip.teal{background:var(--teal-bg);color:var(--teal-ink)}.chip.coral{background:var(--coral-bg);color:var(--coral-ink)}
-.chip.danger{background:var(--danger-bg);color:var(--danger)}
+.chip.danger{background:var(--danger-bg);color:var(--danger-ink)}
 button.chip{cursor:pointer;padding:6px 12px;font-size:.84rem}
 button.chip[aria-pressed="false"]{opacity:.5;text-decoration:line-through}
 .pick{display:flex;gap:6px;flex-wrap:wrap}
@@ -132,7 +132,7 @@ button.chip[aria-pressed="false"]{opacity:.5;text-decoration:line-through}
 .btn.kid{background:var(--kid);color:#2A1A10}
 .btn.ghost{background:var(--surface2);color:var(--ink)}
 .btn.line{background:none;border:1.5px solid var(--line);color:var(--ink)}
-.btn.danger{background:var(--danger-bg);color:var(--danger)}
+.btn.danger{background:var(--danger-bg);color:var(--danger-ink)}
 .btn.sm{padding:6px 11px;border-radius:11px;font-size:.85rem}
 .btn.block{width:100%}
 .btn svg{width:18px;height:18px}
@@ -160,7 +160,7 @@ button.li{border-left:0;border-right:0;border-bottom:0;background:none;text-alig
 .banner>svg{width:20px;height:20px;flex:none;margin-top:1px}
 .banner.info{background:var(--sky-bg);color:var(--sky-ink)}
 .banner.warn{background:var(--butter-bg);color:var(--butter-ink)}
-.banner.alert{background:var(--danger-bg);color:var(--danger)}
+.banner.alert{background:var(--danger-bg);color:var(--danger-ink)}
 .banner.ok{background:var(--mint-bg);color:var(--mint-ink)}
 .banner.soft{background:var(--surface2);color:var(--ink)}
 .banner ul{margin:4px 0 0;padding-left:18px}
@@ -261,7 +261,7 @@ td{padding:9px 8px;border-top:1px solid var(--line);font-variant-numeric:tabular
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal .dow{font-size:.72rem;font-weight:700;color:var(--muted);text-align:center;padding:4px 0}
 .day{aspect-ratio:1/1;max-width:100%;border:0;border-radius:12px;background:var(--surface2);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:5px 2px;gap:2px;font-weight:600;font-size:.86rem;min-width:0;position:relative;overflow:hidden;color:inherit}
-.day.out{background:none;color:var(--soft)}
+.day.out{background:none;color:color-mix(in srgb,var(--muted) 72%,var(--surface))}
 .day.today{outline:2px solid var(--kid);outline-offset:-2px}
 .day.sel{background:var(--kid);color:#2A1A10}
 .day .thumb{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.35}
@@ -425,7 +425,7 @@ blockquote.quote.big{margin:0;font-size:1.25rem;cursor:default}
 input[type=range]{width:100%;accent-color:var(--kid)}
 /* nutrition */
 .nutrow .dombar{height:8px}
-.num.warn{color:var(--danger);font-weight:700}
+.num.warn{color:var(--danger-ink);font-weight:700}
 .macro{display:flex;height:14px;border-radius:8px;overflow:hidden;gap:2px}
 .macro i{display:block;min-width:4px}
 /* photos et familles */

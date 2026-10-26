@@ -158,6 +158,11 @@ function homeView(){
     h += `<button class="card c4" style="border:0;text-align:left;cursor:pointer;color:inherit" data-act="openKid" data-v="${c.id}"><div class="row">${avatarOf(c,48)}<div class="grow"><b style="font-family:var(--display);font-size:1.1rem">${esc(c.nick||c.name)}</b><div class="small muted">${kidAge(c)}</div></div><span class="chip ${st.color}">${T(st.label)}</span></div>
       <div class="small">${line}</div>${nv && nv.doses.some(d=>d.st!=="avenir") && feat("planner") ? `<span class="chip ${nv.doses.some(d=>d.st==="retard")?"danger":"butter"}">${icon("syringe")}${T("Vaccins {l}",{l:T(nv.group.label)})}</span>`:""}</button>`;
   });
+  // défis du jour (cases à cocher directement depuis l'accueil)
+  if (feat("rewards") && S.tasks.length){
+    const par = !isKidUser(), vw = actor(), due = S.tasks.filter(t => taskDueOn(t, today())).map(t => taskBlock(t, today(), par, vw, null)).filter(Boolean);
+    if (due.length) h += `<div class="card c6"><div class="card-h"><h2>${T("Défis du jour")}</h2><button class="btn sm ghost" data-act="tribuTab" data-v="defis">${T("Voir tout")}</button></div><div class="list">${due.slice(0,4).join("")}</div>${due.length > 4 ? `<p class="tiny muted">${T("+ {n} autres dans Défis",{n:due.length-4})}</p>` : ""}</div>`;
+  }
   // aujourd'hui
   if (feat("planner")){
     const ev = allEvents().filter(e => e.date === iso(today()) && e.type !== "photo").sort(evSort);

@@ -1,21 +1,29 @@
 rules_version = '2';
-// Règles de sécurité Firestore pour Tribe.
-// À coller dans la console Firebase : Firestore Database > Règles > Publier.
+// Règles de sécurité Firestore pour Tribe (version durcie).
+// À coller dans la console Firebase : Firestore Database > Règles > (tester dans « Simulateur de règles ») > Publier.
+// L'ancienne version est gardée dans firestore.rules.previous pour revenir en arrière.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function fam(fid) { return get(/databases/$(database)/documents/families/$(fid)).data; }
     function isMember(fid) { return signedIn() && request.auth.uid in fam(fid).memberIds; }
     function isParent(fid) { return isMember(fid) && fam(fid).roles[request.auth.uid] == 'parent'; }
+    function codeOf(c) { return get(/databases/$(database)/documents/codes/$(c)).data; }
+    // un code d'invitation vaut 30 jours
+    function codeFresh(c) { return request.time.toMillis() < codeOf(c).at + 2592000000; }
 
     match /users/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;
     }
 
-    // Codes d'invitation : lisibles un par un (pas de liste) par toute personne connectée
+    // Codes d'invitation : lisibles un par un (pas de liste). Seul un parent (famille) ou un membre (groupe)
+    // peut créer un code pour sa famille ou son groupe.
     match /codes/{code} {
       allow get: if signedIn();
-      allow create: if signedIn() && request.resource.data.by == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.by == request.auth.uid
+        && ((request.resource.data.kind == 'family' && isParent(request.resource.data.id))
+            || (request.resource.data.kind == 'group'
+                && request.auth.uid in get(/databases/$(database)/documents/groups/$(request.resource.data.id)).data.memberIds));
       allow delete: if signedIn() && resource.data.by == request.auth.uid;
     }
 
@@ -23,20 +31,22 @@ service cloud.firestore {
       allow create: if signedIn() && request.resource.data.memberIds == [request.auth.uid];
       allow read: if isMember(fid);
       allow update: if isParent(fid)
-        // une personne qui a reçu un code peut s'ajouter elle-même, avec le rôle prévu par le code
+        // une personne qui a reçu un code valide peut s'ajouter elle-même, avec le rôle prévu par le code
         || (signedIn()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds','roles','members','joinCode'])
             && request.resource.data.memberIds.toSet().difference(resource.data.memberIds.toSet()) == [request.auth.uid].toSet()
-            && get(/databases/$(database)/documents/codes/$(request.resource.data.joinCode)).data.id == fid
-            && request.resource.data.roles[request.auth.uid] == (get(/databases/$(database)/documents/codes/$(request.resource.data.joinCode)).data.role == 'enfant' ? 'enfant' : 'parent'));
+            && codeOf(request.resource.data.joinCode).kind == 'family'
+            && codeOf(request.resource.data.joinCode).id == fid
+            && codeFresh(request.resource.data.joinCode)
+            && request.resource.data.roles[request.auth.uid] == (codeOf(request.resource.data.joinCode).role == 'enfant' ? 'enfant' : 'parent'));
       allow delete: if isParent(fid);
 
-      // santé, profils, agenda, défis, récompenses : écriture réservée aux parents
+      // santé, profils, agenda, défis, récompenses, histoires : écriture réservée aux parents
       match /{col}/{id} {
         allow read: if isMember(fid);
-        allow write: if isParent(fid);
+        allow write: if isParent(fid) && col in ['kids','events','memories','tasks','rewards','reviews','stories','recipes'];
       }
-      // tous les membres : journal, discussion, disponibilités, défis accomplis, échanges, photos
+      // tous les membres : journal, disponibilités, défis accomplis, échanges, photos, activités d'enfants
       match /logs/{id} { allow read, write: if isMember(fid); }
       match /messages/{id} {
         allow read: if isMember(fid);
@@ -52,13 +62,27 @@ service cloud.firestore {
 
     match /groups/{gid} {
       function gm() { return signedIn() && request.auth.uid in resource.data.memberIds; }
-      allow create: if signedIn() && request.resource.data.memberIds == [request.auth.uid];
+      // le créateur d'un groupe ne peut pas être changé
+      function ownerKept() { return request.resource.data.get('owner', null) == resource.data.get('owner', null); }
+      function isOwner() { return !('owner' in resource.data) || resource.data.owner == request.auth.uid; }
+      // un membre peut : ne pas toucher à la liste, se retirer lui-même, ou (créateur) vider le groupe pour le supprimer
+      function membersOk() {
+        let a = resource.data.memberIds.toSet();
+        let b = request.resource.data.memberIds.toSet();
+        return b == a
+          || (a.difference(b) == [request.auth.uid].toSet() && b.difference(a).size() == 0)
+          || (b.size() == 0 && isOwner());
+      }
+      allow create: if signedIn() && request.resource.data.memberIds == [request.auth.uid]
+        && request.resource.data.get('owner', request.auth.uid) == request.auth.uid;
       allow read: if gm();
-      allow update: if gm()
+      allow update: if (gm() && ownerKept() && membersOk())
         || (signedIn()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds','members','joinCode'])
             && request.resource.data.memberIds.toSet().difference(resource.data.memberIds.toSet()) == [request.auth.uid].toSet()
-            && get(/databases/$(database)/documents/codes/$(request.resource.data.joinCode)).data.id == gid);
+            && codeOf(request.resource.data.joinCode).kind == 'group'
+            && codeOf(request.resource.data.joinCode).id == gid
+            && codeFresh(request.resource.data.joinCode));
       match /{sub}/{id} {
         allow read, write: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groups/$(gid)).data.memberIds;
       }
