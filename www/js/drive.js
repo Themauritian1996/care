@@ -112,6 +112,7 @@ async function driveUpOne(x){
     for (const f of s.driveIds||[]) await Cloud.driveDelete(f).catch(() => {});
     const path = ["Histoires", safeName(s.title)], ids = [(await upDoc(s.title, storyDoc(s), T("Histoire"), path)).id];
     if (s.cover){ const d = await PhotoDB.get(s.cover); if (d) ids.push((await Cloud.driveUpload(`${T("Couverture")}.jpg`, "image/jpeg", d.split(",")[1], s.title, path)).id); }
+    for (const c of s.chapters) for (const [pi, pg] of (c.pages||[]).entries()) if (pg.img && pg.img !== c.img){ const d = await PhotoDB.get(pg.img); if (d) ids.push((await Cloud.driveUpload(`${T("Chapitre")} ${c.n} - ${T("page")} ${pi + 1}.jpg`, "image/jpeg", d.split(",")[1], c.title, path)).id); }
     for (const c of s.chapters) if (c.img){ const d = await PhotoDB.get(c.img); if (d) ids.push((await Cloud.driveUpload(`${T("Chapitre")} ${c.n}.jpg`, d.startsWith("data:image/png") ? "image/png" : "image/jpeg", d.split(",")[1], c.title, path)).id); }
     s.driveIds = ids.filter(Boolean);
   } else if (x.kind === "backup"){

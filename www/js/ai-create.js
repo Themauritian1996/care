@@ -179,7 +179,7 @@ function storyOpen(id){
       <div class="seg" style="width:auto"><button data-act="storyEngine" data-v="device" aria-pressed="${s.engine!=="gemini"}">${T("Voix de l'appareil")}</button><button data-act="storyEngine" data-v="gemini" aria-pressed="${s.engine==="gemini"}">${T("Voix Gemini")}</button></div></div>
     <p class="tiny muted">${s.engine==="gemini" ? T("Voix naturelles générées par Gemini (quelques secondes par réplique, utilise votre clé).") : T("Voix intégrées au téléphone : instantanées et gratuites. Réglez la voix de chaque personnage ci-dessous.")}</p>
     <div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.map(x => `<button class="chip ${chColor(s,x.id)}" data-act="charForm" data-v="${id}|${x.id}">${icon("edit").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${esc(x.name)}</button>`).join("")}<button class="chip" style="border:1px dashed var(--line)" data-act="charForm" data-v="${id}|new">${icon("plus").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("Personnage")}</button></div>
-    <div class="read-bar"><span class="tiny muted">${T("Taille du texte")}</span><button class="btn sm ghost" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><b class="tiny num" id="zoomVal">${Math.round(storyZ()*100)} %</b><button class="btn sm ghost" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button><button class="btn sm kid" data-act="storyRead">${icon("book")}${T("Mode lecture")}</button><button class="btn sm ghost" data-act="storyBookShop" data-v="${id}">${icon("image")}${T("Livre illustré")}</button></div>
+    <div class="read-bar"><span class="tiny muted">${T("Taille du texte")}</span><button class="btn sm ghost" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><b class="tiny num" id="zoomVal">${Math.round(storyZ()*100)} %</b><button class="btn sm ghost" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button><button class="btn sm kid" data-act="storyRead">${icon("book")}${T("Mode lecture")}</button><button class="btn sm ghost" data-act="storyBookShop" data-v="${id}">${icon("image")}${T("Livre illustré")}</button><button class="btn sm ghost" data-act="flipOpen" data-v="${id}">${icon("book")}${T("Feuilleter")}</button></div>
     <div class="story-text" id="storyText" style="--sz:${storyZ()}">
     ${s.chapters.map((ch, ci) => `<div class="chapter"><div class="row between"><h3>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h3><div class="row" style="gap:4px;flex-wrap:nowrap">${chCtl(s, id, ci, playing)}</div></div>
       ${ch.img ? `<img class="story-img" data-stimg="${ch.img}" alt="${esc(ch.title)}">` : ""}<div class="row" style="gap:6px"><button class="btn sm ghost" data-act="storyImg" data-v="${id}|${ci}">${icon("camera")}${ch.img?T("Nouvelle image"):T("Illustrer ce chapitre")}</button><button class="btn sm ghost" data-act="storySimplify" data-v="${id}|${ci}">${icon("spark")}${T("Mots plus simples")}</button></div>
@@ -197,7 +197,7 @@ function zoomBar(){ return `<span class="tiny muted">${T("Taille du texte")}</sp
 /* mode lecture : un vrai livre (couverture, une image par chapitre, texte en grand) */
 function storyBook(s, id, playing){
   const kid = kidById(s.kid), done = s.chapters.filter(c => c.img).length;
-  sheet(`<div class="book-top">${sheetHead(esc(s.title))}<div class="read-bar">${zoomBar()}<button class="btn sm ghost" data-act="storyRead">${icon("x")}${T("Quitter la lecture")}</button><button class="btn sm ${s.cover && done === s.chapters.length ? "ghost" : "kid"}" data-act="storyBookShop" data-v="${id}">${icon("image")}${T("Illustrer le livre")}${s.cover || done ? ` · ${(s.cover?1:0) + done}/${s.chapters.length + 1}` : ""}</button><button class="btn sm ghost" data-act="storyPdf" data-v="${id}">${icon("doc")}${T("Livre PDF")}</button></div></div>
+  sheet(`<div class="book-top">${sheetHead(esc(s.title))}<div class="read-bar">${zoomBar()}<button class="btn sm ghost" data-act="storyRead">${icon("x")}${T("Quitter la lecture")}</button><button class="btn sm ${s.cover && done === s.chapters.length ? "ghost" : "kid"}" data-act="storyBookShop" data-v="${id}">${icon("image")}${T("Illustrer le livre")}${s.cover || done ? ` · ${(s.cover?1:0) + done}/${s.chapters.length + 1}` : ""}</button><button class="btn sm ghost" data-act="storyPdf" data-v="${id}">${icon("doc")}${T("Livre PDF")}</button><button class="btn sm kid" data-act="flipOpen" data-v="${id}">${icon("book")}${T("Feuilleter")}</button></div></div>
     <div class="book" id="storyText" style="--sz:${storyZ()}">
       <section class="book-cover">${s.cover ? `<img class="cover-img" data-stimg="${s.cover}" alt="${esc(s.title)}">` : `<button class="cover-ph" data-act="storyBookShop" data-v="${id}">${icon("image")}<span>${T("Ajouter une couverture")}</span></button>`}
         <h1>${esc(s.title)}</h1>${kid ? `<p>${T("Une histoire pour {n}",{n:esc(kid.nick||kid.name)})}</p>` : ""}<p class="tiny muted">${T("{n} chapitre(s)",{n:s.chapters.length})} · ${esc(s.characters.filter(x => x.id !== "narr").map(x => x.name).join(", "))}</p></section>
@@ -307,32 +307,65 @@ function storyImgSheet(sid, ci){
 /* ---------- livre illustré : prompts à copier dans l'app Gemini (gratuit), une seule conversation ---------- */
 const STY = s => s.style || "soft watercolor children's picture book illustration, warm gentle light, rounded friendly shapes";
 const castOf = s => s.characters.filter(x => x.id !== "narr").slice(0, 6).map(x => `${x.name}: ${x.look || x.desc || x.name}`).join(" | ");
+/* pages du livre : chaque chapitre découpé en scènes (une image + le texte qui va avec) */
+const segWords = sg => String(sg.t||"").split(/\s+/).length;
+function autoPages(ch, n){
+  const tot = sum(ch.segs.map(segWords)), per = Math.max(25, tot / Math.max(1, n || Math.round(tot / 55) || 1)), out = []; let cur = null, w = 0;
+  ch.segs.forEach((sg, i) => { if (!cur || (w >= per && out.length < (n || 99))){ cur = {from:i, to:i}; out.push(cur); w = 0; } cur.to = i; w += segWords(sg); });
+  return out.map(p => ({...p, scene:ch.segs.slice(p.from, p.to + 1).map(x => x.t).join(" ").slice(0, 300)}));
+}
+const pagesOf = ch => ch.pages?.length ? ch.pages : autoPages(ch);
+const PAGE_SCHEMA = {type:"OBJECT", properties:{pages:{type:"ARRAY", items:{type:"OBJECT", properties:{from:{type:"INTEGER"}, to:{type:"INTEGER"}, scene:{type:"STRING"}, who:{type:"ARRAY", items:{type:"STRING"}}}, required:["from","to","scene"]}}}, required:["pages"]};
+/* l'IA découpe chaque chapitre en scènes (actions, événements) et décrit chaque image en anglais */
+async function storyScenes(s, force){
+  const n = +(S.settings.bookPages || 4);
+  for (const ch of s.chapters){
+    if (ch.pages?.length && !force) continue;
+    let pages = null;
+    if (aiKey()) try {
+      const r = await gemini({tier:"fast", json:PAGE_SCHEMA, temperature:0.3, contents:[{role:"user", parts:[{text:`Livre illustré pour enfants « ${s.title} », chapitre « ${ch.title} ». Découpe le texte en environ ${n} pages comme un vrai album jeunesse : chaque page = une action ou un événement, avec des répliques consécutives (from et to = numéros des répliques, inclusifs ; toutes les répliques couvertes, dans l'ordre, sans trou ni chevauchement). Pour chaque page, scene = description visuelle précise EN ANGLAIS de l'image à dessiner pour ce moment (lieu, action, émotions, éléments importants), sans texte dans l'image ; who = noms des personnages visibles.\nPersonnages : ${s.characters.filter(x => x.id !== "narr").map(x => x.name).join(", ")}.\nRépliques :\n${ch.segs.map((sg, i) => `${i}. ${sg.c !== "narr" ? (s.characters.find(x => x.id === sg.c)?.name || "") + " : " : ""}${sg.t}`).join("\n")}`}]}]});
+      const P = (parseJSON(r.text).pages || []).map(p => ({from:Math.max(0, +p.from|0), to:Math.min(ch.segs.length - 1, +p.to|0), scene:p.scene || "", who:p.who || []})).filter(p => p.to >= p.from).sort((x, y) => x.from - y.from);
+      // on vérifie que tout est couvert, sinon on répare
+      let ok = P.length && P[0].from === 0 && P.at(-1).to === ch.segs.length - 1; for (let i = 1; ok && i < P.length; i++) if (P[i].from !== P[i-1].to + 1) ok = false;
+      if (ok) pages = P;
+    } catch(e){ console.warn("scenes", e); }
+    const old = ch.pages || [];
+    ch.pages = (pages || autoPages(ch, n)).map((p, i) => ({...p, img:old[i]?.img || (i === 0 && !old.length ? ch.img || null : null)}));
+  }
+  save();
+}
 function bookPrompts(s){
   const kid = kidById(s.kid), lang = LANG === "en" ? "English" : "French";
-  const P = [{k:"ref", t:T("1. Les personnages (référence)"), d:T("Une planche avec tous les personnages : Gemini s'en servira pour les dessiner pareils ensuite."), img:s.refImg,
+  const P = [{k:"ref", t:T("Les personnages (référence)"), d:T("Une planche avec tous les personnages : Gemini s'en servira pour les dessiner pareils ensuite."), img:s.refImg,
       p:`${STY(s)}. Character reference sheet for the children's picture book "${s.title}". Draw each main character side by side, full body, front view, on a plain light background, clearly separated, friendly expressions. Characters: ${castOf(s)}. No text, no letters.`},
-    {k:"cover", t:T("2. La couverture"), d:T("Avec le titre écrit en grand, comme un vrai livre."), img:s.cover,
+    {k:"cover", t:T("La couverture"), d:T("Avec le titre écrit en grand, comme un vrai livre."), img:s.cover,
       p:`Using exactly the same characters and art style as the character sheet above: ${STY(s)}. Front cover of a children's picture book, portrait format (3:4). At the top, write the title "${s.title}" in large, playful, rounded, easy-to-read letters (${lang}, spelled exactly like this). ${kid ? `At the bottom, small text: "${T("Une histoire pour {n}",{n:kid.nick||kid.name})}". ` : ""}Inviting, magical scene that captures the whole story: ${s.chapters.map(c => c.summary).join(" ")} Characters: ${castOf(s)}. No other text.`}];
-  s.chapters.forEach((ch, ci) => P.push({k:"ch" + ci, ci, t:T("{n}. Chapitre {c} · {t}",{n:ci + 3, c:ch.n, t:ch.title}), img:ch.img,
-    p:`Next illustration of the same book, with exactly the same characters and the same art style as the previous images: ${storyImgPrompt(s, ch, false).replace(/^.*?One single illustration/, "One single illustration")} Square format.`}));
+  s.chapters.forEach((ch, ci) => pagesOf(ch).forEach((pg, pi) => {
+    const names = (pg.who?.length ? pg.who : s.characters.filter(x => x.id !== "narr" && (ch.segs.slice(pg.from, pg.to + 1).some(sg => sg.c === x.id || sg.t.includes(x.name)))).map(x => x.name));
+    const cast = s.characters.filter(x => names.includes(x.name)).map(x => `${x.name}: ${x.look || x.desc}`).join(" | ");
+    P.push({k:`p${ci}_${pi}`, ci, pi, t:T("Chapitre {c} · page {p}",{c:ch.n, p:pi + 1}), d:ch.segs.slice(pg.from, pg.to + 1).map(x => x.t).join(" ").slice(0, 110) + "…", img:pg.img,
+      p:`Next page of the same picture book: exactly the same characters and the same art style as the previous images. ${STY(s)}. Scene: ${pg.scene}${cast ? ` Characters in this picture (keep their exact look): ${cast}.` : " No characters needed."} No text, no letters, no speech bubbles. Square format.`});
+  }));
   return P;
 }
 async function storyBookShop(sid){
   const s = S.stories.find(x => x.id === sid); if (!s) return; UI.storyId = sid;
   sheet(`${sheetHead(T("Livre illustré"))}<p class="small muted"><span class="spin"></span> ${T("Préparation des prompts…")}</p>`, "wide");
   try { if (aiKey()) await storyLooks(s); } catch(e){}
+  await storyScenes(s);
   s.characters.forEach(ch => { if (ch.id !== "narr" && !ch.look) ch.look = ch.desc || ch.name; });
   const P = bookPrompts(s); UI.bookP = P; const done = P.filter(x => x.img).length;
   sheet(`${sheetHead(T("Livre illustré"))}
     <div class="card tint" style="padding:12px 14px"><b>${T("Gratuit, avec l'app Gemini, en 3 gestes par image :")}</b>
       <ol class="small" style="margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px"><li>${T("« Copier » le prompt, puis « Ouvrir Gemini » et le coller (choisissez « Créer une image » si on vous le propose).")}</li><li>${T("Restez dans la même conversation Gemini du début à la fin : les personnages et le style resteront les mêmes d'une image à l'autre.")}</li><li>${T("Enregistrez l'image (appui long → Télécharger), revenez ici et touchez « Ajouter l'image ».")}</li></ol></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap"><span class="small muted">${T("Pages par chapitre")}</span>${[3,4,6,8].map(n => `<button class="chip ${(+S.settings.bookPages||4)===n?"lilac":""}" data-act="bookPagesN" data-v="${sid}|${n}">${n}</button>`).join("")}<button class="btn sm ghost" data-act="bookRecut" data-v="${sid}">${icon("auto")}${T("Redécouper")}</button></div>
     <div class="row between"><span class="small"><b>${done}</b> / ${P.length} ${T("images")}</span><div class="row" style="gap:6px"><a class="btn sm kid" href="https://gemini.google.com/app" target="_blank" rel="noopener">${icon("spark")}${T("Ouvrir Gemini")}</a><button class="btn sm ghost" data-act="bookCopyAll">${icon("note")}${T("Tout copier")}</button></div></div>
     <div class="levelbar"><i style="width:${Math.max(2, done / P.length * 100).toFixed(0)}%"></i></div>
     <div class="stack" style="gap:8px">${P.map((x, i) => `<div class="book-step ${x.img ? "done" : ""}"><div class="row between" style="gap:8px"><div style="min-width:0"><b>${x.img ? "✓ " : ""}${esc(x.t)}</b>${x.d ? `<div class="tiny muted">${esc(x.d)}</div>` : ""}</div>${x.img ? `<img class="bs-thumb" data-stimg="${x.img}" alt="">` : ""}</div>
       <details><summary class="tiny">${T("Voir le prompt")}</summary><div class="tiny prompt-box">${esc(x.p)}</div></details>
       <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm ${x.img ? "ghost" : "kid"}" data-act="bookCopy" data-v="${i}">${icon("note")}${T("Copier")}</button><button class="btn sm ghost" data-act="bookImport" data-v="${sid}|${x.k}">${icon("image")}${x.img ? T("Remplacer l'image") : T("Ajouter l'image")}</button></div></div>`).join("")}</div>
     <p class="tiny muted">${T("Astuce : si un personnage change d'apparence, joignez dans Gemini la planche des personnages ou l'image précédente avec le prompt.")}</p>
-    <div class="row" style="flex-wrap:wrap"><button class="btn kid" data-act="storyReadOpen" data-v="${sid}">${icon("book")}${T("Lire le livre")}</button><button class="btn ghost" data-act="storyPdf" data-v="${sid}">${icon("doc")}${T("Livre PDF")}</button></div>`, "wide");
+    <div class="row" style="flex-wrap:wrap"><button class="btn kid" data-act="flipOpen" data-v="${sid}">${icon("book")}${T("Feuilleter le livre")}</button><button class="btn ghost" data-act="storyReadOpen" data-v="${sid}">${T("Lecture continue")}</button><button class="btn ghost" data-act="storyPdf" data-v="${sid}">${icon("doc")}${T("Livre PDF")}</button></div>`, "wide");
   $$("#layer img[data-stimg]").forEach(async im => { im.dataset.act = "viewImg"; const d = await PhotoDB.get(im.dataset.stimg); if (d) im.src = d; });
 }
 async function copyTxt(t, ok){ try { await navigator.clipboard.writeText(t); toast(ok); } catch(e){ Native.share({title:T("Prompt d'image"), text:t}); } }
@@ -352,12 +385,12 @@ async function storyPdf(sid){
   const ch0 = await put(s.cover, M, M, W - 2*M, H - 2*M - (s.cover ? 0 : 0));
   if (!ch0 || !s.cover){ doc.setFont("helvetica", "bold"); doc.setFontSize(30); doc.setTextColor(...ink); doc.splitTextToSize(N(s.title), W - 2*M).forEach((l, i) => doc.text(l, W/2, 220 + i*36, {align:"center"}));
     doc.setFont("helvetica", "normal"); doc.setFontSize(14); doc.setTextColor(...soft); if (kid) doc.text(N(T("Une histoire pour {n}",{n:kid.nick||kid.name})), W/2, 330, {align:"center"}); }
-  for (const [ci, c] of s.chapters.entries()){
+  for (const [ci, c] of s.chapters.entries()) for (const [pi, pg] of pagesOf(c).entries()){
     doc.addPage([W, H]); let y = M;
-    const ih = await put(c.img, M, y, W - 2*M, 300); if (ih) y += ih + 22;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(...ink); doc.splitTextToSize(N(`${T("Chapitre {n}",{n:c.n})} · ${c.title}`), W - 2*M).forEach(l => { doc.text(l, M, y); y += 22; }); y += 6;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(14);
-    for (const sg of c.segs){ const who = sg.c !== "narr" ? (s.characters.find(x => x.id === sg.c)?.name || "") : "", txt = N((who ? who + " : " : "") + sg.t);
+    const ih = await put(pg.img || (pi === 0 ? c.img : null), M, y, W - 2*M, 330); if (ih) y += ih + 22;
+    if (pi === 0){ doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(...ink); doc.splitTextToSize(N(`${T("Chapitre {n}",{n:c.n})} · ${c.title}`), W - 2*M).forEach(l => { doc.text(l, M, y); y += 22; }); y += 6; }
+    doc.setFont("helvetica", "normal"); doc.setFontSize(14); doc.setTextColor(...ink);
+    for (const sg of c.segs.slice(pg.from, pg.to + 1)){ const who = sg.c !== "narr" ? (s.characters.find(x => x.id === sg.c)?.name || "") : "", txt = N((who ? who + " : " : "") + sg.t);
       for (const l of doc.splitTextToSize(txt, W - 2*M)){ if (y > H - M){ doc.addPage([W, H]); y = M + 10; doc.setFont("helvetica", "normal"); doc.setFontSize(14); doc.setTextColor(...ink); } doc.text(l, M, y); y += 20; } y += 6; }
   }
   doc.addPage([W, H]); doc.setFont("helvetica", "bold"); doc.setFontSize(28); doc.setTextColor(...ink); doc.text(N(T("Fin")), W/2, H/2, {align:"center"});
@@ -481,6 +514,78 @@ async function playChapter(sid, ci, from = 0){
 function pausePlay(){ const s = S.stories.find(x => x.id === PL.story); if (s) s.pos = {ch:PL.ch, i:PL.i}; stopPlay(); save(); if (s) storyOpenKeepScroll(s.id); }
 function storyOpenKeepScroll(sid){ const sh = $("#layer .sheet"), top = sh?.scrollTop; if (UI.storyId === sid && sh){ storyOpen(sid); const n = $("#layer .sheet"); if (n) n.scrollTop = top; } }
 
+/* ---------- feuilleter le livre : une page = une image + son texte ; lecture à voix haute qui tourne les pages ---------- */
+const FL = {sid:null, i:0, pages:[]};
+function flipPagesOf(s){
+  const P = [{type:"cover"}];
+  s.chapters.forEach((ch, ci) => pagesOf(ch).forEach((pg, pi) => P.push({type:"page", ci, pi, from:pg.from, to:pg.to, img:pg.img || (pi === 0 ? ch.img : null)})));
+  P.push({type:"end"}); return P;
+}
+function flipOpen(sid, at){
+  const s = S.stories.find(x => x.id === sid); if (!s) return; stopPlay(); closeSheet();
+  Object.assign(FL, {sid, pages:flipPagesOf(s), i:at ?? 0});
+  if (at == null && s.pos){ const k = FL.pages.findIndex(p => p.type === "page" && p.ci === s.pos.ch && s.pos.i >= p.from && s.pos.i <= p.to); if (k > 0) FL.i = k; }
+  let el = $("#flip"); if (!el){ el = document.createElement("div"); el.id = "flip"; el.className = "flip"; document.body.appendChild(el);
+    let x0 = null, y0 = 0; el.addEventListener("pointerdown", e => { if (e.target.closest("button")) return; x0 = e.clientX; y0 = e.clientY; });
+    el.addEventListener("pointerup", e => { if (x0 == null || e.target.closest("button")) return; const dx = e.clientX - x0, dy = e.clientY - y0; x0 = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) return flipGo(FL.i + (dx < 0 ? 1 : -1));
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && !e.target.closest(".flip-text")){ const w = innerWidth; if (e.clientX > w * 0.7) flipGo(FL.i + 1); else if (e.clientX < w * 0.3) flipGo(FL.i - 1); } });
+    el.addEventListener("keydown", e => {}); document.addEventListener("keydown", flipKey); }
+  flipRender();
+}
+const flipKey = e => { if (!$("#flip")) return; if (e.key === "ArrowRight") flipGo(FL.i + 1); else if (e.key === "ArrowLeft") flipGo(FL.i - 1); else if (e.key === "Escape") closeFlip(); };
+function closeFlip(){ stopPlay(); $("#flip")?.remove(); document.removeEventListener("keydown", flipKey); const s = S.stories.find(x => x.id === FL.sid); if (s) save(); }
+function flipPageHtml(s, p){
+  const kid = kidById(s.kid);
+  if (p.type === "cover") return `<div class="flip-img cover">${s.cover ? `<img data-stimg="${s.cover}" alt="">` : `<div class="flip-ph">${icon("book")}</div>`}</div><div class="flip-text center"><h1>${esc(s.title)}</h1>${kid ? `<p>${T("Une histoire pour {n}",{n:esc(kid.nick||kid.name)})}</p>` : ""}<p class="tiny muted">${T("Touchez à droite ou glissez pour tourner la page")}</p></div>`;
+  if (p.type === "end") return `<div class="flip-end"><h1>${T("Fin")}</h1><p>✦</p><p class="small muted">${esc(s.title)}</p><button class="btn kid" data-act="flipGo" data-v="0">${icon("replay")}${T("Recommencer")}</button></div>`;
+  const ch = s.chapters[p.ci];
+  return `<div class="flip-img">${p.img ? `<img data-stimg="${p.img}" alt="">` : `<div class="flip-ph">${icon("image")}<span class="tiny">${T("Image à ajouter dans « Livre illustré »")}</span></div>`}</div>
+    <div class="flip-text">${p.pi === 0 ? `<h2>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h2>` : ""}${ch.segs.slice(p.from, p.to + 1).map((sg, k) => `<p class="flip-seg ${sg.c==="narr"?"narr":""}" id="fsg-${p.ci}-${p.from + k}">${sg.c !== "narr" ? `<b style="color:var(--${chColor(s, sg.c)}-ink)">${esc(s.characters.find(x => x.id === sg.c)?.name || "")}</b> ` : ""}${esc(sg.t)}</p>`).join("")}</div>`;
+}
+function flipRender(dir){
+  const s = S.stories.find(x => x.id === FL.sid), el = $("#flip"); if (!s || !el) return; const p = FL.pages[FL.i], n = FL.pages.length;
+  el.innerHTML = `<div class="flip-bar"><button class="icon-btn" data-act="flipClose" aria-label="${T("Fermer")}">${icon("x")}</button><span class="small grow" style="text-align:center">${FL.i === 0 ? "" : FL.i === n - 1 ? T("Fin") : T("Page {i} / {n}",{i:FL.i, n:n - 2})}</span><button class="icon-btn" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><button class="icon-btn" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button></div>
+    <div class="flip-page ${dir ? "turn-" + dir : ""}" style="--sz:${storyZ()}" id="storyText">${flipPageHtml(s, p)}</div>
+    <div class="flip-nav"><button class="icon-btn" data-act="flipGo" data-v="${FL.i - 1}" ${FL.i ? "" : "disabled"} aria-label="${T("Page précédente")}">${icon("left")}</button>
+      <button class="btn ${PL.on && PL.flip ? "ghost" : "kid"}" data-act="flipPlay">${icon(PL.on && PL.flip ? "pause" : "play")}${PL.on && PL.flip ? T("Pause") : T("Lire à voix haute")}</button>
+      <button class="icon-btn" data-act="flipGo" data-v="${FL.i + 1}" ${FL.i < n - 1 ? "" : "disabled"} aria-label="${T("Page suivante")}">${icon("right")}</button></div>`;
+  $$("#flip img[data-stimg]").forEach(async im => { const d = await PhotoDB.get(im.dataset.stimg); if (d) im.src = d; else im.remove(); });
+}
+function flipGo(i, keepPlay){
+  if (!keepPlay && PL.on && PL.flip) stopPlay();
+  const n = FL.pages.length; if (i < 0 || i >= n || i === FL.i) return; const dir = i > FL.i ? "next" : "prev";
+  const pg = $("#flip .flip-page"); if (pg){ pg.classList.add("out-" + dir); setTimeout(() => { FL.i = i; flipRender(dir); }, 180); } else { FL.i = i; flipRender(dir); }
+}
+/* lecture à voix haute : chaque réplique avec la voix du personnage, puis la page se tourne toute seule */
+async function flipPlay(){
+  if (PL.on && PL.flip){ const s0 = S.stories.find(x => x.id === FL.sid), p0 = FL.pages[FL.i]; if (s0 && p0?.type === "page") s0.pos = {ch:p0.ci, i:PL.i}; stopPlay(); PL.flip = false; save(); return flipRender(); }
+  const s = S.stories.find(x => x.id === FL.sid); if (!s) return; stopPlay();
+  Object.assign(PL, {on:true, flip:true, story:s.id}); const run = ++PL.run; flipRender();
+  const vcOf = sg => (s.characters.find(x => x.id === sg.c) || s.characters[0]).voice || {};
+  const say = async (text, vc) => { if (s.engine === "gemini"){ const url = await TTS.gemini(text, vc); if (!PL.on || PL.run !== run) return; await new Promise(res => { const a = new Audio(url); PL.audio = a; a.onended = res; a.onerror = res; a.play().catch(res); }); } else await TTS.speakDevice(text, vc); };
+  const alive = () => PL.on && PL.run === run && $("#flip");
+  try {
+    while (alive()){
+      const p = FL.pages[FL.i];
+      if (p.type === "cover"){ await say(s.title, (s.characters[0]||{}).voice || {}); if (!alive()) break; await new Promise(r => setTimeout(r, 600)); }
+      else if (p.type === "page"){ const ch = s.chapters[p.ci];
+        if (p.pi === 0){ await say(`${T("Chapitre {n}",{n:ch.n})}. ${ch.title}.`, (s.characters[0]||{}).voice || {}); if (!alive()) break; }
+        const start = s.pos?.ch === p.ci && s.pos.i > p.from && s.pos.i <= p.to ? s.pos.i : p.from;
+        for (let i = start; i <= p.to && alive(); i++){
+          PL.ch = p.ci; PL.i = i; s.pos = {ch:p.ci, i}; $$(".flip-seg.now").forEach(e => e.classList.remove("now")); const el = $(`#fsg-${p.ci}-${i}`); if (el){ el.classList.add("now"); el.scrollIntoView({block:"nearest", behavior:"smooth"}); }
+          const sg = ch.segs[i]; if (s.engine === "gemini" && ch.segs[i+1]) TTS.gemini(ch.segs[i+1].t, vcOf(ch.segs[i+1])).catch(() => {});
+          await say(sg.t, vcOf(sg)); }
+        if (!alive()) break; await new Promise(r => setTimeout(r, 700)); }
+      else break;
+      if (!alive()) break;
+      if (FL.i >= FL.pages.length - 1) break;
+      flipGo(FL.i + 1, true); await new Promise(r => setTimeout(r, 450));
+    }
+  } catch(e){ toast(e.message); }
+  if (PL.run === run){ PL.on = false; PL.flip = false; if (FL.pages[FL.i]?.type === "end") s.pos = null; save(); if ($("#flip")) flipRender(); }
+}
+
 /* ---------- recettes ---------- */
 const RECIPE_SCHEMA = {type:"OBJECT", properties:{title:{type:"STRING"}, labels:{type:"ARRAY", items:{type:"STRING"}}, servings:{type:"NUMBER"}, minutes:{type:"NUMBER"}, ingredients:{type:"ARRAY", items:{type:"STRING"}}, steps:{type:"ARRAY", items:{type:"STRING"}}, kidTips:{type:"STRING"}, allergens:{type:"ARRAY", items:{type:"STRING"}}, nut:NUT_SCHEMA}, required:["title","servings","minutes","ingredients","steps","nut"]};
 function recipeJob(want, label, minutes, servings){
@@ -562,12 +667,16 @@ Object.assign(ACT, {
   storyRead: () => { UI.readMode = !UI.readMode; storyOpen(UI.storyId); const sh = $("#layer .sheet"); if (sh) sh.scrollTop = 0; },
   storyReadOpen: v => { UI.readMode = true; storyOpen(v); },
   storyBookShop: v => storyBookShop(v),
+  bookPagesN: v => { const [sid, n] = v.split("|"); S.settings.bookPages = +n; save(); askConfirm(T("Redécouper toutes les pages en {n} par chapitre ? Les images déjà ajoutées restent dans l'ordre.",{n}), T("Redécouper"), async () => { const s = S.stories.find(x => x.id === sid); toast(T("Découpage…")); await storyScenes(s, true); storyBookShop(sid); }, false); },
+  bookRecut: v => askConfirm(T("Redécouper les chapitres en pages ? Les images déjà ajoutées restent dans l'ordre."), T("Redécouper"), async () => { const s = S.stories.find(x => x.id === v); toast(T("Découpage…")); await storyScenes(s, true); storyBookShop(v); }, false),
+  flipOpen: v => flipOpen(v), flipGo: v => flipGo(+v), flipPlay: () => flipPlay(), flipClose: () => closeFlip(),
   storyPdf: v => storyPdf(v),
   bookCopy: v => { const x = UI.bookP?.[+v]; if (x) copyTxt(x.p, T("Prompt copié : collez-le dans Gemini")); },
   bookCopyAll: () => copyTxt((UI.bookP||[]).map(x => `${x.t}\n${x.p}`).join("\n\n"), T("Tous les prompts sont copiés : collez-les un à la fois dans la même conversation")),
   bookImport: async v => { const [sid, k] = v.split("|"), s = S.stories.find(x => x.id === sid); if (!s) return;
     const d = await Native.takePhoto({source:"photos"}); if (!d) return; const small = await shrinkImage(d, k === "cover" ? 1400 : 1024, 0.85), id = "stimg-" + uid(); await PhotoDB.put(id, small);
     if (k === "cover"){ if (s.cover) PhotoDB.del(s.cover).catch(() => {}); s.cover = id; } else if (k === "ref"){ if (s.refImg) PhotoDB.del(s.refImg).catch(() => {}); s.refImg = id; }
+    else if (k.startsWith("p")){ const [ci, pi] = k.slice(1).split("_").map(Number), ch = s.chapters[ci], pg = ch?.pages?.[pi]; if (!pg) return; if (pg.img && pg.img !== ch.img) PhotoDB.del(pg.img).catch(() => {}); pg.img = id; if (pi === 0) ch.img = id; }
     else { const ch = s.chapters[+k.slice(2)]; if (!ch) return; if (ch.img) PhotoDB.del(ch.img).catch(() => {}); ch.img = id; ch.imgModel = "gemini-app"; }
     save(); driveQ("story", sid); toast(T("Image ajoutée")); storyBookShop(sid); },
   charTest: async v => { const vc = readVoice(), txt = LANG === "en" ? "Hello! Here is my voice for the story." : "Bonjour ! Voici ma voix pour l'histoire."; stopPlay();

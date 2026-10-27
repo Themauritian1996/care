@@ -124,7 +124,7 @@ if (cfg && cfg.apiKey){
       // images des souvenirs, spéciaux et histoires : même collection, marquées « blob » (pas dans l'album)
       const blobIds = new Set();
       S.memories.forEach(m => { if (isParent || m.by === S.me) [m.photoId, ...(m.photoIds||[])].filter(Boolean).forEach(id => blobIds.add(id)); });
-      (S.stories||[]).forEach(st => { if (!isParent) return; [st.cover, st.refImg].filter(Boolean).forEach(i => blobIds.add(i)); (st.chapters||[]).forEach(ch => ch.img && blobIds.add(ch.img)); });
+      (S.stories||[]).forEach(st => { if (!isParent) return; [st.cover, st.refImg].filter(Boolean).forEach(i => blobIds.add(i)); (st.chapters||[]).forEach(ch => { if (ch.img) blobIds.add(ch.img); (ch.pages||[]).forEach(pg => pg.img && blobIds.add(pg.img)); }); });
       for (const id of blobIds){ const path = `families/${fid}/photos/${id}`; let data = await PhotoDB.get(id, true); if (!data) continue; if (data.length > 900000) data = await shrinkImage(data, 1000, 0.7); if (data.length > 900000) data = await shrinkImage(data, 760, 0.6); if (data.length > 1000000) continue; const k = J({id, blob:true, h:data.length + data.slice(-24)}); if (!force && last[path] === k) continue; last[path] = k; batch.push({path, data:{id, blob:true, data}}); }
       Object.keys(last).filter(p => p.startsWith(`families/${fid}/photos/`) && !S.photos.some(x => p.endsWith("/"+x.id)) && !blobIds.has(p.split("/").pop()) && !(last[p]||"").includes('"blob":true')).forEach(p => { delete last[p]; batch.push({path:p, del:true}); });
       // lots limités en nombre ET en poids (un commit dépasse vite 10 Mo avec des photos)
