@@ -4,8 +4,8 @@
 function kidTabs(c){
   if (isPrenatal(c)) return [["grossesse",T("Grossesse")],["conseils",T("Conseils")]].filter(t => t[0] !== "conseils" || feat("tips"));
   const m = ageMonths(c), tabs = [["quotidien",T("Quotidien")]];
-  if (c.adult){ tabs.push(["repas",T("Repas")]); if (allow("health")) tabs.push(["sante",T("Santé")]); return tabs; }
-  if (mod(c,"solids") || mod(c,"feeding")) tabs.push(["repas", m < 12 ? T("Boires et repas") : T("Repas")]);
+  if (c.adult){ tabs.push(["repas",T("Nutrition")]); if (allow("health")) tabs.push(["sante",T("Santé")]); return tabs; }
+  if (mod(c,"solids") || mod(c,"feeding")) tabs.push(["repas", m < 12 ? T("Boires et nutrition") : T("Nutrition")]);
   if (mod(c,"growth") && allow("health")) tabs.push(["croissance",T("Croissance")]);
   if (allow("health")) tabs.push(["sante",T("Santé")]);
   if (mod(c,"milestones") || mod(c,"older")) tabs.push(["dev", m < 72 ? T("Développement") : T("Repères")]);
@@ -25,7 +25,7 @@ function kidView(){
     ${isKidUser()?"":`<div class="hero-actions"><button class="btn sm ghost" data-act="kidForm" data-v="${c.id}">${icon("edit")}${T("Profil")}</button><button class="btn sm ghost" data-act="modules">${icon("sliders")}${T("Personnaliser")}</button>${isPrenatal(c)?"":`<button class="btn sm ghost" data-act="report">${icon("doc")}${T("Rapport")}</button>`}</div>`}</section>`;
   h += timerBar(c) + feverAlert(c) + goalBandNotice(c);
   if (tabs.length > 1) h += `<div class="seg" role="tablist">${tabs.map(([id,l]) => `<button data-act="kidTab" data-v="${id}" aria-pressed="${UI.kidTab===id}">${l}</button>`).join("")}</div>`;
-  return h + ({quotidien, repas, croissance, sante, dev, conseils, grossesse}[UI.kidTab])(c) + tabTips(c, UI.kidTab);
+  return h + ({quotidien, repas:nutritionTab, croissance, sante, dev, conseils, grossesse}[UI.kidTab])(c) + tabTips(c, UI.kidTab);
 }
 /* conseils de la section en cours, cliquables pour plus de détails */
 const TAB_TIPS = {quotidien:["sommeil","ecrans","sport","emotions"], repas:["alim"], croissance:["alim","sport","sante"], sante:["sante","secu"], dev:["dev","social","emotions","ecole","parler","puberte"]};
@@ -100,7 +100,17 @@ const LOGT = {
   med:{label:"Médicament", ic:"pill", c:"butter"}, note:{label:"Note", ic:"note", c:"lilac"},
 };
 const typesFor = c => Object.keys(LOGT).filter(t => !LOGT[t].mod || mod(c, LOGT[t].mod)).filter(t => !(t === "activity" && ageMonths(c) < 9 && mod(c,"tummy")));
-const quickButtons = c => `<div class="quick">${typesFor(c).map(t => `<button class="qbtn" style="background:var(--${LOGT[t].c}-bg);color:var(--${LOGT[t].c}-ink)" data-act="log" data-v="${t}">${icon(LOGT[t].ic)}${T(LOGT[t].label)}</button>`).join("")}${(c.trackers||[]).map(t => `<button class="qbtn" style="background:var(--${t.color||"teal"}-bg);color:var(--${t.color||"teal"}-ink)" data-act="log" data-v="trk:${t.id}">${icon(t.icon||"target")}${esc(t.name)}</button>`).join("")}${isKidUser()?"":`<button class="qbtn" style="background:var(--surface2);color:var(--muted)" data-act="trackerForm">${icon("plus")}${T("Suivi perso")}</button>`}</div>`;
+/* petit résumé sous chaque bouton : total du jour et dernière entrée */
+function quickInfo(c, t){
+  const D = dayTotals(c, today()), L = (c.logs||[]).filter(l => t.startsWith("trk:") ? l.type === "trk" && "trk:" + l.data?.tid === t : l.type === t).sort((a, b) => b.t - a.t), last = L[0];
+  const ago = last ? (Date.now() - last.t < 6e4 ? T("à l'instant") : Date.now() - last.t < 864e5 ? T("il y a {d}",{d:fmtDur(Date.now() - last.t)}) : fmtD(new Date(last.t),{day:"numeric",month:"short"})) : T("jamais");
+  const today0 = {sleep:D.sleep ? fmtMin(D.sleep) : "", solid:D.meals ? T("{n} repas",{n:D.meals}) : "", feed:D.feeds ? T("{n} boires",{n:D.feeds}) : "", activity:D.act ? fmtMin(D.act) : "", read:D.read ? fmtMin(D.read) : "", screen:D.screen ? fmtMin(D.screen) : "", diaper:D.diapers ? String(D.diapers) : "", tummy:D.act ? fmtMin(D.act) : "",
+    temp:last && Date.now() - last.t < 864e5 ? fmtTemp(last.data.temp) : "", mood:last && iso(new Date(last.t)) === iso(today()) ? T(last.data.mood) : "", med:L.filter(l => iso(new Date(l.t)) === iso(today())).length ? T("{n} aujourd'hui",{n:L.filter(l => iso(new Date(l.t)) === iso(today())).length}) : "", note:""}[t];
+  const trk = t.startsWith("trk:") ? (c.trackers||[]).find(x => "trk:" + x.id === t) : null, tv = trk ? D.trk[trk.id] : null;
+  const main = trk ? (tv ? `${fmtNum(tv, tv % 1 ? 1 : 0)} ${trk.unit || ""}`.trim() : "") : today0;
+  return `<span class="qinfo">${main ? `<b>${esc(main)}</b> · ` : ""}${esc(ago)}</span>`;
+}
+const quickButtons = c => `<div class="quick">${typesFor(c).map(t => `<button class="qbtn" style="background:var(--${LOGT[t].c}-bg);color:var(--${LOGT[t].c}-ink)" data-act="log" data-v="${t}">${icon(LOGT[t].ic)}${T(LOGT[t].label)}${quickInfo(c, t)}</button>`).join("")}${(c.trackers||[]).map(t => `<button class="qbtn" style="background:var(--${t.color||"teal"}-bg);color:var(--${t.color||"teal"}-ink)" data-act="log" data-v="trk:${t.id}">${icon(t.icon||"target")}${esc(t.name)}${quickInfo(c, "trk:" + t.id)}</button>`).join("")}${isKidUser()?"":`<button class="qbtn" style="background:var(--surface2);color:var(--muted)" data-act="trackerForm">${icon("plus")}${T("Suivi perso")}</button>`}</div>`;
 function ring(pct, col, over=false){
   const r = 20, C = 2*Math.PI*r, p = clamp(pct||0,0,1);
   return `<svg viewBox="0 0 50 50"><circle cx="25" cy="25" r="${r}" fill="none" stroke="var(--line)" stroke-width="6"/>${p<=0?"":`<circle cx="25" cy="25" r="${r}" fill="none" stroke="${over?"var(--danger)":`var(--${col})`}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(C*p).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 25 25)"/>`}</svg>`;
@@ -125,27 +135,38 @@ function quotidien(c){
   h += weeklyStats(c) + kidCalendarCard(c);
   if (mod(c,"mood")) h += moodCard(c);
   if (mod(c,"sports")) h += sportsCard(c);
-  const days = [];
-  for (let i=0;i<7;i++){ const d = addDays(today(), -i); const L = dayLogs(c, d); if (L.length) days.push([d,L]); }
-  h += `<div class="card"><div class="card-h"><h2>${T("Journal, 7 derniers jours")}</h2></div>`;
-  if (!days.length) h += empty("sunrise", T("Aucune entrée cette semaine. Utilisez les boutons ci-dessus."));
+  const days = [], jEnd = UI.jDate ? parseD(UI.jDate) : today(), jf = UI.jType || "";
+  const keep = l => !jf || (jf.startsWith("trk:") ? l.type === "trk" && "trk:" + l.data?.tid === jf : l.type === jf);
+  for (let i=0;i<7;i++){ const d = addDays(jEnd, -i); const L = dayLogs(c, d).filter(keep); if (L.length) days.push([d,L]); }
+  const used = [...new Set(c.logs.map(l => l.type === "trk" ? "trk:" + l.data?.tid : l.type))];
+  h += `<div class="card"><div class="card-h"><h2>${UI.jDate ? T("Journal jusqu'au {d}",{d:fmtD(jEnd,{day:"numeric",month:"short"})}) : T("Journal, 7 derniers jours")}</h2>${UI.jDate ? `<button class="btn sm line" data-act="jReset">${T("Aujourd'hui")}</button>` : ""}</div>
+    <div class="row" style="gap:6px;flex-wrap:wrap"><input class="inp" type="date" style="width:auto" value="${iso(jEnd)}" max="${iso(today())}" data-change="jDate" aria-label="${T("Date")}"><select class="inp" style="width:auto" data-change="jType" aria-label="${T("Type")}"><option value="">${T("Tout")}</option>${used.map(t => { const tr = t.startsWith("trk:") ? (c.trackers||[]).find(x => "trk:" + x.id === t) : null; return tr || LOGT[t] ? `<option value="${t}" ${jf===t?"selected":""}>${esc(tr ? tr.name : T(LOGT[t].label))}</option>` : ""; }).join("")}</select></div>`;
+  if (!days.length) h += empty("sunrise", T("Aucune entrée pour cette période."));
   days.forEach(([d,L]) => { h += `<button class="eyebrow linkish" data-act="dayDetail" data-v="${iso(d)}" style="margin-top:6px">${dayName(d)} ${icon("right").replace("<svg",'<svg style="width:12px;height:12px;vertical-align:-1px"')}</button><div class="list">${L.map(l => logLine(c,l)).join("")}</div>`; });
   return h + `</div>`;
 }
 const dayName = d => { const diff = Math.round((today()-d)/DAY); return diff===0?T("Aujourd'hui"):diff===1?T("Hier"):fmtD(d,{weekday:"long",day:"numeric",month:"long"}); };
 /* statistiques hebdomadaires : cette semaine vs la précédente */
+/* points d'une mesure entre deux dates */
+function rangeSeries(c, key, from, to){ const M = metricOf(c, key), out = []; for (let d = parseD(from); d <= parseD(to); d = addDays(d, 1)) out.push({d, v:M.get(dayTotals(c, d))}); return out; }
 function weeklyStats(c){
   const keys = ["sleep","act"].concat(mod(c,"screen")?["screen"]:[]).concat(mod(c,"reading")?["read"]:[]).concat(mod(c,"feeding")?["feeds"]:[]).concat((c.trackers||[]).map(t=>"trk:"+t.id));
+  const per = UI.wsPer || "7", to = per === "custom" && UI.wsTo ? UI.wsTo : iso(today()), from = per === "custom" && UI.wsFrom ? UI.wsFrom : iso(addDays(parseD(to), -(+per || 7) + 1)), n = Math.max(1, Math.round((parseD(to) - parseD(from)) / DAY) + 1);
+  const pFrom = iso(addDays(parseD(from), -n)), pTo = iso(addDays(parseD(from), -1));
   const rows = keys.map(k => {
-    const M = metricOf(c, k), a = series(c, k, 14), cur = a.slice(7), prev = a.slice(0,7);
-    const avg = x => sum(x.map(p=>p.v))/7, A = avg(cur), B = avg(prev), goal = M.goal(c);
+    const M = metricOf(c, k), cur = rangeSeries(c, k, from, to), prev = rangeSeries(c, k, pFrom, pTo);
+    const avg = x => sum(x.map(p=>p.v))/Math.max(1, x.length), A = avg(cur), B = avg(prev), goal = M.goal(c);
     const hit = goal ? cur.filter(p => M.kind === "max" ? p.v <= goal : p.v >= goal).length : null;
     const diff = B ? (A-B)/B : null, good = diff == null ? null : (M.kind === "max" ? diff <= 0 : diff >= 0);
     const fmt = v => k === "sleep" ? fmtNum(v,1)+" h" : M.u === "min" ? fmtMin(v) : fmtNum(v, v%1?1:0)+(M.u?" "+M.u:"");
-    return `<tr data-act="trend" data-v="${k}" style="cursor:pointer"><td style="font-weight:600">${T(M.l)}</td><td><b>${fmt(A)}</b></td><td class="small">${diff==null?"—":`<span style="color:var(--${good?"mint":"rose"}-ink)">${diff>=0?"▲":"▼"} ${Math.abs(Math.round(diff*100))} %</span>`}</td><td class="small">${hit==null?"—":`${hit}/7`}</td></tr>`;
+    return `<tr data-act="trend" data-v="${k}" style="cursor:pointer"><td style="font-weight:600">${T(M.l)}</td><td><b>${fmt(A)}</b></td><td class="small">${diff==null?"—":`<span style="color:var(--${good?"mint":"rose"}-ink)">${diff>=0?"▲":"▼"} ${Math.abs(Math.round(diff*100))} %</span>`}</td><td class="small">${hit==null?"—":`${hit}/${cur.length}`}</td></tr>`;
   }).join("");
-  const ins = insights(c, keys);
-  return `<div class="card"><div class="card-h"><h2>${T("Statistiques de la semaine")}</h2><span class="tiny muted">${T("moyenne par jour · touchez une ligne")}</span></div>${ins}<div class="tbl"><table><thead><tr><th>${T("Mesure")}</th><th>${T("7 jours")}</th><th>${T("vs sem. préc.")}</th><th>${T("Objectif atteint")}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  const ins = per === "7" ? insights(c, keys) : "";
+  return `<div class="card"><div class="card-h"><h2>${T("Statistiques")}</h2><span class="tiny muted">${T("moyenne par jour · touchez une ligne")}</span></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap"><div class="seg" style="width:auto">${[["7",T("7 j")],["30",T("30 j")],["90",T("90 j")],["365",T("1 an")],["custom",T("Dates")]].map(([k, l]) => `<button data-act="wsPer" data-v="${k}" aria-pressed="${per===k}">${l}</button>`).join("")}</div>
+    ${per === "custom" ? `<input class="inp" type="date" style="width:auto" value="${from}" max="${iso(today())}" data-change="wsFrom" aria-label="${T("Du")}"><span class="small muted">→</span><input class="inp" type="date" style="width:auto" value="${to}" max="${iso(today())}" data-change="wsTo" aria-label="${T("Au")}">` : ""}</div>
+    <p class="tiny muted">${T("Du {a} au {b} ({n} jours), comparé aux {n} jours précédents.",{a:fmtD(parseD(from),{day:"numeric",month:"short",year:"numeric"}), b:fmtD(parseD(to),{day:"numeric",month:"short",year:"numeric"}), n})}</p>
+    ${ins}<div class="tbl"><table><thead><tr><th>${T("Mesure")}</th><th>${T("Moyenne")}</th><th>${T("vs période préc.")}</th><th>${T("Objectif atteint")}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 /* graphique en barres (tendance) */
 function bars(pts, goal, col, kind, unitH, weekKey){
@@ -282,7 +303,7 @@ function logForm(type, editId){
     if (type === "screen") body = `${pick("mins",["15","30","45","60","90","120"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","60",5,mn))}${time}`;
     if (type === "tummy") body = `${pick("mins",["5","10","15","20","30"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","10",5,mn))}${time}`;
     if (type === "read") body = `${pick("mins",["10","15","20","30","45"],"")}<div class="fgrid">${fld("f-min",T("Ou minutes exactes"),numIn("f-min","15",5,mn))}${fld("f-title",T("Livre (facultatif)"),acInput("f-title", d.title||"", {list:c.logs.filter(l=>l.type==="read"&&l.data.title).map(l=>l.data.title)}))}</div>${time}`;
-    if (type === "activity") body = `${pick("what",[...new Set([...c.activities.map(a=>a.name), ...QUICK.activity])].slice(0,12),"")}${fld("f-what",T("Ou autre activité"),`<input class="inp" id="f-what" value="${esc(d.what||"")}">`)}${pick("mins",["15","30","45","60","90"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","30",5,mn))}${pick("intensity",["Légère","Modérée","Intense"],d.intensity||"Modérée")}${time}`;
+    if (type === "activity") body = `${(c.actFav||[]).length && !ed ? `<div class="field"><label>${T("Favoris : un toucher pour noter")}</label><div class="pick">${c.actFav.map((f, i) => `<button type="button" data-act="actFavLog" data-v="${i}">★ ${esc(T(f.what))} · ${fmtMin(f.min)}</button>`).join("")}</div></div>` : ""}${pick("what",[...new Set([...c.activities.map(a=>a.name), ...QUICK.activity])].slice(0,12),"")}${fld("f-what",T("Ou autre activité"),`<input class="inp" id="f-what" value="${esc(d.what||"")}">`)}${pick("mins",["15","30","45","60","90"],"")}${fld("f-min",T("Ou minutes exactes"),numIn("f-min","30",5,mn))}${pick("intensity",["Légère","Modérée","Intense"],d.intensity||"Modérée")}${time}<label class="switch"><input type="checkbox" id="f-actfav"><span class="tg"></span><span class="grow small">${T("Garder en favori pour la noter en un toucher")}</span></label>${(c.actFav||[]).length ? `<details><summary class="tiny">${T("Gérer les favoris")}</summary><div class="pick" style="margin-top:6px">${c.actFav.map((f, i) => `<button type="button" data-act="actFavDel" data-v="${i}">${esc(T(f.what))} · ${fmtMin(f.min)} ✕</button>`).join("")}</div></details>` : ""}`;
     if (type === "note") body = `${fld("f-text",T("Note"),`<textarea class="inp" id="f-text">${esc(d.text||"")}</textarea>`)}${time}`;
   }
   sheet(`<form class="stack" data-form="log" data-type="${type}" data-id="${ed?L.id:""}" style="gap:14px">${sheetHead(ed ? T("Modifier · {t}",{t:esc(title)}) : esc(title))}${body}<div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${ed?`<button type="button" class="btn danger" data-act="delLog" data-v="${L.id}">${icon("trash")}</button>`:""}</div></form>`);
@@ -356,8 +377,10 @@ function foodSelect(c, attrs){
 function mealForm(prefill){
   const c = child(); UI.meal = prefill || {items:[{name:"", group:"legfruits", qty:""}]};
   const favNames = (c.foodFav||[]).map(f => f.name);
-  const rows = UI.meal.items.map((it,i) => `<div class="stack" style="gap:6px;padding:10px;border-radius:14px;background:var(--surface2)">${foodSelect(c, `data-change="mealPick" data-i="${i}"`)}<div class="row"><div class="grow">${acInput("mi-"+i, it.name, {list:[...favNames, ...Object.values(FOOD_SUGG).flat().map(T)], placeholder:T("Aliment")}, `data-meal="${i}" data-k="name"`)}</div><input class="inp" style="width:110px" data-meal="${i}" data-k="qty" value="${esc(it.qty)}" placeholder="${T("Quantité")}"><button type="button" class="icon-btn flat" data-act="favFood" data-v="${i}" aria-label="${T("Favori")}" style="color:var(--butter-ink)">${icon("star").replace('fill="none"', favNames.includes(it.name)?'fill="currentColor"':'fill="none"')}</button>${UI.meal.items.length>1?`<button type="button" class="icon-btn flat" data-act="rmMealItem" data-v="${i}" aria-label="${T("Retirer")}">${icon("x")}</button>`:""}</div>
-    <div class="pick">${Object.entries(FOOD_GROUPS).map(([k,g]) => `<button type="button" data-act="mealGroup" data-v="${i}:${k}" aria-pressed="${it.group===k}" style="font-size:.78rem;padding:5px 9px">${T(g.label)}</button>`).join("")}</div></div>`).join("");
+  const rows = UI.meal.items.map((it,i) => { const fi = foodInfo(it.name), un = it.unit || fi?.unit || "";
+    return `<div class="stack" style="gap:6px;padding:10px;border-radius:14px;background:var(--surface2)">${foodSelect(c, `data-change="mealPick" data-i="${i}"`)}<div class="row"><div class="grow">${acInput("mi-"+i, it.name, {list:[...favNames, ...Object.keys(FOOD_DB).map(T)], placeholder:T("Ou écrivez un aliment")}, `data-meal="${i}" data-k="name"`)}</div><button type="button" class="icon-btn flat" data-act="favFood" data-v="${i}" aria-label="${T("Favori")}" style="color:var(--butter-ink)">${icon("star").replace('fill="none"', favNames.includes(it.name)?'fill="currentColor"':'fill="none"')}</button>${UI.meal.items.length>1?`<button type="button" class="icon-btn flat" data-act="rmMealItem" data-v="${i}" aria-label="${T("Retirer")}">${icon("x")}</button>`:""}</div>
+    <div class="row qty-row"><input class="inp" type="number" inputmode="decimal" min="0" step="any" style="width:90px" data-meal="${i}" data-k="amt" value="${it.amt ?? ""}" placeholder="${T("Qté")}"><select class="inp" style="width:auto" data-meal="${i}" data-k="unit">${["", ...UNITS].map(u => `<option value="${u}" ${un===u?"selected":""}>${u ? T(u) : T("unité…")}</option>`).join("")}</select><span class="small muted grow" id="mi-kc-${i}">${it.nut?.kcal != null ? `${Math.round(it.nut.kcal)} kcal · ${fmtNum(it.nut.prot||0,1)} g ${T("prot.")}` : fi ? "" : T("valeurs estimées par l'IA à l'enregistrement")}</span></div>
+    <div class="pick">${Object.entries(FOOD_GROUPS).map(([k,g]) => `<button type="button" data-act="mealGroup" data-v="${i}:${k}" aria-pressed="${it.group===k}" style="font-size:.78rem;padding:5px 9px">${T(g.label)}</button>`).join("")}</div></div>`; }).join("");
   const M0 = UI.meal; sheet(`<form class="stack" data-form="meal" style="gap:12px">${sheetHead(M0.editId ? T("Modifier le repas") : T("Repas"))}
     <div class="row" style="flex-wrap:wrap;gap:6px"><button type="button" class="btn sm ghost" data-act="mealFormPhoto">${icon("camera")}${UI.meal.photo ? T("Changer la photo") : T("Ajouter une photo (facultatif)")}</button>${UI.meal.photo ? `<label class="switch" style="flex:1 1 200px"><input type="checkbox" id="f-keep" ${UI.meal.keep!==false?"checked":""}><span class="tg"></span><span class="grow small">${T("Garder aussi en souvenir")}</span></label>` : ""}</div>
     ${UI.meal.photo?`<img src="${UI.meal.photo}" alt="" data-act="viewImg" style="border-radius:16px;max-height:200px;object-fit:cover">`:""}
@@ -705,3 +728,14 @@ function bornForm(){
     <p class="tiny muted">${T("L'âge gestationnel est calculé à partir de la date prévue ; vous pourrez le corriger dans le profil.")}</p>
     <button class="btn kid" type="submit">${T("Enregistrer la naissance")}</button></form>`);
 }
+
+Object.assign(ACT, {
+  wsPer: v => { UI.wsPer = v; if (v === "custom" && !UI.wsFrom){ UI.wsFrom = iso(addDays(today(), -29)); UI.wsTo = iso(today()); } render(); },
+  jReset: () => { UI.jDate = null; render(); },
+  actFavLog: v => { const c = child(), f = (c.actFav||[])[+v]; if (!f) return; c.logs.push({id:uid(), type:"activity", t:Date.now(), data:{what:f.what, min:f.min, intensity:f.intensity||"Modérée"}}); closeSheet(); commit(T("Noté : {a} · {m}",{a:T(f.what), m:fmtMin(f.min)})); },
+  actFavDel: v => { const c = child(); c.actFav = (c.actFav||[]).filter((_, i) => i !== +v); save(); logForm("activity"); },
+});
+Object.assign(CHANGE, {
+  wsFrom: t => { UI.wsFrom = t.value; render(); }, wsTo: t => { UI.wsTo = t.value; render(); },
+  jDate: t => { UI.jDate = t.value && t.value < iso(today()) ? t.value : null; render(); }, jType: t => { UI.jType = t.value; render(); },
+});

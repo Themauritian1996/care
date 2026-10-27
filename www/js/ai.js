@@ -343,7 +343,7 @@ Object.assign(ACT, {
   mealPortion: v => { const [n, f] = v.split(":"); UI.mealLog.items[+n].f = +f; mealSync(); mealDone(); },
   mealItemOff: v => { const it = UI.mealLog.items[+v]; it.off = !it.off; mealSync(); mealDone(); },
   mealItemAdd: async () => { const name = val("ma-add"); if (!name) return; const M = UI.mealLog, fav = (child()?.foodFav||[]).find(f => f.name === name);
-    const it = {name, group:fav?.group||"autres", qty:fav?.qty||"", b:fav?.nut||null, f:1}; M.items.push(it); mealSync(); mealDone();
+    const fi = foodInfo(name), it = {name, group:fav?.group||fi?.group||"autres", qty:fav?.qty||(fi ? qtyTxt(fi.amt, fi.unit) : ""), b:fav?.nut||(fi ? nutOfFood(name, fi.amt, fi.unit) : null), f:1}; M.items.push(it); mealSync(); mealDone();
     if (!it.b && aiKey()){ try { const fake = {data:{items:[{name, qty:it.qty}]}}; await nutEstimate(kidById(Object.keys(M.ids)[0]), fake); it.b = fake.data.items[0].nut; if (it.b?.kcal) it.group = it.group; mealSync(); if ($("#layer .sheet")) mealDone(); } catch(e){} } },
   aiAskQuick: v => { if (UI.view !== "assistant"){ UI.aiTab = "ask"; closeSheet(); go("assistant"); } aiAsk(v); }, aiMealPhoto: () => aiMealPhoto(),
   mealKeep: async () => { const M = UI.mealLog; if (!M || !UI.mealImg) return; const m = await mealToMemory(UI.mealImg, M.items.filter(i => !i.off), Object.keys(M.ids), M.t, M.meal); M.memId = m.id;

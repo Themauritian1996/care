@@ -308,18 +308,27 @@ const threadVisible = (channel, th) => !th || th === "main" || threadsOf(channel
 function chatView(channel){
   if (!Cloud.user) return `<div class="card">${empty("chat", T("La discussion de famille et de groupe demande un compte, pour que chacun la voie sur son téléphone."), Cloud.configured?`<button class="btn kid" data-act="showLogin">${T("Se connecter")}</button>`:"")}</div>`;
   const g = channel === "family" ? null : S.groups.find(x => x.id === channel);
-  UI.thread = UI.thread || {}; const ths = threadsOf(channel); if (!ths.some(t => t.id === UI.thread[channel])) UI.thread[channel] = "main";
-  const cur = UI.thread[channel], curT = ths.find(t => t.id === cur), all = g ? (g.messages||[]) : S.messages, msgs = all.filter(x => (x.th || "main") === cur);
+  UI.thread = UI.thread || {}; const ths = threadsOf(channel); if (!ths.some(t => t.id === UI.thread[channel])) UI.thread[channel] = null;
+  const all0 = g ? (g.messages||[]) : S.messages;
+  if (!UI.thread[channel]) return convList(channel, g, ths, all0);
+  const cur = UI.thread[channel], curT = ths.find(t => t.id === cur), all = all0, msgs = all.filter(x => (x.th || "main") === cur);
   S.lastRead = S.lastRead || {}; S.lastRead[g ? g.id : "family"] = Date.now(); S.lastRead[(g ? g.id : "family") + ":" + cur] = Date.now();
   const unreadIn = t => all.filter(x => (x.th || "main") === t.id && x.at > ((S.lastRead||{})[(g ? g.id : "family") + ":" + t.id] || 0) && x.uid !== Cloud.user.uid).length;
   AFTER.push(() => { const b = $("#chatbox"); if (b) b.scrollTop = b.scrollHeight; });
   const who = curT && !curT.main && curT.members?.length ? curT.members.map(id => g ? g.members?.[id]?.name : member(id)?.name).filter(Boolean).join(", ") : "";
-  return `<div class="card chat-card"><div class="card-h"><h2>${curT?.emoji ? curT.emoji + " " : ""}${esc(curT?.name || "")}</h2><div class="row">${!curT?.main ? `<button class="btn sm ghost" data-act="threadForm" data-v="${channel}|${cur}" aria-label="${T("Modifier la discussion")}">${icon("edit")}</button>` : ""}${g?`<button class="btn sm ghost" data-act="tribuTab" data-v="groupes">${icon("left")}${T("Groupes")}</button>`:""}</div></div>
-    <div class="pick chips-scroll thread-row" style="flex-wrap:nowrap;overflow-x:auto">${ths.map(t => { const n = t.id === cur ? 0 : unreadIn(t); return `<button data-act="threadPick" data-v="${channel}|${t.id}" aria-pressed="${t.id===cur}">${t.emoji ? t.emoji + " " : ""}${esc(t.name)}${n ? ` <b class="badge" style="position:static">${n}</b>` : ""}</button>`; }).join("")}<button data-act="threadForm" data-v="${channel}|" aria-label="${T("Nouvelle discussion")}">${icon("plus")}${T("Discussion")}</button></div>
+  const others = sum(ths.filter(t => t.id !== cur).map(unreadIn));
+  return `<div class="card chat-card"><div class="row" style="gap:8px"><button class="icon-btn" data-act="threadPick" data-v="${channel}|" aria-label="${T("Toutes les discussions")}">${icon("left")}${others ? `<b class="badge">${others}</b>` : ""}</button><span class="conv-ic">${curT?.emoji || "💬"}</span><h2 class="grow" style="min-width:0;font-size:1.1rem">${esc(curT?.name || "")}</h2>${!curT?.main ? `<button class="icon-btn flat" data-act="threadForm" data-v="${channel}|${cur}" aria-label="${T("Modifier la discussion")}">${icon("edit")}</button>` : ""}</div>
     ${who ? `<p class="tiny muted">${T("Avec")} : ${esc(who)}</p>` : ""}
     <div class="chatbox" id="chatbox">${msgs.length ? msgs.slice(-200).map(msgRow).join("") : `<p class="small muted" style="text-align:center">${T("Écrivez le premier message.")}</p>`}</div>
     <div class="pick mention-box" id="mentionBox"></div>
     <form class="composer" data-form="chat" data-ch="${channel}" data-th="${cur}"><textarea class="inp" id="chat-in" rows="1" placeholder="${T("Message · @ pour mentionner")}" enterkeyhint="send"></textarea><button class="btn kid" type="submit" aria-label="${T("Envoyer")}">${icon("send")}</button></form></div>`;
+}
+/* liste des discussions, façon Messenger : une ligne par discussion avec le dernier message */
+function convList(channel, g, ths, all){
+  const last = t => all.filter(x => (x.th || "main") === t.id).at(-1), lr = t => (S.lastRead||{})[(g ? g.id : "family") + ":" + t.id] || 0;
+  const rows = ths.map(t => ({t, m:last(t), n:all.filter(x => (x.th || "main") === t.id && x.at > lr(t) && x.uid !== Cloud.user.uid).length})).sort((a, b) => (b.m?.at || 0) - (a.m?.at || 0));
+  return `<div class="card"><div class="card-h"><h2>${g ? esc(g.name) : T("Discussions")}</h2><div class="row">${g?`<button class="btn sm ghost" data-act="tribuTab" data-v="groupes">${icon("left")}${T("Groupes")}</button>`:""}<button class="btn sm kid" data-act="threadForm" data-v="${channel}|">${icon("plus")}${T("Nouvelle")}</button></div></div>
+    <div class="conv-list">${rows.map(({t, m, n}) => `<button class="conv ${n ? "unread" : ""}" data-act="threadPick" data-v="${channel}|${t.id}"><span class="conv-ic">${t.emoji || "💬"}</span><span class="grow conv-mid"><span class="row between" style="gap:6px"><b class="conv-name">${esc(t.name)}</b><span class="tiny muted">${m ? (iso(new Date(m.at)) === iso(today()) ? fmtT(m.at) : fmtD(new Date(m.at),{day:"numeric",month:"short"})) : ""}</span></span><span class="conv-last">${m ? `${m.uid === Cloud.user.uid ? T("Vous") : esc((m.name||"").split(" ")[0])} : ${esc(m.text)}` : `<i>${T("Aucun message")}</i>`}</span></span>${n ? `<b class="badge conv-badge">${n}</b>` : ""}</button>`).join("")}</div></div>`;
 }
 function threadForm(v){
   const [channel, tid] = v.split("|"), g = channel === "family" ? null : S.groups.find(x => x.id === channel), list = (g ? g.threads : S.settings.threads) || [], t = list.find(x => x.id === tid);
@@ -336,7 +345,7 @@ async function saveThreads(channel, list){
   else { const g = S.groups.find(x => x.id === channel); g.threads = list; render(); try { await Cloud.groupUpdate(channel, {threads:list}); } catch(e){ toast(e.message); } }
 }
 Object.assign(ACT, {
-  threadPick: v => { const [ch, t] = v.split("|"); UI.thread = UI.thread || {}; UI.thread[ch] = t; if (ch === "family") render(); else { $("#main").innerHTML = topbar() + chatView(ch); afterRender(); } },
+  threadPick: v => { const [ch, t] = v.split("|"); UI.thread = UI.thread || {}; UI.thread[ch] = t || null; if (ch === "family") render(); else { $("#main").innerHTML = topbar() + chatView(ch); afterRender(); } if (t) setTimeout(() => $("#chat-in")?.focus({preventScroll:true}), 50); },
   threadForm: v => threadForm(v),
   threadDel: v => { const [ch, tid] = v.split("|"); askConfirm(T("Supprimer cette discussion ? Les messages ne seront plus affichés."), T("Supprimer"), () => { const g = ch === "family" ? null : S.groups.find(x => x.id === ch); saveThreads(ch, ((g ? g.threads : S.settings.threads) || []).filter(x => x.id !== tid)); UI.thread[ch] = "main"; }); },
 });

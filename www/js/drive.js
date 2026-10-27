@@ -139,16 +139,16 @@ let driveBusy = false;
 async function driveFlush(interactive){
   if (driveBusy || !drivePending() || !Cloud.canDrive?.()) return;
   if (!interactive && !Cloud.driveReady?.()) { softRender?.(); return; }
-  driveBusy = true; let done = 0;
+  driveBusy = true; let done = 0; const total = S.driveQueue.length; driveLive(0, total);
   try {
     while (S.driveQueue.length){
       const x = S.driveQueue[0];
       if (x.op === "del") await Cloud.driveDelete(x.f); else await driveUpOne(x);
-      S.driveQueue.shift(); done++; save();
+      S.driveQueue.shift(); done++; save(); driveLive(done, Math.max(total, done + S.driveQueue.length));
     }
     if (interactive) toast(T("Google Drive à jour ({n})",{n:done}));
   } catch(e){ if (interactive) toast(T("Google Drive : {e}",{e:e.message})); }
-  finally { driveBusy = false; save(); softRender?.(); }
+  finally { driveBusy = false; driveLive(); save(); softRender?.(); }
 }
 /* suivi longitudinal : on renvoie le document d'un enfant quand ses données changent (au plus toutes les 2 minutes) */
 const suiviHash = c => { const L = c.logs||[]; return [L.length, L.at(-1)?.t || 0, L.at(-1)?.id || "", JSON.stringify(c.growth||[]).length, Object.keys(c.milestones||{}).length, JSON.stringify(c.teeth||{}).length, JSON.stringify(c.permTeeth||{}).length, JSON.stringify(c.vaccines||{}).length, JSON.stringify(c.allergensLog||{}).length, c.allergies||"", c.conditions||"", c.meds||""].join("|"); };
@@ -175,7 +175,16 @@ function driveBackfill(){
   if (want("suivi")) S.children.filter(c => !isPrenatal(c)).forEach(c => add("suivi", c.id));
   save(); driveFlush(true);
 }
-const driveBanner = () => Cloud.canDrive?.() && drivePending() && !driveBusy ? `<div class="banner info">${icon("drive")}<div class="grow small">${T("{n} élément(s) à copier dans Google Drive (dossier « Tribe »).",{n:drivePending()})}</div><button class="btn sm kid" data-act="driveSync">${T("Synchroniser")}</button></div>` : "";
+const driveBanner = () => !Cloud.canDrive?.() ? "" : driveBusy ? `<div class="banner info drive-live-banner">${icon("drive")}<div class="grow small"><span class="spin"></span> <span class="drive-live">${T("Copie vers Google Drive…")}</span><div class="levelbar" style="margin-top:6px"><i class="drive-bar" style="width:5%"></i></div></div></div>` : drivePending() ? `<div class="banner info">${icon("drive")}<div class="grow small">${T("{n} élément(s) à copier dans Google Drive (dossier « Tribe »).",{n:drivePending()})}</div><button class="btn sm kid" data-act="driveSync">${T("Synchroniser")}</button></div>` : "";
+/* animation pendant l'envoi : boutons qui tournent, compteur et barre */
+function driveLive(done, total){
+  const on = driveBusy && total != null;
+  $$('[data-act=driveSync],[data-act=driveAll],[data-act=driveBackupNow],[data-act=memoryDrive],[data-act=photoDrive]').forEach(b => { b.classList.toggle("busy", on); b.disabled = on; });
+  $$(".drive-live").forEach(e => e.textContent = on ? T("Copie vers Google Drive… {a} / {b}",{a:done, b:total}) : "");
+  $$(".drive-bar").forEach(e => e.style.width = on ? Math.max(5, done / Math.max(1, total) * 100) + "%" : "100%");
+  if (on && !$(".drive-live")){ const host = $("#driveOut"); if (host) host.innerHTML = `<span class="spin"></span> <span class="drive-live">${T("Copie vers Google Drive… {a} / {b}",{a:done, b:total})}</span>`; }
+  if (!on){ const host = $("#driveOut"); if (host && host.querySelector(".drive-live")) host.innerHTML = `<span style="color:var(--mint-ink)">✓ ${T("Google Drive à jour")}</span>`; }
+}
 const driveSettings = () => { const parents = S.family.members.filter(m => m.uid && m.role !== "enfant"), mine = Cloud.user?.uid, keeper = S.settings.driveKeeper;
   return `${parents.length > 1 ? `<div class="field"><label>${T("Dans quel Drive garder la copie ?")}</label><p class="tiny muted">${T("Choisissez un seul compte : il copie tout ce que la famille ajoute (photos et souvenirs de chacun), puis partage le dossier « Tribe » avec l'autre parent. Ainsi les deux voient les mêmes éléments, sans doublons.")}</p>
     <div class="pick">${parents.map(m => `<button data-act="driveKeeper" data-v="${m.uid}" aria-pressed="${keeper===m.uid}">${avatarOf(m,20)} ${esc(m.name)}${m.uid===mine?` (${T("moi")})`:""}</button>`).join("")}<button data-act="driveKeeper" data-v="" aria-pressed="${!keeper}">${T("Chacun son Drive")}</button></div>

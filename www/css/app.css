@@ -696,3 +696,53 @@ img.zoomable,img[data-act=viewImg]{cursor:zoom-in}
 .story-filters{display:grid;grid-template-columns:1fr;gap:6px}
 @media (min-width:600px){.story-filters{grid-template-columns:2fr 1fr 1fr}}
 .story-filters .inp{padding:8px 10px;font-size:.9rem}
+.hist-filters{gap:8px;padding:12px 14px}
+
+/* ---- discussions façon Messenger ---- */
+.conv-list{display:flex;flex-direction:column}
+.conv{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--line);padding:10px 4px;text-align:left;color:inherit;font:inherit;cursor:pointer;min-width:0}
+.conv:first-child{border-top:0}
+.conv-ic{width:42px;height:42px;flex:none;border-radius:50%;background:var(--surface2);display:grid;place-items:center;font-size:1.3rem}
+.conv-mid{display:flex;flex-direction:column;gap:2px;min-width:0}
+.conv-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-last{font-size:.84rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.conv.unread .conv-name,.conv.unread .conv-last{color:var(--ink);font-weight:700}
+.conv-badge{position:static!important}
+.chat-card .icon-btn{position:relative}
+.chat-card .icon-btn .badge{position:absolute;top:-4px;right:-4px;left:auto}
+
+.btn.busy{opacity:.75;pointer-events:none}
+.btn.busy svg{animation:spin 1s linear infinite}
+.rand-btn{flex:none;padding:8px 12px;font-size:1.15rem}
+.rand-btn.busy{animation:pulse 1s infinite}
+
+/* ---- nutrition ---- */
+.nut-day{gap:12px}
+.nut-sum{display:flex;align-items:center;gap:14px}
+.kc-ring{position:relative;width:96px;height:96px;flex:none}
+.kc-ring svg{width:96px;height:96px}
+.kc-ring>div{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.1}
+.kc-ring b{font-size:1.3rem;font-family:var(--display)}
+.macro-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.macro-col{display:flex;flex-direction:column;gap:4px}
+.macro-col b small{font-weight:500;color:var(--muted);font-size:.75rem}
+.micro-row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.micro{background:var(--surface2);border-radius:10px;padding:6px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px}
+.micro b{font-size:1rem}
+.micro.low b{color:var(--butter-ink)}.micro.over b{color:var(--danger-ink)}
+@media (max-width:420px){.micro-row{grid-template-columns:repeat(3,1fr)}}
+.nut-meals{display:flex;flex-direction:column;gap:8px}
+.nut-meal{background:var(--surface2);border-radius:var(--r-md);padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.nut-item{display:flex;align-items:center;gap:8px;background:none;border:0;padding:4px 0;color:inherit;font:inherit;text-align:left;cursor:pointer;width:100%}
+.nut-item .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.nbars{position:relative;display:grid;grid-template-columns:repeat(var(--n),1fr);align-items:end;gap:2px;height:96px;padding-top:6px}
+.nb{height:100%;display:flex;align-items:flex-end;background:none;border:0;padding:0;cursor:pointer}
+.nb i{display:block;width:100%;border-radius:4px 4px 0 0;min-height:2px}
+.nbars .goal{position:absolute;left:0;right:0;border-top:2px dashed var(--ink);opacity:.35;pointer-events:none}
+.reco{display:flex;gap:10px;align-items:flex-start}
+.reco .tip-dot{margin-top:6px}
+.qty-row{gap:6px;align-items:center}
+
+.qbtn{position:relative}
+.qinfo{display:block;font-size:.7rem;font-weight:500;opacity:.8;margin-top:2px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.qinfo b{font-weight:800}

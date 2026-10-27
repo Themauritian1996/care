@@ -148,6 +148,9 @@ Object.assign(ACT, {
 Object.assign(CHANGE, {
   nutEnd: t => { UI.nutEnd = t.value || null; },
   mealPick: t => { const [g, name] = t.value.split("|"), i = +t.dataset.i; if (!name || !UI.meal) return; const c = child(), fav = (c.foodFav||[]).find(f => f.name === name);
-    const it = UI.meal.items[i]; it.name = name; it.group = g === "fav" ? (fav?.group || it.group) : g; if (fav?.qty && !it.qty) it.qty = fav.qty; if (fav?.nut) it.nut = fav.nut; else delete it.nut; mealForm(UI.meal); },
+    const it = UI.meal.items[i], f = foodInfo(name); it.name = name; it.group = g === "fav" ? (fav?.group || f?.group || it.group) : g;
+    if (f){ it.amt = f.amt; it.unit = f.unit; it.nut = nutOfFood(name, f.amt, f.unit); it.qty = qtyTxt(f.amt, f.unit); }
+    else { if (fav?.qty && !it.qty) it.qty = fav.qty; if (fav?.nut) it.nut = fav.nut; else delete it.nut; }
+    mealForm(UI.meal); },
   mealPickAdd: t => { const [, name] = t.value.split("|"); if (!name) return; const inp = $("#ma-add"); if (inp){ inp.value = name; ACT.mealItemAdd(); } },
 });

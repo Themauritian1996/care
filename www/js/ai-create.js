@@ -12,6 +12,8 @@ const CREATE_KINDS = {
   talk:{l:"Préparer une discussion", ic:"chat", d:"Comment aborder un sujet délicat (deuil, puberté, écrans, consentement, drogues…)."},
 };
 const MOODS = ["Doux","Drôle","Aventure","Mystère","Magique","Éducatif"];
+const RAND_THEMES = ["Un dragon qui a peur du noir","Une cabane dans les nuages","Le jour où les jouets ont parlé","Un voyage sous la mer en sous-marin jaune","Une licorne qui perd ses couleurs","Des pirates qui cherchent une chaussette","Une fusée en carton qui décolle vraiment","Un hérisson qui veut un câlin","La forêt des lucioles musiciennes","Un robot qui apprend à rire"];
+const RAND_MSGS = ["Oser demander de l'aide","Partager, c'est doubler la joie","On a le droit de se tromper","Être gentil avec les autres","Croire en soi","Dire ce qu'on ressent","La patience récompense","Accepter les différences","Prendre soin de la nature","Se calmer avant de dormir"];
 const MEAL_LABELS = ["Déjeuner","Dîner","Souper","Collation","Dessert","Boîte à lunch"];
 const aiKidNow = () => kidById(UI.aiKid) || child();
 const kidLine = c => c ? `${c.nick||c.name}${!isPrenatal(c)?`, ${ageLabel(ageMonths(c))}`:""}` : "un enfant";
@@ -28,8 +30,8 @@ function createForm(k){
   if (k === "story"){
     const lib = (S.stories||[]).flatMap(s => s.characters.filter(ch => ch.id !== "narr").map(ch => ({...ch, story:s.title})));
     f = `<div class="fgrid">${fld("st-hero",T("Héros"),inp("st-hero",c?(c.nick||c.name):"",""))}${fld("st-place",T("Lieu (facultatif)"),inp("st-place","",`placeholder="${T("Une forêt enchantée, l'espace…")}"`))}</div>
-      ${fld("st-theme",T("Thème (facultatif)"),inp("st-theme","",`placeholder="${T("Dinosaures, téléportation, un chat qui parle…")}"`))}
-      ${fld("st-msg",T("Ce qu'on veut transmettre (facultatif)"),inp("st-msg","",`placeholder="${T("Le courage, partager, s'endormir calme…")}"`))}
+      <div class="field"><label for="st-theme">${T("Thème (facultatif)")}</label><div class="row" style="gap:6px">${inp("st-theme","",`placeholder="${T("Dinosaures, téléportation, un chat qui parle…")}"`)}<button type="button" class="btn ghost rand-btn" data-act="storyRand" data-v="theme" aria-label="${T("Thème au hasard")}" title="${T("Thème au hasard")}">🎲</button></div></div>
+      <div class="field"><label for="st-msg">${T("Ce qu'on veut transmettre (facultatif)")}</label><div class="row" style="gap:6px">${inp("st-msg","",`placeholder="${T("Le courage, partager, s'endormir calme…")}"`)}<button type="button" class="btn ghost rand-btn" data-act="storyRand" data-v="msg" aria-label="${T("Leçon au hasard")}" title="${T("Leçon au hasard")}">🎲</button></div></div>
       <div class="field"><label>${T("Ambiance")}</label>${checks("st-mood", MOODS.map(x => [x, T(x)]), ["Doux"])}</div>
       <div class="field"><label>${T("Longueur")}</label>${radios("st-len",[["3",T("3 minutes")],["6",T("6 minutes")],["10",T("10 minutes")]],"3")}</div>
       ${fld("st-lvl",T("Niveau du livre (vocabulaire et style)"),lvlSelect("st-lvl",""))}
@@ -79,7 +81,7 @@ function menuJob(c){
 function menuOpen(id){
   const m = (S.menus||[]).find(x => x.id === id); if (!m) return; UI.menuId = id;
   sheet(`${sheetHead(esc(m.title))}<p class="small muted">${T("Touchez ♥ sur un repas que vous avez aimé : il va dans vos recettes favorites (la recette complète est préparée par l'IA).")}</p>
-    ${m.days.map((d, di) => `<div class="menu-day"><h3>${esc(d.day)}</h3>${d.meals.map((x, xi) => `<div class="menu-meal"><span class="chip ${x.label==="Souper"?"peach":x.label==="Dîner"?"mint":x.label==="Déjeuner"?"butter":"sky"}">${T(x.label)}</span><button class="grow menu-name" data-act="menuMeal" data-v="${id}|${di}|${xi}"><b>${esc(x.name)}</b>${x.note?`<span class="tiny muted">${esc(x.note)}</span>`:""}<span class="tiny" style="color:var(--lilac-ink)">${x.recipe || x.liked ? T("Voir la recette") : T("Recette ›")}</span></button><button class="icon-btn flat like ${x.liked?"on":""}" data-act="menuLike" data-v="${id}|${di}|${xi}" aria-pressed="${!!x.liked}" aria-label="${x.liked?T("Ne plus aimer"):T("J'aime : garder en favori")}">${x.liked?"♥":"♡"}</button></div>`).join("")}</div>`).join("")}
+    ${m.days.map((d, di) => `<div class="menu-day"><h3>${esc(d.day)}</h3>${d.meals.map((x, xi) => `<div class="menu-meal"><span class="chip ${x.label==="Souper"?"peach":x.label==="Dîner"?"mint":x.label==="Déjeuner"?"butter":"sky"}">${T(x.label)}</span><button class="grow menu-name" data-act="menuMeal" data-v="${id}|${di}|${xi}"><b>${esc(x.name)}</b>${x.note?`<span class="tiny muted">${esc(x.note)}</span>`:""}<span class="tiny" style="color:var(--lilac-ink)">${x.recipe || x.liked ? T("Voir la recette") : T("Recette ›")}</span></button><button class="icon-btn flat" data-act="menuLog" data-v="${id}|${di}|${xi}" aria-label="${T("Ajouter au journal")}" title="${T("Ajouter au journal")}">${icon("plus")}</button><button class="icon-btn flat like ${x.liked?"on":""}" data-act="menuLike" data-v="${id}|${di}|${xi}" aria-pressed="${!!x.liked}" aria-label="${x.liked?T("Ne plus aimer"):T("J'aime : garder en favori")}">${x.liked?"♥":"♡"}</button></div>`).join("")}</div>`).join("")}
     ${m.grocery?.length ? `<details class="card lexcard"><summary><b>${icon("note")} ${T("Liste d'épicerie")}</b></summary>${m.grocery.map(g => `<div><span class="eyebrow">${esc(g.aisle)}</span><ul class="ing grocery">${(g.items||[]).map(i => typeof i === "string" ? `<li>${esc(i)}</li>` : `<li><span class="qty">${esc(i.qty||"")}</span> ${esc(i.name)}</li>`).join("")}</ul></div>`).join("")}</details>` : ""}
     ${m.tips ? `<div class="banner soft">${icon("bulb")}<div class="small">${esc(m.tips)}</div></div>` : ""}
     <div class="row"><button class="btn ghost" data-act="menuShare" data-v="${id}">${icon("share")}${T("Partager")}</button><button class="btn danger" data-act="menuDel" data-v="${id}">${icon("trash")}</button></div>`, "wide");
@@ -686,7 +688,7 @@ function recipeSheet(rec, histId){
     <h3>${T("Étapes")}</h3><ol class="steps">${(rec.steps||[]).map(s => `<li>${esc(s)}</li>`).join("")}</ol>
     ${rec.kidTips?`<div class="banner soft">${icon("kid")}<div class="small">${esc(rec.kidTips)}</div></div>`:""}
     ${aiKey() ? `<div class="card tint" style="padding:12px 14px"><b>${icon("spark")} ${T("Modifier avec l'IA")}</b><div class="row" style="gap:6px"><input class="inp grow" id="rc-ai" placeholder="${T("Ex. : sans gluten, pour 6, version végé, moins sucré, au four")}"><button class="btn kid" data-act="recipeAiEdit" aria-label="${T("Modifier avec l'IA")}">${icon("spark")}</button></div><p class="tiny muted">${T("La recette est réécrite et remise en forme ici même.")}</p></div>` : ""}
-    <div class="row" style="flex-wrap:wrap"><button class="btn kid" data-act="recipeSave">${icon("star")}${saved?T("Mettre à jour"):T("Garder en favori")}</button>${child()&&ageMonths(child())>=6?`<button class="btn ghost" data-act="recipeLog">${icon("spoon")}${T("Noter comme repas")}</button>`:""}<button class="btn ghost" data-act="recipeShare">${icon("share")}${T("Partager")}</button>${saved?`<button class="btn danger" data-act="recipeDel" data-v="${rec.id}">${icon("trash")}</button>`:""}</div>`, "wide");
+    <div class="row" style="flex-wrap:wrap"><button class="btn kid" data-act="recipeSave">${icon("star")}${saved?T("Mettre à jour"):T("Garder en favori")}</button>${S.children.some(k => !isPrenatal(k) && ageMonths(k) >= 6)?`<button class="btn ghost" data-act="logRecipe">${icon("spoon")}${T("Ajouter au journal")}</button>`:""}<button class="btn ghost" data-act="recipeShare">${icon("share")}${T("Partager")}</button>${saved?`<button class="btn danger" data-act="recipeDel" data-v="${rec.id}">${icon("trash")}</button>`:""}</div>`, "wide");
 }
 function recipesPane(){
   const lab = UI.rcLabel || "all", q = (UI.rcQ||"").toLowerCase(), all = S.recipes||[];
@@ -700,6 +702,8 @@ function recipesPane(){
 Object.assign(ACT, {
   createKind: v => { if (CREATE_TAB[v]){ UI.aiTab = CREATE_TAB[v]; } else { UI.createKind = v; UI.aiTab = "create"; } closeSheet(); if (UI.view !== "assistant") go("assistant"); else render(); },
   menuOpen: v => menuOpen(v),
+  menuLog: v => { const [id, di, xi] = v.split("|"), m = S.menus.find(x => x.id === id), x = m?.days[+di]?.meals[+xi]; if (!x) return; const r = (x.liked && (S.recipes||[]).find(y => y.id === x.liked)) || x.recipe;
+    logRecipeSheet({title:x.name, label:x.label, labels:[x.label], nut:r?.nut || null, id:r?.id || null}); },
   menuMeal: v => { const [id, di, xi] = v.split("|"), m = S.menus.find(x => x.id === id), x = m?.days[+di]?.meals[+xi]; if (!x) return;
     const fav = x.liked && (S.recipes||[]).find(r => r.id === x.liked && (r.ingredients||[]).length); if (fav) return recipeSheet(fav);
     if (x.recipe) return recipeSheet({...x.recipe, menuRef:v});
@@ -752,6 +756,13 @@ Object.assign(ACT, {
   storyKeep: v => { const s = S.stories.find(x => x.id === v); S.memories.push({id:uid(), kind:"story", date:iso(today()), title:s.title, text:s.chapters.map(ch => `## ${ch.title}\n${ch.segs.map(sg => sg.t).join("\n")}`).join("\n\n"), kidIds:s.kid?[s.kid]:[]}); save(); driveQ("mem", S.memories.at(-1).id); toast(T("Souvenir enregistré")); },
   storyDel: v => { if (!confirmDel()) return; stopPlay(); (S.stories.find(x => x.id === v)?.chapters||[]).forEach(ch => ch.img && PhotoDB.del(ch.img).catch(() => {})); driveQDel(S.stories.find(x => x.id === v)?.driveIds); S.stories = S.stories.filter(x => x.id !== v); closeSheet(); commit(); },
   charForm: v => charForm(v),
+  storyRand: async (v, b) => { const id = v === "theme" ? "st-theme" : "st-msg", el = $("#" + id); if (!el) return; const c = aiKidNow(), age = c && !isPrenatal(c) ? ageLabel(ageMonths(c)) : "4 ans";
+    const local = v === "theme" ? RAND_THEMES : RAND_MSGS, pickL = () => T(local[Math.floor(Math.random() * local.length)]);
+    if (!aiKey()){ el.value = pickL(); return; }
+    b.classList.add("busy"); const prev = (UI.randSeen = UI.randSeen || []);
+    try { const r = await gemini({tier:"fast", temperature:1.0, contents:[{role:"user", parts:[{text: v === "theme" ? `Propose UN thème original et amusant pour une histoire du soir pour un enfant de ${age} (5 à 10 mots, sans ponctuation finale, sans guillemets). Surprenant mais rassurant. Évite : ${prev.join(" ; ") || "rien"}. En ${LANG==="en"?"anglais":"français"}. Réponds seulement par le thème.` : `Propose UNE valeur ou leçon à transmettre dans une histoire du soir pour un enfant de ${age} (3 à 8 mots, ex. « oser demander de l'aide »). Évite : ${prev.join(" ; ") || "rien"}. En ${LANG==="en"?"anglais":"français"}. Réponds seulement par la leçon.`}]}]});
+      const t = String(r.text||"").trim().split("\n")[0].replace(/^["«“\s-]+|["»”.\s]+$/g, ""); el.value = t || pickL(); prev.push(el.value); if (prev.length > 12) prev.shift(); }
+    catch(e){ el.value = pickL(); } finally { b.classList.remove("busy"); } },
   charHide: v => { const [sid, cid] = v.split("|"), ch = S.stories.find(x => x.id === sid)?.characters.find(x => x.id === cid); if (!ch) return; ch.libHide = true; save(); const el = document.querySelector(`[data-act=charHide][data-v="${v}"]`)?.closest(".char-pick"); if (el) el.remove(); toast(T("Retiré de la liste (toujours dans son histoire)")); },
   charUnhide: () => { (S.stories||[]).forEach(st => st.characters.forEach(ch => delete ch.libHide)); save(); render(); },
   charDel: v => { const [sid, cid] = v.split("|"), s = S.stories.find(x => x.id === sid), ch = s?.characters.find(x => x.id === cid); if (!ch) return;

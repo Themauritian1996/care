@@ -49,7 +49,17 @@ document.addEventListener("change", async e => {
   if (k && CHANGE[k]) { try { await CHANGE[k](t); } catch(err){ toast(err.message); } return; }
   if (t.name === "born"){ $("#bornFields").hidden = t.value === "non"; $("#preFields").hidden = t.value !== "non"; }
 });
-document.addEventListener("input", e => { const t = e.target; if (t.dataset.meal != null && UI.meal){ delete UI.meal.items[+t.dataset.meal].nut; UI.meal.items[+t.dataset.meal][t.dataset.k] = t.value; } });
+document.addEventListener("input", e => { const t = e.target; if (t.dataset.meal != null && UI.meal) mealItemEdit(+t.dataset.meal, t.dataset.k, t.value); });
+document.addEventListener("change", e => { const t = e.target; if (t.dataset.meal != null && UI.meal && (t.tagName === "SELECT" || t.dataset.k === "name")) mealItemEdit(+t.dataset.meal, t.dataset.k, t.value, t.dataset.k === "name"); });
+/* une ligne d'aliment change : on recalcule tout de suite si l'aliment est dans la base */
+function mealItemEdit(i, k, v, redraw){
+  const it = UI.meal.items[i]; if (!it) return; it[k] = k === "amt" ? (v === "" ? null : +v) : v;
+  const f = foodInfo(it.name);
+  if (f){ if (k === "name"){ it.group = f.group; if (!it.amt){ it.amt = f.amt; it.unit = f.unit; } } it.unit = it.unit || f.unit; it.nut = it.amt ? nutOfFood(it.name, it.amt, it.unit) : null; it.qty = qtyTxt(it.amt, it.unit); }
+  else { delete it.nut; if (k !== "name") it.qty = qtyTxt(it.amt, it.unit); }
+  const el = $("#mi-kc-" + i); if (el) el.textContent = it.nut?.kcal != null ? `${Math.round(it.nut.kcal)} kcal · ${fmtNum(it.nut.prot||0,1)} g ${T("prot.")}` : f ? "" : T("valeurs estimées par l'IA à l'enregistrement");
+  if (f && redraw) mealForm(UI.meal);
+}
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") closeSheet();
   if (e.key === "Enter" && !e.shiftKey && e.target.id === "chat-in"){ e.preventDefault(); e.target.closest("form").requestSubmit(); }
@@ -210,7 +220,7 @@ Object.assign(ACT, {
   rewardTpl: v => { const t = REWARD_TPL[+v]; $("#rw-title").value = T(t.t); $("#rw-cost").value = t.cost; },
   delTask: v => { S.tasks = S.tasks.filter(t => t.id !== v); closeSheet(); commit(); },
   notifTest: async () => { if (!(await Native.notifPermission())) return toast(T("Notifications refusées par l'appareil")); await Native.notifyAt(T("Test {app}",{app:appName()}), T("Les rappels fonctionnent !"), Date.now() + 5000, {go:"home"}); toast(T("Notification dans 5 secondes : vous pouvez fermer l'app")); },
-  driveTest: async () => { const out = $("#driveOut"); if (out) out.innerHTML = `<span class="spin"></span> ${T("Test en cours…")}`;
+  driveTest: async (v, b) => { b?.classList.add("busy"); setTimeout(() => b?.classList.remove("busy"), 8000); const out = $("#driveOut"); if (out) out.innerHTML = `<span class="spin"></span> ${T("Test en cours…")}`;
     try { const r = await Cloud.driveUpload(`${T("Test")} ${new Date().toLocaleString(LOCALE())}.txt`, "text/plain", btoa(unescape(encodeURIComponent(T("Fichier de test de {app}. Vous pouvez le supprimer.",{app:appName()})))), "", [T("Test")]);
       if (out) out.innerHTML = `<span style="color:var(--mint-ink)">✓ ${T("Ça marche : un fichier « Test » est dans votre Drive, dossier « {f} ».",{f:DRIVE_ROOT})}</span> ${r.webViewLink?`<a href="${esc(r.webViewLink)}" target="_blank" rel="noopener">${T("Ouvrir")}</a>`:""} ${S.settings.driveFolder?`<a href="https://drive.google.com/drive/folders/${esc(S.settings.driveFolder)}" target="_blank" rel="noopener">${T("Ouvrir le dossier")}</a>`:""}`; }
     catch(e){ if (out) out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; } },
@@ -304,13 +314,15 @@ Object.assign(FORMS, {
     if (["screen","tummy","read","activity"].includes(type) && !mins) return toast(T("Indiquez le nombre de minutes"));
     if (type === "screen" || type === "tummy") data = {min:mins};
     if (type === "read") data = {min:mins, title:val("f-title")};
-    if (type === "activity") data = {what:val("f-what") || pickVal("what") || "Activité", min:mins, intensity:pickVal("intensity")||"Modérée"};
+    if (type === "activity"){ data = {what:val("f-what") || pickVal("what") || "Activité", min:mins, intensity:pickVal("intensity")||"Modérée"};
+      if ($("#f-actfav")?.checked){ c.actFav = (c.actFav||[]).filter(f => !(f.what === data.what && f.min === data.min)); c.actFav.unshift({what:data.what, min:data.min, intensity:data.intensity}); c.actFav = c.actFav.slice(0, 8); } }
     if (type === "note"){ if (!val("f-text")) return toast(T("Écrivez une note")); data = {text:val("f-text")}; }
     if (f.dataset.id){ const L = c.logs.find(x => x.id === f.dataset.id); if (L){ Object.assign(L, {t, end, data:{...L.data, ...data}}); if (!end) delete L.end; } closeSheet(); return commit(T("Modifié")); }
     c.logs.push({id:uid(), type, t, end, data}); closeSheet(); commit(T("Noté"));
   },
   meal: async f => {
     const c = child(), items = UI.meal.items.filter(i => i.name.trim()); if (!items.length) return toast(T("Ajoutez au moins un aliment"));
+    items.forEach(it => { const f = foodInfo(it.name); if (it.amt) it.qty = qtyTxt(it.amt, it.unit || f?.unit); if (f && !it.nut){ it.group = it.group || f.group; it.nut = nutOfFood(it.name, it.amt || f.amt, it.unit || f.unit); } });
     const t = tsOf("f-t"), al = val("f-al");
     if (al) (c.allergensLog[al] = c.allergensLog[al] || []).push(iso(new Date(t)));
     const ex = UI.meal.editId ? c.logs.find(x => x.id === UI.meal.editId) : null;
