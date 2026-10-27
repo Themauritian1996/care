@@ -675,3 +675,15 @@ img.zoomable,img[data-act=viewImg]{cursor:zoom-in}
 @keyframes fpInPrev{from{transform:rotateY(-60deg);opacity:.3}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.flip-page{animation:none!important}}
 .flip-img img{pointer-events:none;-webkit-user-drag:none}
+
+.ch-select{width:auto;max-width:200px;padding:6px 8px;font-size:.82rem}
+.flip-bar .ch-select{max-width:46vw}
+.flip-seg{cursor:pointer}
+
+.char-book{background:var(--surface2);border-radius:var(--r-md);padding:8px 10px}
+.char-book summary{cursor:pointer}
+.char-pick{display:flex;align-items:center;gap:6px}
+.char-pick label{display:flex;align-items:center;gap:6px;flex-wrap:wrap;cursor:pointer}
+.menu-name{display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:none;border:0;padding:4px 0;text-align:left;color:inherit;font:inherit;cursor:pointer;min-width:0}
+.grocery .qty{display:inline-block;min-width:76px;font-weight:700;color:var(--mint-ink)}
+.quote-card .q-author{font-size:.86rem;color:var(--muted);text-align:right;margin-bottom:2px}

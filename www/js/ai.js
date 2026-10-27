@@ -311,7 +311,7 @@ async function aiReview(kidId, silent){
     const r = await gemini({system: AI_SYSTEM() + "\nFais une revue de suivi structurée : 1) ce qui va bien, 2) points à surveiller, 3) 2 ou 3 recommandations concrètes et réalistes, fondées sur les lignes directrices. Titres courts. 200 à 350 mots.",
       contents:[{role:"user", parts:[{text:`${kidContext(c)}\nPériode : ${days} jours. Sujets demandés : ${topics}.\nSéries quotidiennes : ${["sleep","act","screen","read"].map(sumUp).join(" | ")}.\nObjectifs : ${JSON.stringify(goals(c).custom)}. Recommandations : ${JSON.stringify(goals(c).rec)}.\n${dev}\n${nut}`}]}]});
     S.reviews = S.reviews || []; S.reviews.push({id:uid(), kid:c.id, date:iso(today()), text:r.text}); S.settings.ai.lastReview = iso(today());
-    const e = aiHist("review", T("Revue de {n}",{n:c.nick||c.name}), r.text, {kid:c.id}); save();
+    const e = aiHist("review", T("Revue de {n}",{n:c.nick||c.name}), r.text, {kid:c.id}); save(); driveQ("review", e.id);
     if (silent && S.settings.notif.enabled && S.settings.notif.review) Native.notifyNow(T("Revue prête"), T("La revue de {n} est disponible dans l'assistant.",{n:c.nick||c.name}), {go:"assistant", tab:"review"});
     return {histId:e.id};
   };

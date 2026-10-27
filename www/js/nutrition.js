@@ -92,7 +92,7 @@ async function nutAdvice(c, days = UI.nutDays || 7, quiet, endIso = UI.nutEnd){
     const L = c.logs.filter(l => l.type === "solid" && l.t >= startT && l.t < endT);
     const foods = L.map(l => `${iso(new Date(l.t))} ${mealKindOf(l)} : ${(l.data.items||[]).map(i => `${i.name}${i.qty?` (${i.qty})`:""}`).join(", ")}`).slice(-80).join("\n");
     const r = await gemini({system:AI_SYSTEM(), contents:[{role:"user", parts:[{text:`${kidContext(c)}\nPériode : ${days === 1 ? `la journée du ${iso(end)}` : `${days} jours, du ${iso(addDays(end, 1 - days))} au ${iso(end)}`}. Apports moyens par jour vs cibles : ${rangeSummary(c, end, days)}.\nRepas notés (date, moment, aliments) :\n${foods||"peu"}\nDonne : 1) ce qui va bien, 2) les écarts importants (seulement s'ils sont nets, en tenant compte que l'estimation est approximative et que des repas peuvent manquer), 3) 4 idées concrètes de repas ou collations adaptées à l'âge et au Guide alimentaire canadien pour combler les écarts, 4) portions indicatives pour l'âge. Rassurant, sans culpabiliser, pas de régime restrictif. 200 à 300 mots.`}]}]});
-    const e = aiHist("nutrition", T("Conseils nutrition · {n}",{n:c.nick||c.name}) + " · " + label, r.text, {kid:c.id}); return {histId:e.id};
+    const e = aiHist("nutrition", T("Conseils nutrition · {n}",{n:c.nick||c.name}) + " · " + label, r.text, {kid:c.id}); driveQ("review", e.id); return {histId:e.id};
   }, {kid:c.id, quiet});
 }
 Object.assign(ACT, {

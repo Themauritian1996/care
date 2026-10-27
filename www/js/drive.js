@@ -19,17 +19,20 @@ const DRIVE_KINDS = [
   ["speciaux", "Souvenirs spéciaux", "Premières fois, lettres ouvertes, voyages, créations…"],
   ["histoires", "Histoires", "Chaque histoire avec ses chapitres et ses images"],
   ["suivi", "Suivi de chaque enfant", "Un document par enfant mis à jour : croissance, vaccins, jalons, dents, habitudes par mois, notes, fièvre et médicaments"],
+  ["revues", "Revues et avis de l'IA", "Chaque revue (automatique ou demandée) et chaque avis nutrition, en document, rangé par enfant"],
   ["backup", "Sauvegarde hebdomadaire", "Un fichier avec toutes les données de l'app (sans les photos), chaque semaine ; les 8 dernières sont gardées"],
 ];
 /* une seule personne de la famille garde la copie (pas de doublons) ; elle peut partager le dossier avec l'autre parent */
 const driveKeeperOk = () => !S.settings.driveKeeper || S.settings.driveKeeper === Cloud.user?.uid;
 const driveOn = () => Cloud.canDrive?.() && S.settings.driveAuto !== false && driveKeeperOk();
-const driveWants = k => driveOn() && (S.settings.driveSync?.[k] ?? true);
+const DRIVE_OFF = ["revues"]; /* désactivés tant qu'on ne les active pas */
+const driveKindOn = k => S.settings.driveSync?.[k] ?? !DRIVE_OFF.includes(k);
+const driveWants = k => driveOn() && driveKindOn(k);
 const b64txt = t => btoa(unescape(encodeURIComponent(t)));
 const safeName = (t, n = 80) => String(t||"").replace(/[\/\\:*?"<>|]/g, "-").trim().slice(0, n) || "Tribe";
 const memKind = m => SPECIAL.find(x => x.k === m.kind) ? "speciaux" : ["story","yearbook"].includes(m.kind) ? "histoires" : "moments";
 function driveQ(kind, id, force){
-  const k = kind === "photo" ? "photos" : kind === "mem" ? memKind(S.memories.find(m => m.id === id) || {}) : kind === "story" ? "histoires" : kind;
+  const k = kind === "photo" ? "photos" : kind === "mem" ? memKind(S.memories.find(m => m.id === id) || {}) : kind === "story" ? "histoires" : kind === "review" ? "revues" : kind;
   if (!(force ? Cloud.canDrive?.() : driveWants(k))) return;
   S.driveQueue = (S.driveQueue||[]).filter(x => !(x.op === "up" && x.kind === kind && x.id === id)); S.driveQueue.push({op:"up", kind, id}); save(); driveFlush();
 }
@@ -115,6 +118,10 @@ async function driveUpOne(x){
     for (const c of s.chapters) for (const [pi, pg] of (c.pages||[]).entries()) if (pg.img && pg.img !== c.img){ const d = await PhotoDB.get(pg.img); if (d) ids.push((await Cloud.driveUpload(`${T("Chapitre")} ${c.n} - ${T("page")} ${pi + 1}.jpg`, "image/jpeg", d.split(",")[1], c.title, path)).id); }
     for (const c of s.chapters) if (c.img){ const d = await PhotoDB.get(c.img); if (d) ids.push((await Cloud.driveUpload(`${T("Chapitre")} ${c.n}.jpg`, d.startsWith("data:image/png") ? "image/png" : "image/jpeg", d.split(",")[1], c.title, path)).id); }
     s.driveIds = ids.filter(Boolean);
+  } else if (x.kind === "review"){
+    const e = (S.aiHist||[]).find(y => y.id === x.id); if (!e?.text) return; const c = kidById(e.kid);
+    await upDoc(`${fmtD(new Date(e.at),{year:"numeric",month:"2-digit",day:"2-digit"})} ${e.title}`, docHTML(e.title, `<h1>${H(e.title)}</h1><p class="sub">${H(fmtD(new Date(e.at),{weekday:"long",day:"numeric",month:"long",year:"numeric"}))}${c ? " · " + H(c.nick||c.name) : ""}</p>${md(e.text)}${(e.sources||[]).length ? `<h3>${H(T("Sources"))}</h3><ul>${e.sources.slice(0, 8).map(x => `<li><a href="${H(x.uri)}">${H(x.title||x.uri)}</a></li>`).join("")}</ul>` : ""}<p class="sub">${H(T("Ne remplace pas un avis médical."))}</p>`), T("Revue de l'IA"), ["Revues", safeName(c?.name || T("Famille"))]);
+    e.drive = true;
   } else if (x.kind === "backup"){
     const snap = JSON.parse(JSON.stringify({...S, exportedAt:new Date().toISOString(), app:appName()})); delete snap.driveQueue; if (snap.settings?.parental) delete snap.settings.parental.pin;
     const r = await Cloud.driveUpload(`Sauvegarde-${iso(today())}.json`, "application/json", b64txt(JSON.stringify(snap)), T("Sauvegarde automatique de Tribe"), ["Sauvegardes"]);
@@ -175,7 +182,7 @@ const driveSettings = () => { const parents = S.family.members.filter(m => m.uid
     ${keeper && keeper !== mine ? `<p class="small">${T("La copie est faite par {n}. Demandez-lui de partager le dossier avec vous (bouton ci-dessous sur son téléphone).",{n:esc(parents.find(m => m.uid===keeper)?.name||"")})}</p>` : ""}
     ${keeper === mine ? `<div class="row" style="flex-wrap:wrap">${parents.filter(m => m.uid !== mine && m.email).map(m => `<button class="btn sm ghost" data-act="driveShareWith" data-v="${esc(m.email)}">${icon("share")}${T("Partager le dossier avec {n}",{n:esc(m.name)})}</button>`).join("")}</div>` : ""}</div>` : ""}
   <div class="row" style="flex-wrap:wrap"><button class="btn sm ghost" data-act="driveBackupNow">${icon("db")}${T("Sauvegarder maintenant")}</button><span class="tiny muted">${S.settings.driveBackupAt ? T("Dernière sauvegarde : {d}",{d:fmtD(new Date(S.settings.driveBackupAt),{day:"numeric",month:"long"})}) : T("Aucune sauvegarde pour l'instant")}</span></div>
-  <div class="field"><label>${T("Copier automatiquement")}</label><div class="list">${DRIVE_KINDS.map(([k, l, d]) => `<label class="switch"><input type="checkbox" data-change="driveKind" data-k="${k}" ${(S.settings.driveSync?.[k] ?? true)?"checked":""} ${S.settings.driveAuto===false?"disabled":""}><span class="tg"></span><span class="grow"><b>${T(l)}</b><span class="tiny muted" style="display:block">${T(d)}</span></span></label>`).join("")}</div></div>`; };
+  <div class="field"><label>${T("Copier automatiquement")}</label><div class="list">${DRIVE_KINDS.map(([k, l, d]) => `<label class="switch"><input type="checkbox" data-change="driveKind" data-k="${k}" ${driveKindOn(k)?"checked":""} ${S.settings.driveAuto===false?"disabled":""}><span class="tg"></span><span class="grow"><b>${T(l)}</b><span class="tiny muted" style="display:block">${T(d)}</span></span></label>`).join("")}</div></div>`; };
 Object.assign(ACT, {
   driveKeeper: v => { S.settings.driveKeeper = v || null; S.settings.driveKeeperSince = Date.now() - 30*DAY; commit(v ? T("Copie Drive confiée à un seul compte") : T("Chacun garde sa copie")); },
   driveShareWith: async v => { try { toast(T("Partage du dossier…")); await Cloud.driveShare(v); toast(T("Dossier « Tribe » partagé avec {e} : il apparaîtra dans « Partagés avec moi » de son Drive.",{e:v})); } catch(e){ toast(T("Google Drive : {e}",{e:e.message})); } },

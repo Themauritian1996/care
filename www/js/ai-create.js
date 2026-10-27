@@ -33,7 +33,7 @@ function createForm(k){
       <div class="field"><label>${T("Ambiance")}</label>${checks("st-mood", MOODS.map(x => [x, T(x)]), ["Doux"])}</div>
       <div class="field"><label>${T("Longueur")}</label>${radios("st-len",[["3",T("3 minutes")],["6",T("6 minutes")],["10",T("10 minutes")]],"3")}</div>
       ${fld("st-lvl",T("Niveau du livre (vocabulaire et style)"),lvlSelect("st-lvl",""))}
-      ${lib.length ? `<div class="field"><label>${T("Reprendre des personnages")}</label>${checks("st-chars", lib.map(ch => [ch.id, `${ch.name} (${ch.story})`]), [])}</div>` : ""}
+      ${charLibrary()}
       ${fld("st-new",T("Nouveaux personnages (facultatif)"),inp("st-new","",`placeholder="${T("Ex. : Zara, une renarde qui adore les énigmes")}"`))}
       <div class="row" style="flex-wrap:wrap"><button type="button" class="btn ghost" data-act="storyIdeas">${icon("bulb")}${T("Proposer 3 idées d'abord")}</button><button class="btn kid" type="submit">${icon("spark")}${T("Écrire directement")}</button></div>
       <div id="storyIdeas"></div>`;
@@ -64,13 +64,13 @@ function menusPane(){
     + (liked.length ? `<div class="card"><div class="card-h"><h2>${T("Repas aimés")}</h2><button class="btn sm ghost" data-act="aiTab" data-v="recipes">${T("Recettes")}</button></div><div class="pick">${liked.slice(0, 20).map(r => `<button data-act="recipeOpen" data-v="${r.id}">♥ ${esc(r.title)}</button>`).join("")}</div></div>` : "")
     + histOfCat("menu", T("Les anciens menus (texte) apparaissent ici."));
 }
-const MENU_SCHEMA = {type:"OBJECT", properties:{title:{type:"STRING"}, days:{type:"ARRAY", items:{type:"OBJECT", properties:{day:{type:"STRING"}, meals:{type:"ARRAY", items:{type:"OBJECT", properties:{label:{type:"STRING", enum:["Déjeuner","Dîner","Souper","Collation"]}, name:{type:"STRING"}, note:{type:"STRING"}}, required:["label","name"]}}}, required:["day","meals"]}}, grocery:{type:"ARRAY", items:{type:"OBJECT", properties:{aisle:{type:"STRING"}, items:{type:"ARRAY", items:{type:"STRING"}}}, required:["aisle","items"]}}, tips:{type:"STRING"}}, required:["title","days","grocery"]};
+const MENU_SCHEMA = {type:"OBJECT", properties:{title:{type:"STRING"}, days:{type:"ARRAY", items:{type:"OBJECT", properties:{day:{type:"STRING"}, meals:{type:"ARRAY", items:{type:"OBJECT", properties:{label:{type:"STRING", enum:["Déjeuner","Dîner","Souper","Collation"]}, name:{type:"STRING"}, note:{type:"STRING"}}, required:["label","name"]}}}, required:["day","meals"]}}, grocery:{type:"ARRAY", items:{type:"OBJECT", properties:{aisle:{type:"STRING"}, items:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, qty:{type:"STRING"}}, required:["name","qty"]}}}, required:["aisle","items"]}}, tips:{type:"STRING"}}, required:["title","days","grocery"]};
 function menuJob(c){
   const meals = checked("pl-meals"), nd = +(radio("pl-days") || 7), cons = val("pl-a"), favs = $("#pl-fav")?.checked ? (S.recipes||[]).slice(0, 12).map(r => r.title).join(", ") : "";
   if (!meals.length) return toast(T("Choisissez au moins un repas")); S.settings.menuMeals = meals; save();
   const foods = (c?.foodFav||[]).map(f => f.name).join(", ");
   return aiJob("menu", T("Menu de la semaine"), async () => {
-    const r = await gemini({json:MENU_SCHEMA, temperature:0.8, timeout:120000, system:AI_SYSTEM(), contents:[{role:"user", parts:[{text:`Propose un menu de ${nd} jours pour une famille avec ${kidLine(c)}${S.children.length > 1 ? ` (autres enfants : ${S.children.filter(k => k.id !== c?.id && !isPrenatal(k)).map(kidLine).join(", ")})` : ""}. Repas à prévoir chaque jour : ${meals.join(", ")}. Guide alimentaire canadien, textures sûres pour l'âge, variété, restes réutilisés intelligemment. Aliments aimés : ${foods||"inconnus"}. Allergies : ${c?.allergies||"aucune connue"}. Contraintes : ${cons||"aucune"}.${favs ? ` Intègre 2 ou 3 de ces recettes favorites : ${favs}.` : ""} Pour chaque repas : un nom court et appétissant (name) et une note très brève (portion de l'enfant ou astuce). Jours nommés (Lundi…). Puis la liste d'épicerie groupée par rayon et 2 phrases d'astuces de préparation. En ${LANG==="en"?"anglais":"français"}.`}]}]});
+    const r = await gemini({json:MENU_SCHEMA, temperature:0.8, timeout:120000, system:AI_SYSTEM(), contents:[{role:"user", parts:[{text:`Propose un menu de ${nd} jours pour une famille avec ${kidLine(c)}${S.children.length > 1 ? ` (autres enfants : ${S.children.filter(k => k.id !== c?.id && !isPrenatal(k)).map(kidLine).join(", ")})` : ""}. Repas à prévoir chaque jour : ${meals.join(", ")}. Guide alimentaire canadien, textures sûres pour l'âge, variété, restes réutilisés intelligemment. Aliments aimés : ${foods||"inconnus"}. Allergies : ${c?.allergies||"aucune connue"}. Contraintes : ${cons||"aucune"}.${favs ? ` Intègre 2 ou 3 de ces recettes favorites : ${favs}.` : ""} Pour chaque repas : un nom court et appétissant (name) et une note très brève (portion de l'enfant ou astuce). Jours nommés (Lundi…). Puis la liste d'épicerie groupée par rayon, avec pour chaque article la quantité totale à acheter pour toute la semaine et pour ${Math.max(2, S.family.members.length)} personnes (ex. « 1 kg », « 2 boîtes de 540 ml », « 1 douzaine », « 3 »), et 2 phrases d'astuces de préparation. En ${LANG==="en"?"anglais":"français"}.`}]}]});
     const out = parseJSON(r.text), m = {id:uid(), at:Date.now(), kid:c?.id||null, title:out.title || T("Menu de la semaine"), days:(out.days||[]).map(d => ({day:d.day, meals:(d.meals||[]).map(x => ({label:x.label, name:x.name, note:x.note||""}))})), grocery:out.grocery||[], tips:out.tips||""};
     if (!m.days.length) throw new Error(T("Réponse incomplète, réessayez"));
     S.menus = [m, ...(S.menus||[])].slice(0, 40); save(); if (UI.aiTab === "menus") softRender(); return {open:() => menuOpen(m.id)};
@@ -79,14 +79,27 @@ function menuJob(c){
 function menuOpen(id){
   const m = (S.menus||[]).find(x => x.id === id); if (!m) return; UI.menuId = id;
   sheet(`${sheetHead(esc(m.title))}<p class="small muted">${T("Touchez ♥ sur un repas que vous avez aimé : il va dans vos recettes favorites (la recette complète est préparée par l'IA).")}</p>
-    ${m.days.map((d, di) => `<div class="menu-day"><h3>${esc(d.day)}</h3>${d.meals.map((x, xi) => `<div class="menu-meal"><span class="chip ${x.label==="Souper"?"peach":x.label==="Dîner"?"mint":x.label==="Déjeuner"?"butter":"sky"}">${T(x.label)}</span><div class="grow"><b>${esc(x.name)}</b>${x.note?`<div class="tiny muted">${esc(x.note)}</div>`:""}</div><button class="icon-btn flat like ${x.liked?"on":""}" data-act="menuLike" data-v="${id}|${di}|${xi}" aria-pressed="${!!x.liked}" aria-label="${x.liked?T("Ne plus aimer"):T("J'aime : garder en favori")}">${x.liked?"♥":"♡"}</button></div>`).join("")}</div>`).join("")}
-    ${m.grocery?.length ? `<details class="card lexcard"><summary><b>${icon("note")} ${T("Liste d'épicerie")}</b></summary>${m.grocery.map(g => `<div><span class="eyebrow">${esc(g.aisle)}</span><ul class="ing">${(g.items||[]).map(i => `<li>${esc(i)}</li>`).join("")}</ul></div>`).join("")}</details>` : ""}
+    ${m.days.map((d, di) => `<div class="menu-day"><h3>${esc(d.day)}</h3>${d.meals.map((x, xi) => `<div class="menu-meal"><span class="chip ${x.label==="Souper"?"peach":x.label==="Dîner"?"mint":x.label==="Déjeuner"?"butter":"sky"}">${T(x.label)}</span><button class="grow menu-name" data-act="menuMeal" data-v="${id}|${di}|${xi}"><b>${esc(x.name)}</b>${x.note?`<span class="tiny muted">${esc(x.note)}</span>`:""}<span class="tiny" style="color:var(--lilac-ink)">${x.recipe || x.liked ? T("Voir la recette") : T("Recette ›")}</span></button><button class="icon-btn flat like ${x.liked?"on":""}" data-act="menuLike" data-v="${id}|${di}|${xi}" aria-pressed="${!!x.liked}" aria-label="${x.liked?T("Ne plus aimer"):T("J'aime : garder en favori")}">${x.liked?"♥":"♡"}</button></div>`).join("")}</div>`).join("")}
+    ${m.grocery?.length ? `<details class="card lexcard"><summary><b>${icon("note")} ${T("Liste d'épicerie")}</b></summary>${m.grocery.map(g => `<div><span class="eyebrow">${esc(g.aisle)}</span><ul class="ing grocery">${(g.items||[]).map(i => typeof i === "string" ? `<li>${esc(i)}</li>` : `<li><span class="qty">${esc(i.qty||"")}</span> ${esc(i.name)}</li>`).join("")}</ul></div>`).join("")}</details>` : ""}
     ${m.tips ? `<div class="banner soft">${icon("bulb")}<div class="small">${esc(m.tips)}</div></div>` : ""}
     <div class="row"><button class="btn ghost" data-act="menuShare" data-v="${id}">${icon("share")}${T("Partager")}</button><button class="btn danger" data-act="menuDel" data-v="${id}">${icon("trash")}</button></div>`, "wide");
 }
-const menuText = m => `${m.title}\n\n${m.days.map(d => `${d.day}\n${d.meals.map(x => `- ${T(x.label)} : ${x.name}`).join("\n")}`).join("\n\n")}${m.grocery?.length ? `\n\n${T("Liste d'épicerie")}\n${m.grocery.map(g => `${g.aisle} : ${(g.items||[]).join(", ")}`).join("\n")}` : ""}`;
+const menuText = m => `${m.title}\n\n${m.days.map(d => `${d.day}\n${d.meals.map(x => `- ${T(x.label)} : ${x.name}`).join("\n")}`).join("\n\n")}${m.grocery?.length ? `\n\n${T("Liste d'épicerie")}\n${m.grocery.map(g => `${g.aisle} : ${(g.items||[]).map(i => typeof i === "string" ? i : `${i.qty} ${i.name}`).join(", ")}`).join("\n")}` : ""}`;
 
 /* ---------- histoires ---------- */
+/* personnages à reprendre : classés par livre, filtrables, on peut en retirer de la liste */
+function charLibrary(){
+  const books = (S.stories||[]).map(st => ({st, chars:st.characters.filter(ch => ch.id !== "narr" && !ch.libHide)})).filter(b => b.chars.length);
+  if (!books.length) return "";
+  const hidden = sum((S.stories||[]).map(st => st.characters.filter(ch => ch.libHide).length));
+  return `<div class="field"><label>${T("Reprendre des personnages")}</label>
+    ${books.length > 1 || books[0].chars.length > 6 ? `<input class="inp" id="st-charq" placeholder="${T("Filtrer par nom ou par livre")}" autocomplete="off">` : ""}
+    <div class="stack char-lib" style="gap:6px">${books.map(({st, chars}, bi) => `<details class="char-book" data-book="${esc(st.title.toLowerCase())}" ${books.length <= 2 || bi === 0 ? "open" : ""}><summary><b>${esc(st.title)}</b> <span class="tiny muted">${chars.length}${st.kid && kidById(st.kid) ? " · " + T("pour {n}",{n:esc(kidById(st.kid).nick||kidById(st.kid).name)}) : ""}</span></summary>
+      <div class="stack" style="gap:4px;margin-top:6px">${chars.map(ch => `<div class="char-pick" data-name="${esc(ch.name.toLowerCase())}"><label class="grow"><input type="checkbox" name="st-chars" value="${esc(ch.id)}"> <b>${esc(ch.name)}</b>${ch.fav?" ★":""} <span class="tiny muted">${esc((ch.desc||"").slice(0, 60))}</span></label><button type="button" class="icon-btn flat" data-act="charHide" data-v="${st.id}|${ch.id}" aria-label="${T("Retirer de la liste")}" title="${T("Retirer de la liste")}">${icon("x")}</button></div>`).join("")}</div></details>`).join("")}</div>
+    ${hidden ? `<button type="button" class="btn sm line" data-act="charUnhide" style="align-self:flex-start">${T("Réafficher les personnages retirés ({n})",{n:hidden})}</button>` : ""}</div>`;
+}
+document.addEventListener("input", e => { if (e.target.id !== "st-charq") return; const q = e.target.value.trim().toLowerCase();
+  $$(".char-book").forEach(b => { const bookHit = b.dataset.book.includes(q); let any = false; b.querySelectorAll(".char-pick").forEach(c => { const hit = !q || bookHit || c.dataset.name.includes(q); c.hidden = !hit; any = any || hit; }); b.hidden = !any; if (q && any) b.open = true; }); });
 const STORY_SCHEMA = {type:"OBJECT", properties:{title:{type:"STRING"}, chapterTitle:{type:"STRING"}, summary:{type:"STRING"},
   characters:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, desc:{type:"STRING"}, kind:{type:"STRING", enum:["enfant","adulte","aine","animal","creature","robot"]}, gender:{type:"STRING", enum:["fille","garcon","neutre"]}}, required:["name","desc","kind"]}},
   segments:{type:"ARRAY", items:{type:"OBJECT", properties:{speaker:{type:"STRING"}, text:{type:"STRING"}}, required:["speaker","text"]}}}, required:["title","chapterTitle","summary","characters","segments"]};
@@ -163,10 +176,11 @@ const CH_COLORS = ["lilac","peach","mint","sky","butter","rose","teal","coral"];
 const chColor = (st, id) => id === "narr" ? "surface2" : CH_COLORS[st.characters.findIndex(x => x.id === id) % CH_COLORS.length];
 
 function storiesPane(){
-  const mode = UI.stMode || "stories", fav = !!UI.stFav, list = (S.stories||[]).filter(s => !fav || s.fav);
-  let h = `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><div class="seg" style="width:auto"><button data-act="stMode" data-v="stories" aria-pressed="${mode==="stories"}">${T("Par histoire")}</button><button data-act="stMode" data-v="chars" aria-pressed="${mode==="chars"}">${T("Personnages")}</button></div><div class="row"><button class="btn sm ghost" data-act="stFav" aria-pressed="${fav}">${icon("star")}${T("Favoris")}</button><button class="btn sm kid" data-act="createKind" data-v="story">${icon("plus")}${T("Nouvelle")}</button></div></div></div>`;
+  const mode = UI.stMode || "stories", fav = !!UI.stFav, fk = UI.stKid || "", list = (S.stories||[]).filter(s => (!fav || s.fav) && (!fk || (fk === "fam" ? !s.kid : s.kid === fk)));
+  const kidsWith = S.children.filter(k => (S.stories||[]).some(s => s.kid === k.id));
+  let h = `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><div class="seg" style="width:auto"><button data-act="stMode" data-v="stories" aria-pressed="${mode==="stories"}">${T("Par histoire")}</button><button data-act="stMode" data-v="chars" aria-pressed="${mode==="chars"}">${T("Personnages")}</button></div><div class="row"><button class="btn sm ghost" data-act="stFav" aria-pressed="${fav}">${icon("star")}${T("Favoris")}</button><button class="btn sm kid" data-act="createKind" data-v="story">${icon("plus")}${T("Nouvelle")}</button></div></div>${kidsWith.length ? `<div class="pick chips-scroll" style="flex-wrap:nowrap;overflow-x:auto"><button data-act="stKid" data-v="" aria-pressed="${!fk}">${T("Toutes")}</button>${kidsWith.map(k => `<button data-act="stKid" data-v="${k.id}" aria-pressed="${fk===k.id}">${avatarOf(k,18)} ${esc(k.nick||k.name)}</button>`).join("")}${(S.stories||[]).some(s => !s.kid) ? `<button data-act="stKid" data-v="fam" aria-pressed="${fk==="fam"}">${T("Toute la famille")}</button>` : ""}</div>` : ""}</div>`;
   if (!list.length) return h + `<div class="card">${empty("moon", T("Vos histoires apparaîtront ici, avec leurs chapitres et leurs personnages."))}</div>`;
-  if (mode === "stories") return h + list.map(s => `<div class="story-row"><button class="card story-card" data-act="storyOpen" data-v="${s.id}"><div class="row between"><div class="grow" style="min-width:0"><span class="eyebrow">${s.kid&&kidById(s.kid)?esc(kidById(s.kid).nick||kidById(s.kid).name)+" · ":""}${T("{n} chapitre(s)",{n:s.chapters.length})}</span><h3>${esc(s.title)}</h3></div>${s.fav?icon("star").replace('fill="none"','fill="currentColor"').replace("<svg",'<svg style="width:20px;height:20px;color:var(--butter-ink)"'):""}</div><p class="small muted clamp2">${esc(s.chapters.at(-1)?.summary||"")}</p><div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.filter(x => x.id !== "narr").map(x => `<span class="chip ${chColor(s, x.id)}">${esc(x.name)}</span>`).join("")}</div></button><button class="story-next" data-act="storyNextSheet" data-v="${s.id}" aria-label="${T("Chapitre suivant")}">${icon("spark")}<span>${T("Chapitre {n}",{n:s.chapters.length+1})}</span></button></div>`).join("");
+  if (mode === "stories") return h + list.map(s => `<div class="story-row"><button class="card story-card" data-act="storyOpen" data-v="${s.id}"><div class="row between"><div class="grow" style="min-width:0"><span class="eyebrow">${s.kid&&kidById(s.kid)?T("Pour {n}",{n:esc(kidById(s.kid).nick||kidById(s.kid).name)}):T("Pour toute la famille")} · ${T("{n} chapitre(s)",{n:s.chapters.length})}${s.cover?" · " + T("illustré"):""}</span><h3>${esc(s.title)}</h3></div>${s.fav?icon("star").replace('fill="none"','fill="currentColor"').replace("<svg",'<svg style="width:20px;height:20px;color:var(--butter-ink)"'):""}</div><p class="small muted clamp2">${esc(s.chapters.at(-1)?.summary||"")}</p><div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.filter(x => x.id !== "narr").map(x => `<span class="chip ${chColor(s, x.id)}">${esc(x.name)}</span>`).join("")}</div></button><button class="story-next" data-act="storyNextSheet" data-v="${s.id}" aria-label="${T("Chapitre suivant")}">${icon("spark")}<span>${T("Chapitre {n}",{n:s.chapters.length+1})}</span></button></div>`).join("");
   return h + list.map(s => `<div class="card"><div class="card-h"><h3>${esc(s.title)}</h3><button class="btn sm ghost" data-act="storyOpen" data-v="${s.id}">${T("Ouvrir")}</button></div><div class="list">${s.characters.map(x => `<button class="li" data-act="charForm" data-v="${s.id}|${x.id}"><div class="ic" style="background:var(--${chColor(s,x.id)}-bg, var(--surface2));color:var(--${chColor(s,x.id)}-ink, var(--ink))">${icon(x.id==="narr"?"book":"user")}</div><div class="grow"><div class="li-title">${esc(x.name)}${x.fav?" ★":""}</div><div class="small muted">${esc(x.desc||T("Narrateur"))} · ${T("voix")} ${esc((s.engine==="gemini"?x.voice?.gv:voiceLabel(x.voice?.dv))||T("auto"))}</div></div>${icon("sliders")}</button>`).join("")}</div></div>`).join("");
 }
 function storyOpen(id){
@@ -175,7 +189,8 @@ function storyOpen(id){
   UI.storyId = id;
   const playing = PL.story === id && PL.on;
   if (UI.readMode) return storyBook(s, id, playing);
-  sheet(`${sheetHead(esc(s.title))}<div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ghost" data-act="storyFav" data-v="${id}">${icon("star")}${s.fav?T("Favori ✓"):T("Favori")}</button>
+  sheet(`${sheetHead(esc(s.title))}<div class="row" style="gap:8px;flex-wrap:wrap"><span class="small muted">${T("Histoire pour")}</span><select class="inp" style="width:auto;padding:6px 10px" data-change="storyKid" data-v="${id}"><option value="">${T("Toute la famille")}</option>${S.children.filter(k => !isPrenatal(k)).map(k => `<option value="${k.id}" ${s.kid===k.id?"selected":""}>${esc(k.nick||k.name)}</option>`).join("")}</select><span class="tiny muted">${T("Créée le {d}",{d:fmtD(new Date(s.at||Date.now()),{day:"numeric",month:"long",year:"numeric"})})}</span></div>
+    <div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ghost" data-act="storyFav" data-v="${id}">${icon("star")}${s.fav?T("Favori ✓"):T("Favori")}</button>
       <div class="seg" style="width:auto"><button data-act="storyEngine" data-v="device" aria-pressed="${s.engine!=="gemini"}">${T("Voix de l'appareil")}</button><button data-act="storyEngine" data-v="gemini" aria-pressed="${s.engine==="gemini"}">${T("Voix Gemini")}</button></div></div>
     <p class="tiny muted">${s.engine==="gemini" ? T("Voix naturelles générées par Gemini (quelques secondes par réplique, utilise votre clé).") : T("Voix intégrées au téléphone : instantanées et gratuites. Réglez la voix de chaque personnage ci-dessous.")}</p>
     <div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.map(x => `<button class="chip ${chColor(s,x.id)}" data-act="charForm" data-v="${id}|${x.id}">${icon("edit").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${esc(x.name)}</button>`).join("")}<button class="chip" style="border:1px dashed var(--line)" data-act="charForm" data-v="${id}|new">${icon("plus").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("Personnage")}</button></div>
@@ -195,13 +210,14 @@ function chCtl(s, id, ci, playing){ return `${playing && PL.ch === ci ? `<button
 function segsHtml(s, id, ci, ch, playing){ return `${ch.segs.map((sg, si) => `<p class="seg-line ${sg.c==="narr"?"narr":""} ${s.pos?.ch===ci && s.pos.i===si && !playing?"mark":""}" id="sg-${ci}-${si}" data-act="storyPlayFrom" data-v="${id}|${ci}|${si}" title="${T("Lire à partir d'ici")}">${sg.c!=="narr"?`<b class="who" style="color:var(--${chColor(s,sg.c)}-ink)">${esc(s.characters.find(x=>x.id===sg.c)?.name||"")}</b> `:""}${esc(sg.t)}</p>`).join("")}`; }
 function zoomBar(){ return `<span class="tiny muted">${T("Taille du texte")}</span><button class="btn sm ghost" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><b class="tiny num" id="zoomVal">${Math.round(storyZ()*100)} %</b><button class="btn sm ghost" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button>`; }
 /* mode lecture : un vrai livre (couverture, une image par chapitre, texte en grand) */
+const chSelect = s => s.chapters.length > 1 ? `<select class="inp ch-select" data-change="bookSelOne" data-v="${s.id}" aria-label="${T("Chapitres")}"><option value="">${T("Tous les chapitres")}</option>${s.chapters.map((ch, ci) => `<option value="${ci}" ${(s.bookSel||[]).length === 1 && s.bookSel[0] === ci ? "selected" : ""}>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</option>`).join("")}</select>` : "";
 function storyBook(s, id, playing){
   const kid = kidById(s.kid), done = s.chapters.filter(c => c.img).length;
-  sheet(`<div class="book-top">${sheetHead(esc(s.title))}<div class="read-bar">${zoomBar()}<button class="btn sm ghost" data-act="storyRead">${icon("x")}${T("Quitter la lecture")}</button><button class="btn sm ${s.cover && done === s.chapters.length ? "ghost" : "kid"}" data-act="storyBookShop" data-v="${id}">${icon("image")}${T("Illustrer le livre")}${s.cover || done ? ` · ${(s.cover?1:0) + done}/${s.chapters.length + 1}` : ""}</button><button class="btn sm ghost" data-act="storyPdf" data-v="${id}">${icon("doc")}${T("Livre PDF")}</button><button class="btn sm kid" data-act="flipOpen" data-v="${id}">${icon("book")}${T("Feuilleter")}</button></div></div>
+  sheet(`<div class="book-top">${sheetHead(esc(s.title))}<div class="read-bar">${zoomBar()}<button class="btn sm ghost" data-act="storyRead">${icon("x")}${T("Quitter la lecture")}</button><button class="btn sm ${s.cover && done === s.chapters.length ? "ghost" : "kid"}" data-act="storyBookShop" data-v="${id}">${icon("image")}${T("Illustrer le livre")}${s.cover || done ? ` · ${(s.cover?1:0) + done}/${s.chapters.length + 1}` : ""}</button><button class="btn sm ghost" data-act="storyPdf" data-v="${id}">${icon("doc")}${T("Livre PDF")}</button><button class="btn sm kid" data-act="flipOpen" data-v="${id}">${icon("book")}${T("Feuilleter")}</button>${chSelect(s)}</div></div>
     <div class="book" id="storyText" style="--sz:${storyZ()}">
       <section class="book-cover">${s.cover ? `<img class="cover-img" data-stimg="${s.cover}" alt="${esc(s.title)}">` : `<button class="cover-ph" data-act="storyBookShop" data-v="${id}">${icon("image")}<span>${T("Ajouter une couverture")}</span></button>`}
         <h1>${esc(s.title)}</h1>${kid ? `<p>${T("Une histoire pour {n}",{n:esc(kid.nick||kid.name)})}</p>` : ""}<p class="tiny muted">${T("{n} chapitre(s)",{n:s.chapters.length})} · ${esc(s.characters.filter(x => x.id !== "narr").map(x => x.name).join(", "))}</p></section>
-      ${s.chapters.map((ch, ci) => `<section class="book-page">${ch.img ? `<img class="story-img" data-stimg="${ch.img}" alt="${esc(ch.title)}">` : ""}
+      ${s.chapters.map((ch, ci) => !bookSel(s).includes(ci) ? "" : `<section class="book-page">${ch.img ? `<img class="story-img" data-stimg="${ch.img}" alt="${esc(ch.title)}">` : ""}
         <div class="row between"><h2>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h2><div class="row" style="gap:4px;flex-wrap:nowrap">${chCtl(s, id, ci, playing)}</div></div>
         ${segsHtml(s, id, ci, ch, playing)}</section>`).join("")}
       <section class="book-end">${T("Fin")} ✦</section></div>`, "wide reading");
@@ -314,60 +330,96 @@ function autoPages(ch, n){
   ch.segs.forEach((sg, i) => { if (!cur || (w >= per && out.length < (n || 99))){ cur = {from:i, to:i}; out.push(cur); w = 0; } cur.to = i; w += segWords(sg); });
   return out.map(p => ({...p, scene:ch.segs.slice(p.from, p.to + 1).map(x => x.t).join(" ").slice(0, 300)}));
 }
-const pagesOf = ch => ch.pages?.length ? ch.pages : autoPages(ch);
+const pagesOf = ch => ch.pages?.length ? ch.pages : autoPages(ch, chN(ch));
+/* nombre d'images conseillé pour un chapitre : environ une scène pour 45 mots (1 à 12) */
+const suggestN = ch => Math.max(1, Math.min(12, ch.segs.length, Math.round(sum(ch.segs.map(segWords)) / 45) || 1));
+const chN = ch => Math.min(ch.segs.length, ch.pagesN || suggestN(ch));
+/* chapitres choisis pour le livre (tous par défaut) */
+const bookSel = s => { const all = s.chapters.map((_, i) => i), sel = (s.bookSel || []).filter(i => i < s.chapters.length); return sel.length ? sel : all; };
 const PAGE_SCHEMA = {type:"OBJECT", properties:{pages:{type:"ARRAY", items:{type:"OBJECT", properties:{from:{type:"INTEGER"}, to:{type:"INTEGER"}, scene:{type:"STRING"}, who:{type:"ARRAY", items:{type:"STRING"}}}, required:["from","to","scene"]}}}, required:["pages"]};
 /* l'IA découpe chaque chapitre en scènes (actions, événements) et décrit chaque image en anglais */
-async function storyScenes(s, force){
-  const n = +(S.settings.bookPages || 4);
-  for (const ch of s.chapters){
-    if (ch.pages?.length && !force) continue;
+async function storyScenes(s, force, only){
+  for (const [ci, ch] of s.chapters.entries()){
+    if (only && !only.includes(ci)) continue;
+    const n = chN(ch);
+    if (ch.pages?.length && !force && (ch.pagesFor ?? ch.pages.length) === n) continue;
     let pages = null;
     if (aiKey()) try {
-      const r = await gemini({tier:"fast", json:PAGE_SCHEMA, temperature:0.3, contents:[{role:"user", parts:[{text:`Livre illustré pour enfants « ${s.title} », chapitre « ${ch.title} ». Découpe le texte en environ ${n} pages comme un vrai album jeunesse : chaque page = une action ou un événement, avec des répliques consécutives (from et to = numéros des répliques, inclusifs ; toutes les répliques couvertes, dans l'ordre, sans trou ni chevauchement). Pour chaque page, scene = description visuelle précise EN ANGLAIS de l'image à dessiner pour ce moment (lieu, action, émotions, éléments importants), sans texte dans l'image ; who = noms des personnages visibles.\nPersonnages : ${s.characters.filter(x => x.id !== "narr").map(x => x.name).join(", ")}.\nRépliques :\n${ch.segs.map((sg, i) => `${i}. ${sg.c !== "narr" ? (s.characters.find(x => x.id === sg.c)?.name || "") + " : " : ""}${sg.t}`).join("\n")}`}]}]});
+      const r = await gemini({tier:"fast", json:PAGE_SCHEMA, temperature:0.3, contents:[{role:"user", parts:[{text:`Livre illustré pour enfants « ${s.title} », chapitre « ${ch.title} ». Découpe le texte en exactement ${n} page(s) comme un vrai album jeunesse : chaque page = une action ou un événement important, avec des répliques consécutives (from et to = numéros des répliques, inclusifs ; toutes les répliques couvertes, dans l'ordre, sans trou ni chevauchement). Pour chaque page, scene = description visuelle précise EN ANGLAIS de l'image à dessiner pour ce moment (lieu, action, émotions, éléments importants), sans texte dans l'image ; who = noms des personnages visibles.\nPersonnages : ${s.characters.filter(x => x.id !== "narr").map(x => x.name).join(", ")}.\nRépliques :\n${ch.segs.map((sg, i) => `${i}. ${sg.c !== "narr" ? (s.characters.find(x => x.id === sg.c)?.name || "") + " : " : ""}${sg.t}`).join("\n")}`}]}]});
       const P = (parseJSON(r.text).pages || []).map(p => ({from:Math.max(0, +p.from|0), to:Math.min(ch.segs.length - 1, +p.to|0), scene:p.scene || "", who:p.who || []})).filter(p => p.to >= p.from).sort((x, y) => x.from - y.from);
-      // on vérifie que tout est couvert, sinon on répare
       let ok = P.length && P[0].from === 0 && P.at(-1).to === ch.segs.length - 1; for (let i = 1; ok && i < P.length; i++) if (P[i].from !== P[i-1].to + 1) ok = false;
       if (ok) pages = P;
     } catch(e){ console.warn("scenes", e); }
     const old = ch.pages || [];
-    ch.pages = (pages || autoPages(ch, n)).map((p, i) => ({...p, img:old[i]?.img || (i === 0 && !old.length ? ch.img || null : null)}));
+    ch.pages = (pages || autoPages(ch, n)).map((p, i) => ({...p, img:old[i]?.img || (i === 0 && !old.length ? ch.img || null : null)})); ch.pagesFor = n;
   }
   save();
 }
 function bookPrompts(s){
-  const kid = kidById(s.kid), lang = LANG === "en" ? "English" : "French";
+  const kid = kidById(s.kid), lang = LANG === "en" ? "English" : "French", sel = bookSel(s);
   const P = [{k:"ref", t:T("Les personnages (référence)"), d:T("Une planche avec tous les personnages : Gemini s'en servira pour les dessiner pareils ensuite."), img:s.refImg,
       p:`${STY(s)}. Character reference sheet for the children's picture book "${s.title}". Draw each main character side by side, full body, front view, on a plain light background, clearly separated, friendly expressions. Characters: ${castOf(s)}. No text, no letters.`},
     {k:"cover", t:T("La couverture"), d:T("Avec le titre écrit en grand, comme un vrai livre."), img:s.cover,
       p:`Using exactly the same characters and art style as the character sheet above: ${STY(s)}. Front cover of a children's picture book, portrait format (3:4). At the top, write the title "${s.title}" in large, playful, rounded, easy-to-read letters (${lang}, spelled exactly like this). ${kid ? `At the bottom, small text: "${T("Une histoire pour {n}",{n:kid.nick||kid.name})}". ` : ""}Inviting, magical scene that captures the whole story: ${s.chapters.map(c => c.summary).join(" ")} Characters: ${castOf(s)}. No other text.`}];
-  s.chapters.forEach((ch, ci) => pagesOf(ch).forEach((pg, pi) => {
+  s.chapters.forEach((ch, ci) => { if (!sel.includes(ci)) return; pagesOf(ch).forEach((pg, pi) => {
     const names = (pg.who?.length ? pg.who : s.characters.filter(x => x.id !== "narr" && (ch.segs.slice(pg.from, pg.to + 1).some(sg => sg.c === x.id || sg.t.includes(x.name)))).map(x => x.name));
     const cast = s.characters.filter(x => names.includes(x.name)).map(x => `${x.name}: ${x.look || x.desc}`).join(" | ");
     P.push({k:`p${ci}_${pi}`, ci, pi, t:T("Chapitre {c} · page {p}",{c:ch.n, p:pi + 1}), d:ch.segs.slice(pg.from, pg.to + 1).map(x => x.t).join(" ").slice(0, 110) + "…", img:pg.img,
       p:`Next page of the same picture book: exactly the same characters and the same art style as the previous images. ${STY(s)}. Scene: ${pg.scene}${cast ? ` Characters in this picture (keep their exact look): ${cast}.` : " No characters needed."} No text, no letters, no speech bubbles. Square format.`});
-  }));
+  }); });
   return P;
 }
-async function storyBookShop(sid){
+/* une seule demande pour toutes les images qui manquent (Gemini les crée l'une après l'autre) */
+const batchPrompt = (s, list) => `I am making a children's picture book called "${s.title}". Please create the following ${list.length} illustrations, ONE SEPARATE IMAGE EACH, one after another, in this exact order, all with exactly the same characters and the same art style (${STY(s)}). Do not put any text in the images except the title on the cover. If you can't make them all at once, make the first ones and I will say "continue".\n\n${list.map((x, i) => `IMAGE ${i + 1} — ${x.t}:\n${x.p}`).join("\n\n")}`;
+/* place une image dans la bonne case du livre */
+async function bookSetSlot(s, k, dataUrl){
+  const small = await shrinkImage(dataUrl, k === "cover" ? 1400 : 1024, 0.85), id = "stimg-" + uid(); await PhotoDB.put(id, small);
+  if (k === "cover"){ if (s.cover) PhotoDB.del(s.cover).catch(() => {}); s.cover = id; }
+  else if (k === "ref"){ if (s.refImg) PhotoDB.del(s.refImg).catch(() => {}); s.refImg = id; }
+  else if (k.startsWith("p")){ const [ci, pi] = k.slice(1).split("_").map(Number), ch = s.chapters[ci], pg = ch?.pages?.[pi]; if (!pg) return; if (pg.img && pg.img !== ch.img) PhotoDB.del(pg.img).catch(() => {}); pg.img = id; if (pi === 0) ch.img = id; }
+}
+/* création directe par l'API (clé avec facturation) */
+async function genImage(prompt, ref){
+  let lastErr;
+  for (const model of await imageModels()){
+    try {
+      const parts = [...(ref ? [{inline_data:{mime_type:"image/jpeg", data:ref.split(",")[1]}}] : []), {text:prompt}];
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {method:"POST", headers:{"Content-Type":"application/json", "x-goog-api-key":aiKey()}, body:JSON.stringify({contents:[{role:"user", parts}], generationConfig:{responseModalities:["IMAGE","TEXT"]}})});
+      const d = await r.json(); if (!r.ok) throw new Error(d.error?.message || `Gemini ${r.status}`);
+      const img = (d.candidates?.[0]?.content?.parts||[]).find(p => p.inlineData || p.inline_data), id2 = img?.inlineData || img?.inline_data;
+      if (!id2?.data) throw new Error(d.candidates?.[0]?.finishReason || T("pas d'image"));
+      return `data:${id2.mimeType||id2.mime_type||"image/png"};base64,${id2.data}`;
+    } catch(e){ lastErr = e; AI_LAST_ERR = `${model} : ${e.message}`.slice(0, 300); if (/API_KEY_INVALID|PERMISSION_DENIED/i.test(e.message)) break; }
+  }
+  const paid = /quota|limit: ?0|billing|exceeded|RESOURCE_EXHAUSTED|not available|free tier|not found|NOT_FOUND/i.test(lastErr?.message||"");
+  if (paid) S.settings.ai.imgPaidOnly = true, save();
+  throw new Error(paid ? T("La création d'images par l'API demande une clé avec facturation activée. Utilisez plutôt l'app Gemini (gratuit).") : T("Image impossible : {e}",{e:lastErr?.message||"?"}));
+}
+async function storyBookShop(sid, keep){
   const s = S.stories.find(x => x.id === sid); if (!s) return; UI.storyId = sid;
-  sheet(`${sheetHead(T("Livre illustré"))}<p class="small muted"><span class="spin"></span> ${T("Préparation des prompts…")}</p>`, "wide");
+  if (!keep) sheet(`${sheetHead(T("Livre illustré"))}<p class="small muted"><span class="spin"></span> ${T("Préparation des prompts…")}</p>`, "wide");
   try { if (aiKey()) await storyLooks(s); } catch(e){}
-  await storyScenes(s);
+  await storyScenes(s, false, bookSel(s));
   s.characters.forEach(ch => { if (ch.id !== "narr" && !ch.look) ch.look = ch.desc || ch.name; });
-  const P = bookPrompts(s); UI.bookP = P; const done = P.filter(x => x.img).length;
+  const P = bookPrompts(s), sel = bookSel(s), all = sel.length === s.chapters.length; UI.bookP = P; const done = P.filter(x => x.img).length, miss = P.filter(x => !x.img);
   sheet(`${sheetHead(T("Livre illustré"))}
-    <div class="card tint" style="padding:12px 14px"><b>${T("Gratuit, avec l'app Gemini, en 3 gestes par image :")}</b>
-      <ol class="small" style="margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px"><li>${T("« Copier » le prompt, puis « Ouvrir Gemini » et le coller (choisissez « Créer une image » si on vous le propose).")}</li><li>${T("Restez dans la même conversation Gemini du début à la fin : les personnages et le style resteront les mêmes d'une image à l'autre.")}</li><li>${T("Enregistrez l'image (appui long → Télécharger), revenez ici et touchez « Ajouter l'image ».")}</li></ol></div>
-    <div class="row" style="gap:6px;flex-wrap:wrap"><span class="small muted">${T("Pages par chapitre")}</span>${[3,4,6,8].map(n => `<button class="chip ${(+S.settings.bookPages||4)===n?"lilac":""}" data-act="bookPagesN" data-v="${sid}|${n}">${n}</button>`).join("")}<button class="btn sm ghost" data-act="bookRecut" data-v="${sid}">${icon("auto")}${T("Redécouper")}</button></div>
-    <div class="row between"><span class="small"><b>${done}</b> / ${P.length} ${T("images")}</span><div class="row" style="gap:6px"><a class="btn sm kid" href="https://gemini.google.com/app" target="_blank" rel="noopener">${icon("spark")}${T("Ouvrir Gemini")}</a><button class="btn sm ghost" data-act="bookCopyAll">${icon("note")}${T("Tout copier")}</button></div></div>
+    <div class="field"><label>${T("Chapitres du livre")}</label><div class="pick chips-scroll" style="flex-wrap:nowrap;overflow-x:auto"><button data-act="bookSelAll" data-v="${sid}" aria-pressed="${all}">${T("Tous")}</button>${s.chapters.map((ch, ci) => `<button data-act="bookSelTog" data-v="${sid}|${ci}" aria-pressed="${!all && sel.includes(ci)}">${T("Ch. {n}",{n:ch.n})}</button>`).join("")}</div></div>
+    <details class="card lexcard" ${UI.bookNOpen ? "open" : ""}><summary><b>${icon("image")} ${T("Images par chapitre")}</b> <span class="tiny muted">${T("suggéré selon la longueur, modifiable")}</span></summary><div class="stack" style="gap:6px">${sel.map(ci => { const ch = s.chapters[ci]; return `<div class="row between" style="gap:8px"><span class="small" style="min-width:0">${T("Ch. {n}",{n:ch.n})} · ${esc(ch.title)}</span><select class="inp" style="width:auto;padding:6px 8px" data-change="bookN" data-v="${sid}|${ci}"><option value="">${T("Auto ({n})",{n:suggestN(ch)})}</option>${Array.from({length:12}, (_, k) => k + 1).filter(k => k <= ch.segs.length).map(k => `<option value="${k}" ${ch.pagesN === k ? "selected" : ""}>${k}</option>`).join("")}</select></div>`; }).join("")}</div></details>
+    <div class="row between"><span class="small"><b>${done}</b> / ${P.length} ${T("images")}</span><span class="tiny muted">${miss.length ? T("{n} à créer",{n:miss.length}) : T("Livre complet !")}</span></div>
     <div class="levelbar"><i style="width:${Math.max(2, done / P.length * 100).toFixed(0)}%"></i></div>
+    ${miss.length ? `<div class="card tint" style="padding:12px 14px"><b>${icon("spark")} ${T("Le plus rapide (gratuit) : tout d'un coup")}</b>
+      <ol class="small" style="margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px"><li>${T("« Envoyer à Gemini » : choisissez Gemini dans la liste ; la demande contient toutes les images qui manquent, dans l'ordre.")}</li><li>${T("Si Gemini s'arrête, écrivez « continue ». Enregistrez les images au fur et à mesure.")}</li><li>${T("« Importer plusieurs images » : sélectionnez-les toutes, dans l'ordre ; elles se placent toutes seules.")}</li></ol>
+      <div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm kid" data-act="bookSendAll">${icon("share")}${T("Envoyer à Gemini")}</button><button class="btn sm ghost" data-act="bookCopyAll">${icon("note")}${T("Copier")}</button><a class="btn sm ghost" href="https://gemini.google.com/app" target="_blank" rel="noopener">${T("Ouvrir Gemini")}</a><label class="btn sm kid" style="cursor:pointer">${icon("image")}${T("Importer plusieurs images")}<input type="file" accept="image/*" multiple hidden data-change="bookMulti" data-v="${sid}"></label></div>
+      <p class="tiny muted">${T("Elles iront dans les cases vides, dans cet ordre : {l}",{l:esc(miss.slice(0, 6).map(x => x.t).join(", ")) + (miss.length > 6 ? "…" : "")})}</p></div>
+      <div class="card" style="padding:12px 14px"><b>${T("Encore plus rapide : directement ici")}</b><p class="small muted">${T("Demande une clé Gemini avec facturation activée (environ 4 ¢ par image, soit environ {c} $ pour ce qui manque).",{c:(miss.length * 0.04).toFixed(2)})}</p><button class="btn sm ghost" data-act="bookGenAll" data-v="${sid}">${icon("spark")}${T("Créer les {n} images ici",{n:miss.length})}</button></div>` : ""}
     <div class="stack" style="gap:8px">${P.map((x, i) => `<div class="book-step ${x.img ? "done" : ""}"><div class="row between" style="gap:8px"><div style="min-width:0"><b>${x.img ? "✓ " : ""}${esc(x.t)}</b>${x.d ? `<div class="tiny muted">${esc(x.d)}</div>` : ""}</div>${x.img ? `<img class="bs-thumb" data-stimg="${x.img}" alt="">` : ""}</div>
       <details><summary class="tiny">${T("Voir le prompt")}</summary><div class="tiny prompt-box">${esc(x.p)}</div></details>
-      <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm ${x.img ? "ghost" : "kid"}" data-act="bookCopy" data-v="${i}">${icon("note")}${T("Copier")}</button><button class="btn sm ghost" data-act="bookImport" data-v="${sid}|${x.k}">${icon("image")}${x.img ? T("Remplacer l'image") : T("Ajouter l'image")}</button></div></div>`).join("")}</div>
-    <p class="tiny muted">${T("Astuce : si un personnage change d'apparence, joignez dans Gemini la planche des personnages ou l'image précédente avec le prompt.")}</p>
+      <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm ${x.img ? "ghost" : "kid"}" data-act="bookSend" data-v="${i}">${icon("share")}${T("Envoyer à Gemini")}</button><button class="btn sm ghost" data-act="bookCopy" data-v="${i}">${icon("note")}${T("Copier")}</button><button class="btn sm ghost" data-act="bookImport" data-v="${sid}|${x.k}">${icon("image")}${x.img ? T("Remplacer") : T("Ajouter l'image")}</button></div></div>`).join("")}</div>
+    <p class="tiny muted">${T("Restez dans la même conversation Gemini : les personnages et le style restent pareils. Si un personnage change, joignez la planche des personnages avec la demande.")}</p>
     <div class="row" style="flex-wrap:wrap"><button class="btn kid" data-act="flipOpen" data-v="${sid}">${icon("book")}${T("Feuilleter le livre")}</button><button class="btn ghost" data-act="storyReadOpen" data-v="${sid}">${T("Lecture continue")}</button><button class="btn ghost" data-act="storyPdf" data-v="${sid}">${icon("doc")}${T("Livre PDF")}</button></div>`, "wide");
   $$("#layer img[data-stimg]").forEach(async im => { im.dataset.act = "viewImg"; const d = await PhotoDB.get(im.dataset.stimg); if (d) im.src = d; });
 }
+const shareTxt = (t, title) => Native.share({title:title || T("Prompt d'image"), text:t});
 async function copyTxt(t, ok){ try { await navigator.clipboard.writeText(t); toast(ok); } catch(e){ Native.share({title:T("Prompt d'image"), text:t}); } }
 /* livre PDF : couverture, puis pour chaque chapitre l'image et le texte en grand */
 async function storyPdf(sid){
@@ -385,7 +437,7 @@ async function storyPdf(sid){
   const ch0 = await put(s.cover, M, M, W - 2*M, H - 2*M - (s.cover ? 0 : 0));
   if (!ch0 || !s.cover){ doc.setFont("helvetica", "bold"); doc.setFontSize(30); doc.setTextColor(...ink); doc.splitTextToSize(N(s.title), W - 2*M).forEach((l, i) => doc.text(l, W/2, 220 + i*36, {align:"center"}));
     doc.setFont("helvetica", "normal"); doc.setFontSize(14); doc.setTextColor(...soft); if (kid) doc.text(N(T("Une histoire pour {n}",{n:kid.nick||kid.name})), W/2, 330, {align:"center"}); }
-  for (const [ci, c] of s.chapters.entries()) for (const [pi, pg] of pagesOf(c).entries()){
+  for (const [ci, c] of s.chapters.entries()) if (bookSel(s).includes(ci)) for (const [pi, pg] of pagesOf(c).entries()){
     doc.addPage([W, H]); let y = M;
     const ih = await put(pg.img || (pi === 0 ? c.img : null), M, y, W - 2*M, 330); if (ih) y += ih + 22;
     if (pi === 0){ doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(...ink); doc.splitTextToSize(N(`${T("Chapitre {n}",{n:c.n})} · ${c.title}`), W - 2*M).forEach(l => { doc.text(l, M, y); y += 22; }); y += 6; }
@@ -454,7 +506,7 @@ const TTS = {
     if (!("speechSynthesis" in window)) throw new Error(T("La synthèse vocale n'est pas disponible ici"));
     return new Promise(res => { const u = new SpeechSynthesisUtterance(text); u.lang = lang; u.rate = vc.rate ?? 1; u.pitch = vc.pitch ?? 1; const v = speechSynthesis.getVoices().find(x => x.voiceURI === vc.dv); if (v) u.voice = v; u.onend = res; u.onerror = res; speechSynthesis.speak(u); });
   },
-  stopDevice(){ const p = this.plugin(); if (p){ try { p.stop(); } catch(e){} } else if ("speechSynthesis" in window) speechSynthesis.cancel(); },
+  async stopDevice(){ const p = this.plugin(); if (p){ try { await p.stop(); } catch(e){} } else if ("speechSynthesis" in window) speechSynthesis.cancel(); },
   _audio:new Map(),
   async gemini(text, vc = {}){
     const key = `${vc.gv}|${vc.style||""}|${text}`; if (this._audio.has(key)) return this._audio.get(key);
@@ -492,10 +544,11 @@ async function geminiTTS(text, voice, style){
 }
 /* lecteur : enchaîne les répliques avec la voix de chaque personnage */
 const PL = {on:false, story:null, ch:0, i:0, audio:null, run:0};
-function stopPlay(){ PL.on = false; PL.run++; TTS.stopDevice(); if (PL.audio){ PL.audio.pause(); PL.audio = null; } $$(".seg-line.now").forEach(e => e.classList.remove("now")); }
+function stopPlay(){ PL.on = false; PL.run++; PL.stopping = TTS.stopDevice(); if (PL.audio){ PL.audio.pause(); PL.audio = null; } $$(".seg-line.now").forEach(e => e.classList.remove("now")); }
 async function playChapter(sid, ci, from = 0){
   stopPlay(); const s = S.stories.find(x => x.id === sid), ch = s?.chapters[ci]; if (!ch) return;
-  Object.assign(PL, {on:true, story:sid, ch:ci, i:from}); const run = ++PL.run; storyOpenKeepScroll(sid);
+  Object.assign(PL, {on:true, flip:false, story:sid, ch:ci, i:from}); const run = ++PL.run; storyOpenKeepScroll(sid);
+  await PL.stopping; await new Promise(r => setTimeout(r, 160)); if (PL.run !== run) return;
   const vcOf = sg => (s.characters.find(x => x.id === sg.c) || s.characters[0]).voice || {};
   for (let i = from; i < ch.segs.length && PL.on && PL.run === run; i++){
     PL.i = i; s.pos = {ch:ci, i};  $$(".seg-line.now").forEach(e => e.classList.remove("now")); const el = $(`#sg-${ci}-${i}`); if (el){ el.classList.add("now"); el.scrollIntoView({block:"center", behavior:"smooth"}); }
@@ -506,7 +559,7 @@ async function playChapter(sid, ci, from = 0){
         if (!PL.on || PL.run !== run) break;
         await new Promise(res => { const a = new Audio(url); PL.audio = a; a.onended = res; a.onerror = res; a.play().catch(res); });
       } else await TTS.speakDevice(sg.t, vc);
-    } catch(e){ toast(e.message); break; }
+    } catch(e){ if (PL.run !== run) break; console.warn("tts", e); if (/interrupt|cancel/i.test(String(e?.message||e))) continue; toast(e.message); break; }
   }
   if (PL.run === run){ PL.on = false; if (s.pos?.ch === ci && s.pos.i >= ch.segs.length - 1) s.pos = null; save(); $$(".seg-line.now").forEach(e => e.classList.remove("now")); storyOpenKeepScroll(sid); }
 }
@@ -518,7 +571,7 @@ function storyOpenKeepScroll(sid){ const sh = $("#layer .sheet"), top = sh?.scro
 const FL = {sid:null, i:0, pages:[]};
 function flipPagesOf(s){
   const P = [{type:"cover"}];
-  s.chapters.forEach((ch, ci) => pagesOf(ch).forEach((pg, pi) => P.push({type:"page", ci, pi, from:pg.from, to:pg.to, img:pg.img || (pi === 0 ? ch.img : null)})));
+  const sel = bookSel(s); s.chapters.forEach((ch, ci) => sel.includes(ci) && pagesOf(ch).forEach((pg, pi) => P.push({type:"page", ci, pi, from:pg.from, to:pg.to, img:pg.img || (pi === 0 ? ch.img : null)})));
   P.push({type:"end"}); return P;
 }
 function flipOpen(sid, at){
@@ -541,11 +594,11 @@ function flipPageHtml(s, p){
   if (p.type === "end") return `<div class="flip-end"><h1>${T("Fin")}</h1><p>✦</p><p class="small muted">${esc(s.title)}</p><button class="btn kid" data-act="flipGo" data-v="0">${icon("replay")}${T("Recommencer")}</button></div>`;
   const ch = s.chapters[p.ci];
   return `<div class="flip-img">${p.img ? `<img data-stimg="${p.img}" alt="">` : `<div class="flip-ph">${icon("image")}<span class="tiny">${T("Image à ajouter dans « Livre illustré »")}</span></div>`}</div>
-    <div class="flip-text">${p.pi === 0 ? `<h2>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h2>` : ""}${ch.segs.slice(p.from, p.to + 1).map((sg, k) => `<p class="flip-seg ${sg.c==="narr"?"narr":""}" id="fsg-${p.ci}-${p.from + k}">${sg.c !== "narr" ? `<b style="color:var(--${chColor(s, sg.c)}-ink)">${esc(s.characters.find(x => x.id === sg.c)?.name || "")}</b> ` : ""}${esc(sg.t)}</p>`).join("")}</div>`;
+    <div class="flip-text">${p.pi === 0 ? `<h2>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h2>` : ""}${ch.segs.slice(p.from, p.to + 1).map((sg, k) => `<p class="flip-seg ${sg.c==="narr"?"narr":""}" id="fsg-${p.ci}-${p.from + k}" data-act="flipFrom" data-v="${p.ci}|${p.from + k}" title="${T("Lire à partir d'ici")}">${sg.c !== "narr" ? `<b style="color:var(--${chColor(s, sg.c)}-ink)">${esc(s.characters.find(x => x.id === sg.c)?.name || "")}</b> ` : ""}${esc(sg.t)}</p>`).join("")}</div>`;
 }
 function flipRender(dir){
   const s = S.stories.find(x => x.id === FL.sid), el = $("#flip"); if (!s || !el) return; const p = FL.pages[FL.i], n = FL.pages.length;
-  el.innerHTML = `<div class="flip-bar"><button class="icon-btn" data-act="flipClose" aria-label="${T("Fermer")}">${icon("x")}</button><span class="small grow" style="text-align:center">${FL.i === 0 ? "" : FL.i === n - 1 ? T("Fin") : T("Page {i} / {n}",{i:FL.i, n:n - 2})}</span><button class="icon-btn" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><button class="icon-btn" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button></div>
+  el.innerHTML = `<div class="flip-bar"><button class="icon-btn" data-act="flipClose" aria-label="${T("Fermer")}">${icon("x")}</button><span class="small grow" style="text-align:center">${FL.i === 0 ? "" : FL.i === n - 1 ? T("Fin") : T("Page {i} / {n}",{i:FL.i, n:n - 2})}</span>${chSelect(s)}<button class="icon-btn" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><button class="icon-btn" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button></div>
     <div class="flip-page ${dir ? "turn-" + dir : ""}" style="--sz:${storyZ()}" id="storyText">${flipPageHtml(s, p)}</div>
     <div class="flip-nav"><button class="icon-btn" data-act="flipGo" data-v="${FL.i - 1}" ${FL.i ? "" : "disabled"} aria-label="${T("Page précédente")}">${icon("left")}</button>
       <button class="btn ${PL.on && PL.flip ? "ghost" : "kid"}" data-act="flipPlay">${icon(PL.on && PL.flip ? "pause" : "play")}${PL.on && PL.flip ? T("Pause") : T("Lire à voix haute")}</button>
@@ -562,6 +615,7 @@ async function flipPlay(){
   if (PL.on && PL.flip){ const s0 = S.stories.find(x => x.id === FL.sid), p0 = FL.pages[FL.i]; if (s0 && p0?.type === "page") s0.pos = {ch:p0.ci, i:PL.i}; stopPlay(); PL.flip = false; save(); return flipRender(); }
   const s = S.stories.find(x => x.id === FL.sid); if (!s) return; stopPlay();
   Object.assign(PL, {on:true, flip:true, story:s.id}); const run = ++PL.run; flipRender();
+  await PL.stopping; await new Promise(r => setTimeout(r, 160)); if (PL.run !== run) return;
   const vcOf = sg => (s.characters.find(x => x.id === sg.c) || s.characters[0]).voice || {};
   const say = async (text, vc) => { if (s.engine === "gemini"){ const url = await TTS.gemini(text, vc); if (!PL.on || PL.run !== run) return; await new Promise(res => { const a = new Audio(url); PL.audio = a; a.onended = res; a.onerror = res; a.play().catch(res); }); } else await TTS.speakDevice(text, vc); };
   const alive = () => PL.on && PL.run === run && $("#flip");
@@ -570,12 +624,12 @@ async function flipPlay(){
       const p = FL.pages[FL.i];
       if (p.type === "cover"){ await say(s.title, (s.characters[0]||{}).voice || {}); if (!alive()) break; await new Promise(r => setTimeout(r, 600)); }
       else if (p.type === "page"){ const ch = s.chapters[p.ci];
-        if (p.pi === 0){ await say(`${T("Chapitre {n}",{n:ch.n})}. ${ch.title}.`, (s.characters[0]||{}).voice || {}); if (!alive()) break; }
         const start = s.pos?.ch === p.ci && s.pos.i > p.from && s.pos.i <= p.to ? s.pos.i : p.from;
+        if (p.pi === 0 && start === p.from){ await say(`${T("Chapitre {n}",{n:ch.n})}. ${ch.title}.`, (s.characters[0]||{}).voice || {}); if (!alive()) break; }
         for (let i = start; i <= p.to && alive(); i++){
           PL.ch = p.ci; PL.i = i; s.pos = {ch:p.ci, i}; $$(".flip-seg.now").forEach(e => e.classList.remove("now")); const el = $(`#fsg-${p.ci}-${i}`); if (el){ el.classList.add("now"); el.scrollIntoView({block:"nearest", behavior:"smooth"}); }
           const sg = ch.segs[i]; if (s.engine === "gemini" && ch.segs[i+1]) TTS.gemini(ch.segs[i+1].t, vcOf(ch.segs[i+1])).catch(() => {});
-          await say(sg.t, vcOf(sg)); }
+          try { await say(sg.t, vcOf(sg)); } catch(e){ if (PL.run !== run) break; if (!/interrupt|cancel/i.test(String(e?.message||e))) throw e; } }
         if (!alive()) break; await new Promise(r => setTimeout(r, 700)); }
       else break;
       if (!alive()) break;
@@ -605,6 +659,7 @@ function recipeSheet(rec, histId){
     <h3>${T("Ingrédients")}</h3><ul class="ing">${(rec.ingredients||[]).map(i => `<li>${esc(i)}</li>`).join("")}</ul>
     <h3>${T("Étapes")}</h3><ol class="steps">${(rec.steps||[]).map(s => `<li>${esc(s)}</li>`).join("")}</ol>
     ${rec.kidTips?`<div class="banner soft">${icon("kid")}<div class="small">${esc(rec.kidTips)}</div></div>`:""}
+    ${aiKey() ? `<div class="card tint" style="padding:12px 14px"><b>${icon("spark")} ${T("Modifier avec l'IA")}</b><div class="row" style="gap:6px"><input class="inp grow" id="rc-ai" placeholder="${T("Ex. : sans gluten, pour 6, version végé, moins sucré, au four")}"><button class="btn kid" data-act="recipeAiEdit" aria-label="${T("Modifier avec l'IA")}">${icon("spark")}</button></div><p class="tiny muted">${T("La recette est réécrite et remise en forme ici même.")}</p></div>` : ""}
     <div class="row" style="flex-wrap:wrap"><button class="btn kid" data-act="recipeSave">${icon("star")}${saved?T("Mettre à jour"):T("Garder en favori")}</button>${child()&&ageMonths(child())>=6?`<button class="btn ghost" data-act="recipeLog">${icon("spoon")}${T("Noter comme repas")}</button>`:""}<button class="btn ghost" data-act="recipeShare">${icon("share")}${T("Partager")}</button>${saved?`<button class="btn danger" data-act="recipeDel" data-v="${rec.id}">${icon("trash")}</button>`:""}</div>`, "wide");
 }
 function recipesPane(){
@@ -619,6 +674,14 @@ function recipesPane(){
 Object.assign(ACT, {
   createKind: v => { if (CREATE_TAB[v]){ UI.aiTab = CREATE_TAB[v]; } else { UI.createKind = v; UI.aiTab = "create"; } closeSheet(); if (UI.view !== "assistant") go("assistant"); else render(); },
   menuOpen: v => menuOpen(v),
+  menuMeal: v => { const [id, di, xi] = v.split("|"), m = S.menus.find(x => x.id === id), x = m?.days[+di]?.meals[+xi]; if (!x) return;
+    const fav = x.liked && (S.recipes||[]).find(r => r.id === x.liked && (r.ingredients||[]).length); if (fav) return recipeSheet(fav);
+    if (x.recipe) return recipeSheet({...x.recipe, menuRef:v});
+    if (!aiKey()) return toast(T("Ajoutez d'abord votre clé Gemini dans l'Assistant."));
+    aiJob("recipe", T("Recette : {w}",{w:x.name.slice(0, 40)}), async () => { const c = kidById(m.kid) || aiKidNow();
+      const r = await gemini({tier:"fast", json:RECIPE_SCHEMA, temperature:0.5, contents:[{role:"user", parts:[{text:`Écris la recette complète de « ${x.name} » (${x.label}${x.note ? ", " + x.note : ""}) pour une famille avec ${kidLine(c)}, 4 portions, adaptée à l'âge (textures sûres, peu de sel). Quantités précises. Allergies : ${c?.allergies||"aucune connue"}. ${NUT_HELP} nut = pour une portion d'enfant. En ${LANG==="en"?"anglais":"français"}.`}]}]});
+      x.recipe = {...parseJSON(r.text), id:uid(), title:x.name, labels:[x.label], at:Date.now(), kid:m.kid}; save(); return {open:() => recipeSheet({...x.recipe, menuRef:v})};
+    }, {kid:m.kid, open:res => res?.open?.()}); },
   menuShare: v => { const m = S.menus.find(x => x.id === v); Native.share({title:m.title, text:menuText(m)}); },
   menuDel: v => askConfirm(T("Supprimer ce menu ?"), T("Supprimer"), () => { S.menus = S.menus.filter(x => x.id !== v); save(); render(); }),
   menuLike: v => { const [id, di, xi] = v.split("|"), m = S.menus.find(x => x.id === id), x = m?.days[+di]?.meals[+xi]; if (!x) return;
@@ -633,6 +696,7 @@ Object.assign(ACT, {
     }, {quiet:true}); },
   storyIdeas: () => storyIdeas(), storyPick: v => storyPick(v),
   storyWrite: () => { const plan = val("st-plan"); UI.storyOpts = UI.storyOpts || storyOpts(); storyGen(null, plan); },
+  stKid: v => { UI.stKid = v || ""; render(); },
   storyOpen: v => storyOpen(v), stMode: v => { UI.stMode = v; render(); }, stFav: () => { UI.stFav = !UI.stFav; render(); },
   storyFav: v => { const s = S.stories.find(x => x.id === v); s.fav = !s.fav; save(); storyOpenKeepScroll(v); },
   storyEngine: v => { const s = S.stories.find(x => x.id === UI.storyId); s.engine = v; save(); stopPlay(); storyOpenKeepScroll(s.id); },
@@ -661,28 +725,51 @@ Object.assign(ACT, {
   storyKeep: v => { const s = S.stories.find(x => x.id === v); S.memories.push({id:uid(), kind:"story", date:iso(today()), title:s.title, text:s.chapters.map(ch => `## ${ch.title}\n${ch.segs.map(sg => sg.t).join("\n")}`).join("\n\n"), kidIds:s.kid?[s.kid]:[]}); save(); driveQ("mem", S.memories.at(-1).id); toast(T("Souvenir enregistré")); },
   storyDel: v => { if (!confirmDel()) return; stopPlay(); (S.stories.find(x => x.id === v)?.chapters||[]).forEach(ch => ch.img && PhotoDB.del(ch.img).catch(() => {})); driveQDel(S.stories.find(x => x.id === v)?.driveIds); S.stories = S.stories.filter(x => x.id !== v); closeSheet(); commit(); },
   charForm: v => charForm(v),
+  charHide: v => { const [sid, cid] = v.split("|"), ch = S.stories.find(x => x.id === sid)?.characters.find(x => x.id === cid); if (!ch) return; ch.libHide = true; save(); const el = document.querySelector(`[data-act=charHide][data-v="${v}"]`)?.closest(".char-pick"); if (el) el.remove(); toast(T("Retiré de la liste (toujours dans son histoire)")); },
+  charUnhide: () => { (S.stories||[]).forEach(st => st.characters.forEach(ch => delete ch.libHide)); save(); render(); },
   charDel: v => { const [sid, cid] = v.split("|"), s = S.stories.find(x => x.id === sid), ch = s?.characters.find(x => x.id === cid); if (!ch) return;
     askConfirm(T("Retirer {n} de l'histoire ?",{n:ch.name}), T("Retirer"), () => { s.chapters.forEach(c => c.segs.forEach(sg => { if (sg.c === cid) sg.c = "narr"; })); s.characters = s.characters.filter(x => x.id !== cid); s.removed = [...(s.removed||[]), ch.name]; save(); driveQ("story", sid); toast(T("Personnage retiré")); storyOpen(sid); }); },
   storyZoom: v => { const z = v === "+" ? storyZ() + 0.1 : v === "-" ? storyZ() - 0.1 : 1; S.settings.storyZoom = Math.round(clamp(z, 0.8, 2.4) * 100) / 100; save(); const b = $("#storyText"); if (b) b.style.setProperty("--sz", storyZ()); const zv = $("#zoomVal"); if (zv) zv.textContent = Math.round(storyZ()*100) + " %"; },
   storyRead: () => { UI.readMode = !UI.readMode; storyOpen(UI.storyId); const sh = $("#layer .sheet"); if (sh) sh.scrollTop = 0; },
   storyReadOpen: v => { UI.readMode = true; storyOpen(v); },
   storyBookShop: v => storyBookShop(v),
+  bookSelAll: v => { const s = S.stories.find(x => x.id === v); s.bookSel = null; save(); storyBookShop(v, true); },
+  bookSelTog: v => { const [sid, ci] = v.split("|"), s = S.stories.find(x => x.id === sid), all = bookSel(s).length === s.chapters.length; let sel = all ? [] : [...bookSel(s)]; sel = sel.includes(+ci) ? sel.filter(x => x !== +ci) : [...sel, +ci].sort((a, b) => a - b); s.bookSel = sel.length ? sel : null; save(); storyBookShop(sid, true); },
+  bookSend: v => { const x = UI.bookP?.[+v]; if (x) shareTxt(x.p); },
+  bookSendAll: () => { const s = S.stories.find(x => x.id === UI.storyId), miss = (UI.bookP||[]).filter(x => !x.img); if (s && miss.length) shareTxt(batchPrompt(s, miss), s.title); },
+  bookGenAll: v => { const s = S.stories.find(x => x.id === v); if (!s) return; if (!aiKey()) return toast(T("Ajoutez d'abord votre clé Gemini dans l'Assistant."));
+    const miss = (UI.bookP||[]).filter(x => !x.img); if (!miss.length) return;
+    aiJob("story", T("{n} images · {t}",{n:miss.length, t:s.title}), async j => { let ref = s.refImg ? await PhotoDB.get(s.refImg) : null, n = 0;
+      for (const x of miss){ const d = await genImage(x.p, ref); await bookSetSlot(s, x.k, d); n++; if (x.k === "ref") ref = await PhotoDB.get(s.refImg); save(); j.title = T("{n} images · {t}",{n:`${n}/${miss.length}`, t:s.title}); }
+      driveQ("story", v); return {open:() => storyBookShop(v)}; }, {kid:s.kid, open:() => storyBookShop(v)}); },
   bookPagesN: v => { const [sid, n] = v.split("|"); S.settings.bookPages = +n; save(); askConfirm(T("Redécouper toutes les pages en {n} par chapitre ? Les images déjà ajoutées restent dans l'ordre.",{n}), T("Redécouper"), async () => { const s = S.stories.find(x => x.id === sid); toast(T("Découpage…")); await storyScenes(s, true); storyBookShop(sid); }, false); },
   bookRecut: v => askConfirm(T("Redécouper les chapitres en pages ? Les images déjà ajoutées restent dans l'ordre."), T("Redécouper"), async () => { const s = S.stories.find(x => x.id === v); toast(T("Découpage…")); await storyScenes(s, true); storyBookShop(v); }, false),
+  flipFrom: v => { const [ci, i] = v.split("|").map(Number), s = S.stories.find(x => x.id === FL.sid); if (!s) return; stopPlay(); PL.flip = false; s.pos = {ch:ci, i}; flipPlay(); },
   flipOpen: v => flipOpen(v), flipGo: v => flipGo(+v), flipPlay: () => flipPlay(), flipClose: () => closeFlip(),
   storyPdf: v => storyPdf(v),
   bookCopy: v => { const x = UI.bookP?.[+v]; if (x) copyTxt(x.p, T("Prompt copié : collez-le dans Gemini")); },
-  bookCopyAll: () => copyTxt((UI.bookP||[]).map(x => `${x.t}\n${x.p}`).join("\n\n"), T("Tous les prompts sont copiés : collez-les un à la fois dans la même conversation")),
+  bookCopyAll: () => { const s = S.stories.find(x => x.id === UI.storyId), miss = (UI.bookP||[]).filter(x => !x.img); copyTxt(batchPrompt(s, miss.length ? miss : UI.bookP), T("Demande copiée : collez-la dans Gemini")); },
   bookImport: async v => { const [sid, k] = v.split("|"), s = S.stories.find(x => x.id === sid); if (!s) return;
-    const d = await Native.takePhoto({source:"photos"}); if (!d) return; const small = await shrinkImage(d, k === "cover" ? 1400 : 1024, 0.85), id = "stimg-" + uid(); await PhotoDB.put(id, small);
-    if (k === "cover"){ if (s.cover) PhotoDB.del(s.cover).catch(() => {}); s.cover = id; } else if (k === "ref"){ if (s.refImg) PhotoDB.del(s.refImg).catch(() => {}); s.refImg = id; }
-    else if (k.startsWith("p")){ const [ci, pi] = k.slice(1).split("_").map(Number), ch = s.chapters[ci], pg = ch?.pages?.[pi]; if (!pg) return; if (pg.img && pg.img !== ch.img) PhotoDB.del(pg.img).catch(() => {}); pg.img = id; if (pi === 0) ch.img = id; }
-    else { const ch = s.chapters[+k.slice(2)]; if (!ch) return; if (ch.img) PhotoDB.del(ch.img).catch(() => {}); ch.img = id; ch.imgModel = "gemini-app"; }
-    save(); driveQ("story", sid); toast(T("Image ajoutée")); storyBookShop(sid); },
+    const d = await Native.takePhoto({source:"photos"}); if (!d) return; await bookSetSlot(s, k, d);
+    save(); driveQ("story", sid); toast(T("Image ajoutée")); storyBookShop(sid, true); },
   charTest: async v => { const vc = readVoice(), txt = LANG === "en" ? "Hello! Here is my voice for the story." : "Bonjour ! Voici ma voix pour l'histoire."; stopPlay();
     try { if (v === "gemini"){ toast(T("Génération de la voix…")); const url = await TTS.gemini(txt, vc); const a = new Audio(url); PL.audio = a; a.play(); } else await TTS.speakDevice(txt, vc); } catch(e){ toast(e.message); } },
   rcLabel: v => { UI.rcLabel = v; render(); }, recipeOpen: v => recipeSheet(S.recipes.find(x => x.id === v)),
-  recipeSave: () => { const r = UI.recipeView; r.labels = checked("rc-lab"); r.edited = true; S.recipes = S.recipes || []; const i = S.recipes.findIndex(x => x.id === r.id); if (i >= 0) S.recipes[i] = {...S.recipes[i], ...r}; else S.recipes.unshift({...r, fav:true}); save(); toast(T("Recette gardée en favori")); recipeSheet(r); },
+  recipeSave: () => { const r = UI.recipeView; r.labels = checked("rc-lab"); r.edited = true;
+    if (r.menuRef){ const [id, di, xi] = r.menuRef.split("|"), x = S.menus?.find(m => m.id === id)?.days[+di]?.meals[+xi]; if (x) x.liked = r.id; delete r.menuRef; r.fromMenu = true; } S.recipes = S.recipes || []; const i = S.recipes.findIndex(x => x.id === r.id); if (i >= 0) S.recipes[i] = {...S.recipes[i], ...r}; else S.recipes.unshift({...r, fav:true}); save(); toast(T("Recette gardée en favori")); recipeSheet(r); },
+  recipeAiEdit: () => { const r = UI.recipeView, ask = val("rc-ai").trim(); if (!r || !ask) return toast(T("Écrivez la modification voulue"));
+    const btn = $("[data-act=recipeAiEdit]"); if (btn){ btn.disabled = true; btn.innerHTML = `<span class="spin"></span>`; }
+    const job = aiJob("recipe", T("Modifier : {t}",{t:r.title.slice(0, 40)}), async () => {
+      const keep = {...r}; delete keep.menuRef;
+      const out = await gemini({tier:"fast", json:RECIPE_SCHEMA, temperature:0.4, contents:[{role:"user", parts:[{text:`Voici une recette (JSON) :
+${JSON.stringify({title:keep.title, servings:keep.servings, minutes:keep.minutes, ingredients:keep.ingredients, steps:keep.steps, kidTips:keep.kidTips, allergens:keep.allergens})}
+Modifie-la selon cette demande : « ${ask} ». Garde ce qui n'est pas concerné, ajuste quantités, étapes, temps, allergènes et nutriments en conséquence. Quantités précises, étapes claires et numérotables. ${NUT_HELP} nut = pour une portion d'enfant. En ${LANG==="en"?"anglais":"français"}.`}]}]});
+      const nr = {...r, ...parseJSON(out.text), id:r.id, labels:r.labels, edited:true, at:Date.now()};
+      const i = (S.recipes||[]).findIndex(x => x.id === r.id); if (i >= 0) S.recipes[i] = {...S.recipes[i], ...nr};
+      if (r.menuRef){ const [id, di, xi] = r.menuRef.split("|"), x = S.menus?.find(m => m.id === id)?.days[+di]?.meals[+xi]; if (x && !x.liked) x.recipe = {...nr}; }
+      save(); return {open:() => recipeSheet(nr)};
+    }, {quiet:true, open:res => res?.open?.(), onErr:() => { if (btn){ btn.disabled = false; btn.innerHTML = icon("spark"); } }});
+    const watch = setInterval(() => { if (job.st !== "run"){ clearInterval(watch); if (job.st === "ok" && $("#rc-ai")){ job.res?.open?.(); toast(T("Recette modifiée")); } } }, 400); setTimeout(() => clearInterval(watch), 180000); },
   recipeDel: v => { S.recipes = S.recipes.filter(x => x.id !== v); closeSheet(); commit(T("Supprimé")); },
   recipeShare: () => { const r = UI.recipeView; Native.share({title:r.title, text:recipeText(r)}); },
   recipeLog: () => { const r = UI.recipeView, c = child(); closeSheet(); mealForm({items:[{name:r.title, group:"autres", qty:T("1 portion"), nut:r.nut||null}], comment:"", ai:true}); },
@@ -716,3 +803,15 @@ Object.assign(FORMS, {
 });
 Object.assign(CHANGE, { rcQ: t => { UI.rcQ = t.value; render(); } });
 Object.assign(FORMS, { storyNextGo: f => storyNextRun(f.dataset.id, false) });
+
+Object.assign(CHANGE, {
+  bookN: async t => { const [sid, ci] = t.dataset.v.split("|"), s = S.stories.find(x => x.id === sid), ch = s?.chapters[+ci]; if (!ch) return; ch.pagesN = t.value ? +t.value : null; UI.bookNOpen = true; toast(T("Découpage…")); await storyScenes(s, true, [+ci]); storyBookShop(sid, true); },
+  bookMulti: async t => { const sid = t.dataset.v, s = S.stories.find(x => x.id === sid), files = [...(t.files||[])]; if (!s || !files.length) return;
+    const slots = (UI.bookP||[]).filter(x => !x.img).map(x => x.k); let n = 0;
+    files.sort((a, b) => (a.lastModified - b.lastModified) || a.name.localeCompare(b.name, undefined, {numeric:true}));
+    for (const f of files){ if (!slots[n]) break; const d = await readFile(f); await bookSetSlot(s, slots[n], d); n++; }
+    save(); driveQ("story", sid); toast(T("{n} image(s) placée(s)",{n})); storyBookShop(sid, true); },
+  bookSelOne: t => { const s = S.stories.find(x => x.id === t.dataset.v); if (!s) return; s.bookSel = t.value === "" ? null : [+t.value]; save(); if ($("#flip")) flipOpen(s.id, 0); else storyOpen(s.id); },
+});
+
+Object.assign(CHANGE, { storyKid: t => { const st = S.stories.find(x => x.id === t.dataset.v); if (!st) return; st.kid = t.value || null; save(); toast(t.value ? T("Histoire pour {n}",{n:kidById(t.value)?.nick || kidById(t.value)?.name || ""}) : T("Histoire pour toute la famille")); } });
