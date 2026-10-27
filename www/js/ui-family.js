@@ -225,7 +225,7 @@ async function photoDay(date, editId){
 async function openPhoto(id){
   const p = S.photos.find(x => x.id === id); if (!p) return;
   const d = await PhotoDB.get(id) || (await Cloud.fetchPhoto?.(id));
-  sheet(`${sheetHead(esc(p.caption || T("Photo du jour")))}${d?`<img src="${d}" alt="" style="border-radius:16px;width:100%;max-height:60vh;object-fit:contain;background:var(--surface2)">`:`<p class="muted">${T("Photo non disponible sur cet appareil.")}</p>`}
+  sheet(`${sheetHead(esc(p.caption || T("Photo du jour")))}${d?`<img src="${d}" alt="" data-act="viewImg" class="zoomable" style="border-radius:16px;width:100%;max-height:60vh;object-fit:contain;background:var(--surface2)">`:`<p class="muted">${T("Photo non disponible sur cet appareil.")}</p>`}
     <div class="row"><span class="chip ${PHOTO_CATS.find(c=>c.id===p.cat)?.c||""}">${T(PHOTO_CATS.find(c=>c.id===p.cat)?.l||"")}</span><span class="small muted">${fmtD(p.date,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</span></div>
     <div class="row" style="flex-wrap:wrap"><button class="btn kid" data-act="sharePhoto" data-v="${id}">${icon("share")}${T("Partager")}</button>${!isKidUser()||p.by===S.me?`<button class="btn ghost" data-act="photoEdit" data-v="${id}">${icon("edit")}${T("Modifier")}</button>`:""}${Cloud.canDrive?.()?`<button class="btn ghost" data-act="photoDrive" data-v="${id}">${icon("drive")}${T("Google Drive")}</button>`:""}${!isKidUser()||allow("delete")?`<button class="btn danger" data-act="delPhoto" data-v="${id}">${icon("trash")}</button>`:""}</div>`, "wide");
 }
@@ -245,12 +245,13 @@ async function openMemory(id){
   const m = S.memories.find(x => x.id === id); if (!m) return;
   const ph = m.photoId ? await PhotoDB.get(m.photoId) : null;
   const lk = lockedMem(m), canMod = !isKidUser() && (m.kind !== "letter" || !lk || m.by === S.me);
-  sheet(`${sheetHead(esc(m.kind === "quote" ? T("Mot d'enfant") : m.title))}<span class="small muted">${fmtD(m.date,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</span>${ph && !lk?`<img src="${ph}" alt="" style="border-radius:16px;max-height:50vh;object-fit:contain">`:""}${m.kind ? specialDetail(m) : m.text?`<p>${esc(m.text)}</p>`:""}
+  sheet(`${sheetHead(esc(m.kind === "quote" ? T("Mot d'enfant") : m.title))}<span class="small muted">${fmtD(m.date,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</span>${ph && !lk?`<img src="${ph}" alt="" data-act="viewImg" class="zoomable" style="border-radius:16px;max-height:50vh;object-fit:contain">`:""}${m.kind ? specialDetail(m) : m.text?`<p>${esc(m.text)}</p>`:""}
     ${lk ? (canMod ? `<div class="row"><button class="btn ghost" data-act="memoryEdit" data-v="${id}">${icon("edit")}${T("Relire ou modifier ma lettre")}</button></div>` : "") : `<div class="row"><button class="btn kid" data-act="shareMemory" data-v="${id}">${icon("share")}${T("Partager")}</button>${Cloud.canDrive?.()?`<button class="btn ghost" data-act="memoryDrive" data-v="${id}">${icon("drive")}${m.drive?T("Mettre à jour dans Drive"):T("Google Drive")}</button>`:""}${canMod?`<button class="btn ghost" data-act="memoryEdit" data-v="${id}">${icon("edit")}${T("Modifier")}</button>`:""}</div>`}`, m.kind === "story" || m.kind === "yearbook" ? "wide" : "");
 }
 
 /* ======== DÉFIS ET RÉCOMPENSES ======== */
 function taskDueOn(t, d){
+  if (t.kind === "goal") return false;
   if (t.recur === "daily") return true;
   if (t.recur === "weekly") return (t.days||[]).map(Number).includes(d.getDay());
   return t.date === iso(d);
@@ -260,7 +261,7 @@ const taskSlots = t => (t.times||[]).length ? [...t.times].sort() : (t.perDay||1
 const slotLabel = (t, s) => !s ? "" : s.includes(":") ? s : T("{i} de {n}",{i:s, n:t.perDay});
 const levelOf = pts => { let i = LEVELS.findIndex(l => pts < l); if (i < 0) i = LEVELS.length; return {lvl:i, from:LEVELS[i-1]||0, to:LEVELS[i]||LEVELS[LEVELS.length-1]*1.5}; };
 const leaderboard = () => S.family.members.filter(m => S.tasks.some(t => (t.assignees||[]).includes(m.id))).map(m => ({m, ...pointsOf(m.id)})).sort((a,b)=>b.week-a.week);
-function unreadCount(){ if (!Cloud.user) return 0; const lr = (S.lastRead||{}).family || 0; return S.messages.filter(x => x.at > lr && x.uid !== Cloud.user.uid).length + sum((S.groups||[]).map(g => (g.messages||[]).filter(x => x.at > ((S.lastRead||{})[g.id]||0) && x.uid !== Cloud.user.uid).length)); }
+function unreadCount(){ if (!Cloud.user) return 0; const lr = (S.lastRead||{}).family || 0; return S.messages.filter(x => x.at > lr && x.uid !== Cloud.user.uid && threadVisible("family", x.th)).length + sum((S.groups||[]).map(g => (g.messages||[]).filter(x => x.at > ((S.lastRead||{})[g.id]||0) && x.uid !== Cloud.user.uid && threadVisible(g.id, x.th)).length)); }
 function tribuView(){
   const tabs = [feat("rewards")&&["defis",T("Défis")], feat("chat")&&allow("chat")&&["chat",T("Discussion")], feat("groups")&&allow("groups")&&["groupes",T("Groupes")]].filter(Boolean);
   if (!tabs.some(t=>t[0]===UI.sub.tribu)) UI.sub.tribu = tabs[0]?.[0];
@@ -296,17 +297,57 @@ function rewardForm(id){
 
 /* ======== DISCUSSIONS ======== */
 const msgRow = x => { const mine = Cloud.user && x.uid === Cloud.user.uid, me2 = !mine && ((x.mentions||[]).includes(Cloud.user?.uid) || (x.mentions||[]).includes("all")); return `<div class="msg ${mine?"mine":""} ${me2?"tagged":""}">${mine?"":`<div class="who">${esc(x.name||"")}</div>`}${mentionHtml(x.text)}<div class="tiny" style="opacity:.6;text-align:right">${fmtT(x.at)}</div></div>`; };
+/* plusieurs discussions : la principale (tout le monde) et des discussions choisies (ex. avec un enfant, entre parents) */
+const myChatId = channel => channel === "family" ? S.me : Cloud.user?.uid;
+function threadsOf(channel){
+  const g = channel === "family" ? null : S.groups.find(x => x.id === channel), me0 = myChatId(channel);
+  const list = (g ? g.threads : S.settings.threads) || [];
+  return [{id:"main", name:g ? g.name : T("Famille"), emoji:g?.emoji || "🏠", main:true}, ...list.filter(t => !t.members?.length || t.members.includes(me0) || t.by === me0)];
+}
+const threadVisible = (channel, th) => !th || th === "main" || threadsOf(channel).some(t => t.id === th);
 function chatView(channel){
   if (!Cloud.user) return `<div class="card">${empty("chat", T("La discussion de famille et de groupe demande un compte, pour que chacun la voie sur son téléphone."), Cloud.configured?`<button class="btn kid" data-act="showLogin">${T("Se connecter")}</button>`:"")}</div>`;
   const g = channel === "family" ? null : S.groups.find(x => x.id === channel);
-  const msgs = g ? (g.messages||[]) : S.messages;
-  S.lastRead = S.lastRead || {}; S.lastRead[g ? g.id : "family"] = Date.now();
+  UI.thread = UI.thread || {}; const ths = threadsOf(channel); if (!ths.some(t => t.id === UI.thread[channel])) UI.thread[channel] = "main";
+  const cur = UI.thread[channel], curT = ths.find(t => t.id === cur), all = g ? (g.messages||[]) : S.messages, msgs = all.filter(x => (x.th || "main") === cur);
+  S.lastRead = S.lastRead || {}; S.lastRead[g ? g.id : "family"] = Date.now(); S.lastRead[(g ? g.id : "family") + ":" + cur] = Date.now();
+  const unreadIn = t => all.filter(x => (x.th || "main") === t.id && x.at > ((S.lastRead||{})[(g ? g.id : "family") + ":" + t.id] || 0) && x.uid !== Cloud.user.uid).length;
   AFTER.push(() => { const b = $("#chatbox"); if (b) b.scrollTop = b.scrollHeight; });
-  return `<div class="card"><div class="card-h"><h2>${g ? esc(g.name) : T("Famille")}</h2>${g?`<button class="btn sm ghost" data-act="tribuTab" data-v="groupes">${icon("left")}${T("Groupes")}</button>`:""}</div>
+  const who = curT && !curT.main && curT.members?.length ? curT.members.map(id => g ? g.members?.[id]?.name : member(id)?.name).filter(Boolean).join(", ") : "";
+  return `<div class="card chat-card"><div class="card-h"><h2>${curT?.emoji ? curT.emoji + " " : ""}${esc(curT?.name || "")}</h2><div class="row">${!curT?.main ? `<button class="btn sm ghost" data-act="threadForm" data-v="${channel}|${cur}" aria-label="${T("Modifier la discussion")}">${icon("edit")}</button>` : ""}${g?`<button class="btn sm ghost" data-act="tribuTab" data-v="groupes">${icon("left")}${T("Groupes")}</button>`:""}</div></div>
+    <div class="pick chips-scroll thread-row" style="flex-wrap:nowrap;overflow-x:auto">${ths.map(t => { const n = t.id === cur ? 0 : unreadIn(t); return `<button data-act="threadPick" data-v="${channel}|${t.id}" aria-pressed="${t.id===cur}">${t.emoji ? t.emoji + " " : ""}${esc(t.name)}${n ? ` <b class="badge" style="position:static">${n}</b>` : ""}</button>`; }).join("")}<button data-act="threadForm" data-v="${channel}|" aria-label="${T("Nouvelle discussion")}">${icon("plus")}${T("Discussion")}</button></div>
+    ${who ? `<p class="tiny muted">${T("Avec")} : ${esc(who)}</p>` : ""}
     <div class="chatbox" id="chatbox">${msgs.length ? msgs.slice(-200).map(msgRow).join("") : `<p class="small muted" style="text-align:center">${T("Écrivez le premier message.")}</p>`}</div>
     <div class="pick mention-box" id="mentionBox"></div>
-    <form class="composer" data-form="chat" data-ch="${channel}"><textarea class="inp" id="chat-in" rows="1" placeholder="${T("Message · @ pour mentionner")}" enterkeyhint="send"></textarea><button class="btn kid" type="submit" aria-label="${T("Envoyer")}">${icon("send")}</button></form></div>`;
+    <form class="composer" data-form="chat" data-ch="${channel}" data-th="${cur}"><textarea class="inp" id="chat-in" rows="1" placeholder="${T("Message · @ pour mentionner")}" enterkeyhint="send"></textarea><button class="btn kid" type="submit" aria-label="${T("Envoyer")}">${icon("send")}</button></form></div>`;
 }
+function threadForm(v){
+  const [channel, tid] = v.split("|"), g = channel === "family" ? null : S.groups.find(x => x.id === channel), list = (g ? g.threads : S.settings.threads) || [], t = list.find(x => x.id === tid);
+  if (channel === "family" && isKidUser()) return toast(T("Seul un parent peut créer une discussion de famille"));
+  const people = g ? Object.entries(g.members||{}).map(([uid, m]) => [uid, m.name]) : S.family.members.map(m => [m.id, m.name]), me0 = myChatId(channel);
+  sheet(`<form class="stack" data-form="thread" data-ch="${channel}" data-id="${tid||""}" style="gap:14px">${sheetHead(t ? T("Modifier la discussion") : T("Nouvelle discussion"))}
+    <div class="fgrid">${fld("th-name",T("Nom"),inp("th-name",t?.name||"",`required placeholder="${T("Ex. : Papa et Léo, Les parents, Les grands")}"`))}<div class="field"><label>${T("Icône")}</label>${emojiPick("themo", t?.emoji||"💬")}</div></div>
+    <div class="field"><label>${T("Qui participe ?")}</label>${checks("thwho", people.filter(([id]) => id !== me0), (t?.members||[]).filter(id => id !== me0))}</div>
+    <p class="tiny muted">${T("Les messages n'apparaissent qu'aux personnes choisies dans l'app.")}</p>
+    <div class="row"><button class="btn kid grow" type="submit">${t ? T("Enregistrer") : T("Créer")}</button>${t ? `<button type="button" class="btn danger" data-act="threadDel" data-v="${v}">${icon("trash")}</button>` : ""}</div></form>`);
+}
+async function saveThreads(channel, list){
+  if (channel === "family"){ S.settings.threads = list; commit(); }
+  else { const g = S.groups.find(x => x.id === channel); g.threads = list; render(); try { await Cloud.groupUpdate(channel, {threads:list}); } catch(e){ toast(e.message); } }
+}
+Object.assign(ACT, {
+  threadPick: v => { const [ch, t] = v.split("|"); UI.thread = UI.thread || {}; UI.thread[ch] = t; if (ch === "family") render(); else { $("#main").innerHTML = topbar() + chatView(ch); afterRender(); } },
+  threadForm: v => threadForm(v),
+  threadDel: v => { const [ch, tid] = v.split("|"); askConfirm(T("Supprimer cette discussion ? Les messages ne seront plus affichés."), T("Supprimer"), () => { const g = ch === "family" ? null : S.groups.find(x => x.id === ch); saveThreads(ch, ((g ? g.threads : S.settings.threads) || []).filter(x => x.id !== tid)); UI.thread[ch] = "main"; }); },
+});
+Object.assign(FORMS, {
+  thread: f => { const ch = f.dataset.ch, id = f.dataset.id, g = ch === "family" ? null : S.groups.find(x => x.id === ch), list = [...((g ? g.threads : S.settings.threads) || [])], me0 = myChatId(ch);
+    const name = val("th-name").trim(); if (!name) return toast(T("Nom requis")); const members = [...new Set([me0, ...checked("thwho")])];
+    if (members.length < 2) return toast(T("Choisissez au moins une autre personne"));
+    const d = {name, emoji:radio("themo") || "💬", members}; let tid = id;
+    if (id){ Object.assign(list.find(x => x.id === id), d); } else { tid = "t" + uid(); list.push({id:tid, by:me0, at:Date.now(), ...d}); }
+    UI.thread = UI.thread || {}; UI.thread[ch] = tid; closeSheet(); saveThreads(ch, list); if (ch !== "family"){ $("#main").innerHTML = topbar() + chatView(ch); afterRender(); } },
+});
 function groupsView(){
   if (UI.groupOpen) return groupDetail(UI.groupOpen);
   if (!Cloud.user) return `<div class="card">${empty("people", T("Les groupes permettent de planifier des activités avec des amis ou des cousins et d'en discuter. Il faut un compte."), Cloud.configured?`<button class="btn kid" data-act="showLogin">${T("Se connecter")}</button>`:"")}</div>`;

@@ -16,8 +16,14 @@ const MEAL_LABELS = ["Déjeuner","Dîner","Souper","Collation","Dessert","Boîte
 const aiKidNow = () => kidById(UI.aiKid) || child();
 const kidLine = c => c ? `${c.nick||c.name}${!isPrenatal(c)?`, ${ageLabel(ageMonths(c))}`:""}` : "un enfant";
 
+const CREATE_TAB = {plan:"menus", ideas:"ideas", talk:"talk"};
 function createPane(){
-  const k = UI.createKind || "story", c = aiKidNow();
+  if (!["story","recipe"].includes(UI.createKind)) UI.createKind = "story";
+  return `<div class="create-grid">${Object.entries(CREATE_KINDS).map(([id,x]) => `<button class="create-tile" data-act="createKind" data-v="${id}" aria-pressed="${id===UI.createKind}">${icon(x.ic)}<b>${T(x.l)}</b></button>`).join("")}</div>` + createForm(UI.createKind)
+    + `<p class="tiny muted center">${T("Vous pouvez lancer une autre création pendant que celle-ci se prépare : suivez-les dans « En cours ».")}</p>`;
+}
+function createForm(k){
+  UI.createKind = k; const c = aiKidNow();
   let f = "";
   if (k === "story"){
     const lib = (S.stories||[]).flatMap(s => s.characters.filter(ch => ch.id !== "narr").map(ch => ({...ch, story:s.title})));
@@ -36,16 +42,49 @@ function createPane(){
       <div class="field"><label>${T("Moment")}</label>${radios("rc-label", MEAL_LABELS.map(x => [x, T(x)]), "Souper")}</div>
       <div class="fgrid">${fld("rc-time",T("Temps maximum"),`<select class="inp" id="rc-time"><option value="20">20 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="90">1 h 30</option></select>`)}${fld("rc-serv",T("Portions"),`<input class="inp" id="rc-serv" type="number" min="1" max="12" value="4">`)}</div>
       <button class="btn kid" type="submit">${icon("spark")}${T("Créer la recette")}</button>`;
-  if (k === "plan") f = `${fld("pl-a",T("Contraintes (facultatif)"),inp("pl-a","",`placeholder="${T("Végé, budget serré, soupers en 20 min…")}"`))}<button class="btn kid" type="submit">${icon("spark")}${T("Créer le menu")}</button>`;
+  if (k === "plan") f = `${fld("pl-a",T("Contraintes (facultatif)"),inp("pl-a","",`placeholder="${T("Végé, budget serré, soupers en 20 min…")}"`))}
+      <div class="field"><label>${T("Repas à prévoir")}</label>${checks("pl-meals", ["Déjeuner","Dîner","Souper","Collation"].map(x => [x, T(x)]), S.settings.menuMeals || ["Déjeuner","Dîner","Souper","Collation"])}</div>
+      <div class="field"><label>${T("Nombre de jours")}</label>${radios("pl-days",[["5",T("5 jours")],["7",T("7 jours")]],"7")}</div>
+      ${(S.recipes||[]).length ? `<label class="switch"><input type="checkbox" id="pl-fav" checked><span class="tg"></span><span class="grow">${T("Inclure quelques recettes favorites")}</span></label>` : ""}
+      <button class="btn kid" type="submit">${icon("spark")}${T("Créer le menu")}</button>`;
   if (k === "ideas") f = `<div class="field"><label>${T("Où ?")}</label>${radios("id-where",[["dedans",T("À l'intérieur")],["dehors",T("Dehors")],["sortie",T("Sortie près de chez nous")]],"dedans")}</div>
       ${fld("id-city",T("Ville, code postal ou adresse (pour les sorties)"),addrInput("id-city", S.settings.city||"Montréal"))}
       <div class="field"><label>${T("Temps disponible")}</label>${radios("id-time",[["15",T("15 min")],["60",T("1 h")],["jour",T("Une journée")]],"60")}</div><button class="btn kid" type="submit">${icon("spark")}${T("Trouver des idées")}</button>`;
   if (k === "talk") f = `${fld("tk-a",T("Sujet"),inp("tk-a","",`placeholder="${T("Ex. : parler de la mort de grand-papa")}" required`))}<button class="btn kid" type="submit">${icon("spark")}${T("Préparer")}</button>`;
-  return `<div class="create-grid">${Object.entries(CREATE_KINDS).map(([id,x]) => `<button class="create-tile" data-act="createKind" data-v="${id}" aria-pressed="${id===k}">${icon(x.ic)}<b>${T(x.l)}</b></button>`).join("")}</div>
-    <div class="card"><div class="card-h"><div><span class="eyebrow">${esc(kidLine(c))}</span><h2>${T(CREATE_KINDS[k].l)}</h2></div></div><p class="small muted">${T(CREATE_KINDS[k].d)}</p>
-    <form class="stack" data-form="aiCreate" style="gap:12px">${f}</form></div>
-    <p class="tiny muted center">${T("Vous pouvez lancer une autre création pendant que celle-ci se prépare : suivez-les dans « En cours ».")}</p>`;
+  return `<div class="card"><div class="card-h"><div><span class="eyebrow">${esc(kidLine(c))}</span><h2>${T(CREATE_KINDS[k].l)}</h2></div></div><p class="small muted">${T(CREATE_KINDS[k].d)}</p>
+    <form class="stack" data-form="aiCreate" style="gap:12px">${f}</form></div>`;
 }
+/* onglets dédiés : menus de la semaine, idées d'activités, préparer une discussion */
+const histOfCat = (cat, empty0) => { const L = (S.aiHist||[]).filter(e => e.cat === cat); return L.length ? `<div class="card"><div class="card-h"><h2>${T("Déjà préparés")}</h2><span class="chip">${L.length}</span></div><div class="list">${L.slice(0, 30).map(e => `<button class="li" data-act="aiHistOpen" data-v="${e.id}"><div class="ic" style="background:var(--surface2)">${icon((AI_CATS[e.cat]||["","spark"])[1])}</div><div class="grow"><div class="li-title">${esc(e.title)}</div><div class="small muted">${fmtD(new Date(e.at),{day:"numeric",month:"short",year:"numeric"})}${e.kid&&kidById(e.kid)?" · "+esc(kidById(e.kid).nick||kidById(e.kid).name):""}</div></div>${e.fav?"★":""}${icon("right")}</button>`).join("")}</div></div>` : `<div class="card">${empty("spark", empty0)}</div>`; };
+function ideasPane(){ return createForm("ideas") + histOfCat("ideas", T("Vos idées d'activités apparaîtront ici.")); }
+function talkPane(){ return createForm("talk") + histOfCat("talk", T("Vos discussions préparées apparaîtront ici.")); }
+function menusPane(){
+  const M = (S.menus||[]).slice().sort((a,b) => b.at - a.at), liked = (S.recipes||[]).filter(r => r.fromMenu);
+  return createForm("plan") + (M.length ? `<div class="card"><div class="card-h"><h2>${T("Mes menus")}</h2><span class="chip">${M.length}</span></div><div class="list">${M.map(m => `<button class="li" data-act="menuOpen" data-v="${m.id}"><div class="ic" style="background:var(--mint-bg);color:var(--mint-ink)">${icon("spoon")}</div><div class="grow"><div class="li-title">${esc(m.title || T("Menu de la semaine"))}</div><div class="small muted">${fmtD(new Date(m.at),{day:"numeric",month:"long"})} · ${T("{n} jours",{n:m.days.length})} · ${T("{n} aimé(s)",{n:m.days.flatMap(d => d.meals).filter(x => x.liked).length})}</div></div>${icon("right")}</button>`).join("")}</div></div>` : `<div class="card">${empty("spoon", T("Créez un menu : chaque repas pourra être aimé (♥) pour le garder dans vos recettes favorites."))}</div>`)
+    + (liked.length ? `<div class="card"><div class="card-h"><h2>${T("Repas aimés")}</h2><button class="btn sm ghost" data-act="aiTab" data-v="recipes">${T("Recettes")}</button></div><div class="pick">${liked.slice(0, 20).map(r => `<button data-act="recipeOpen" data-v="${r.id}">♥ ${esc(r.title)}</button>`).join("")}</div></div>` : "")
+    + histOfCat("menu", T("Les anciens menus (texte) apparaissent ici."));
+}
+const MENU_SCHEMA = {type:"OBJECT", properties:{title:{type:"STRING"}, days:{type:"ARRAY", items:{type:"OBJECT", properties:{day:{type:"STRING"}, meals:{type:"ARRAY", items:{type:"OBJECT", properties:{label:{type:"STRING", enum:["Déjeuner","Dîner","Souper","Collation"]}, name:{type:"STRING"}, note:{type:"STRING"}}, required:["label","name"]}}}, required:["day","meals"]}}, grocery:{type:"ARRAY", items:{type:"OBJECT", properties:{aisle:{type:"STRING"}, items:{type:"ARRAY", items:{type:"STRING"}}}, required:["aisle","items"]}}, tips:{type:"STRING"}}, required:["title","days","grocery"]};
+function menuJob(c){
+  const meals = checked("pl-meals"), nd = +(radio("pl-days") || 7), cons = val("pl-a"), favs = $("#pl-fav")?.checked ? (S.recipes||[]).slice(0, 12).map(r => r.title).join(", ") : "";
+  if (!meals.length) return toast(T("Choisissez au moins un repas")); S.settings.menuMeals = meals; save();
+  const foods = (c?.foodFav||[]).map(f => f.name).join(", ");
+  return aiJob("menu", T("Menu de la semaine"), async () => {
+    const r = await gemini({json:MENU_SCHEMA, temperature:0.8, timeout:120000, system:AI_SYSTEM(), contents:[{role:"user", parts:[{text:`Propose un menu de ${nd} jours pour une famille avec ${kidLine(c)}${S.children.length > 1 ? ` (autres enfants : ${S.children.filter(k => k.id !== c?.id && !isPrenatal(k)).map(kidLine).join(", ")})` : ""}. Repas à prévoir chaque jour : ${meals.join(", ")}. Guide alimentaire canadien, textures sûres pour l'âge, variété, restes réutilisés intelligemment. Aliments aimés : ${foods||"inconnus"}. Allergies : ${c?.allergies||"aucune connue"}. Contraintes : ${cons||"aucune"}.${favs ? ` Intègre 2 ou 3 de ces recettes favorites : ${favs}.` : ""} Pour chaque repas : un nom court et appétissant (name) et une note très brève (portion de l'enfant ou astuce). Jours nommés (Lundi…). Puis la liste d'épicerie groupée par rayon et 2 phrases d'astuces de préparation. En ${LANG==="en"?"anglais":"français"}.`}]}]});
+    const out = parseJSON(r.text), m = {id:uid(), at:Date.now(), kid:c?.id||null, title:out.title || T("Menu de la semaine"), days:(out.days||[]).map(d => ({day:d.day, meals:(d.meals||[]).map(x => ({label:x.label, name:x.name, note:x.note||""}))})), grocery:out.grocery||[], tips:out.tips||""};
+    if (!m.days.length) throw new Error(T("Réponse incomplète, réessayez"));
+    S.menus = [m, ...(S.menus||[])].slice(0, 40); save(); if (UI.aiTab === "menus") softRender(); return {open:() => menuOpen(m.id)};
+  }, {kid:c?.id, open:(res) => res?.open?.()});
+}
+function menuOpen(id){
+  const m = (S.menus||[]).find(x => x.id === id); if (!m) return; UI.menuId = id;
+  sheet(`${sheetHead(esc(m.title))}<p class="small muted">${T("Touchez ♥ sur un repas que vous avez aimé : il va dans vos recettes favorites (la recette complète est préparée par l'IA).")}</p>
+    ${m.days.map((d, di) => `<div class="menu-day"><h3>${esc(d.day)}</h3>${d.meals.map((x, xi) => `<div class="menu-meal"><span class="chip ${x.label==="Souper"?"peach":x.label==="Dîner"?"mint":x.label==="Déjeuner"?"butter":"sky"}">${T(x.label)}</span><div class="grow"><b>${esc(x.name)}</b>${x.note?`<div class="tiny muted">${esc(x.note)}</div>`:""}</div><button class="icon-btn flat like ${x.liked?"on":""}" data-act="menuLike" data-v="${id}|${di}|${xi}" aria-pressed="${!!x.liked}" aria-label="${x.liked?T("Ne plus aimer"):T("J'aime : garder en favori")}">${x.liked?"♥":"♡"}</button></div>`).join("")}</div>`).join("")}
+    ${m.grocery?.length ? `<details class="card lexcard"><summary><b>${icon("note")} ${T("Liste d'épicerie")}</b></summary>${m.grocery.map(g => `<div><span class="eyebrow">${esc(g.aisle)}</span><ul class="ing">${(g.items||[]).map(i => `<li>${esc(i)}</li>`).join("")}</ul></div>`).join("")}</details>` : ""}
+    ${m.tips ? `<div class="banner soft">${icon("bulb")}<div class="small">${esc(m.tips)}</div></div>` : ""}
+    <div class="row"><button class="btn ghost" data-act="menuShare" data-v="${id}">${icon("share")}${T("Partager")}</button><button class="btn danger" data-act="menuDel" data-v="${id}">${icon("trash")}</button></div>`, "wide");
+}
+const menuText = m => `${m.title}\n\n${m.days.map(d => `${d.day}\n${d.meals.map(x => `- ${T(x.label)} : ${x.name}`).join("\n")}`).join("\n\n")}${m.grocery?.length ? `\n\n${T("Liste d'épicerie")}\n${m.grocery.map(g => `${g.aisle} : ${(g.items||[]).join(", ")}`).join("\n")}` : ""}`;
 
 /* ---------- histoires ---------- */
 const STORY_SCHEMA = {type:"OBJECT", properties:{title:{type:"STRING"}, chapterTitle:{type:"STRING"}, summary:{type:"STRING"},
@@ -86,7 +125,7 @@ function storyGen(story, plan, direction, over = {}){
   const words = Math.round((o.len||3) * 120);
   const title = story ? T("{t} · chapitre {n}",{t:story.title, n}) : T("Nouvelle histoire");
   return aiJob("story", title, async () => {
-    const prev = story ? `Histoire existante « ${story.title} ». Personnages (garde leurs noms, caractères et façons de parler) : ${story.characters.filter(x => x.id !== "narr").map(x => `${x.name} — ${x.desc}`).join(" ; ")}.\nRésumé des chapitres précédents :\n${story.chapters.map(ch => `${ch.n}. ${ch.title} : ${ch.summary}`).join("\n")}\nFin du dernier chapitre : ${story.chapters.at(-1).segs.slice(-3).map(s => s.t).join(" ")}\nÉcris le chapitre ${n}, qui continue l'histoire. ${direction ? `Direction voulue : ${direction}.` : ""}` : `Plan : ${plan || "à inventer"}`;
+    const prev = story ? `Histoire existante « ${story.title} ». Personnages (garde leurs noms, caractères et façons de parler) : ${story.characters.filter(x => x.id !== "narr").map(x => `${x.name} — ${x.desc}`).join(" ; ")}.${story.removed?.length ? ` Ne fais plus apparaître : ${story.removed.join(", ")}.` : ""}\nRésumé des chapitres précédents :\n${story.chapters.map(ch => `${ch.n}. ${ch.title} : ${ch.summary}`).join("\n")}\nFin du dernier chapitre : ${story.chapters.at(-1).segs.slice(-3).map(s => s.t).join(" ")}\nÉcris le chapitre ${n}, qui continue l'histoire. ${direction ? `Direction voulue : ${direction}.` : ""}` : `Plan : ${plan || "à inventer"}`;
     const lv = o.level || lvlOfAge(c && !isPrenatal(c) ? ageMonths(c) : 48);
     const r = await gemini({tier:"fast", json:STORY_SCHEMA, temperature:0.7, timeout:90000, system:`Tu es un auteur de livres jeunesse spécialiste du niveau ${lv} ans. RÈGLE ABSOLUE : ${LVL_HINT[lv]} Avant de répondre, relis chaque phrase : si un enfant de ${lv.split("-")[0].replace("+","")} ans ne comprendrait pas un mot sans aide, remplace-le par un mot plus simple. La simplicité du vocabulaire passe avant le style.`, contents:[{role:"user", parts:[{text:`Écris une histoire du soir pour ${kidLine(c)} (rythme apaisant, fin calme). Niveau du texte : ${LVL_HINT[lv]} ${optsText(o)}\n${prev}\nLongueur : environ ${words} mots. Découpe le texte en segments : la narration avec speaker « Narrateur », chaque réplique d'un personnage dans un segment séparé avec son nom exact comme speaker (sans tiret ni guillemets, ni « dit-il » dans la réplique). Liste dans characters tous les personnages qui parlent (pas le narrateur), avec une description courte, leur type et leur genre (fille, garcon ou neutre). summary : 2 phrases qui résument ce chapitre. En ${LANG==="en"?"anglais":"français"}.`}]}]});
     const out = parseJSON(r.text);
@@ -138,14 +177,27 @@ function storyOpen(id){
   sheet(`${sheetHead(esc(s.title))}<div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ghost" data-act="storyFav" data-v="${id}">${icon("star")}${s.fav?T("Favori ✓"):T("Favori")}</button>
       <div class="seg" style="width:auto"><button data-act="storyEngine" data-v="device" aria-pressed="${s.engine!=="gemini"}">${T("Voix de l'appareil")}</button><button data-act="storyEngine" data-v="gemini" aria-pressed="${s.engine==="gemini"}">${T("Voix Gemini")}</button></div></div>
     <p class="tiny muted">${s.engine==="gemini" ? T("Voix naturelles générées par Gemini (quelques secondes par réplique, utilise votre clé).") : T("Voix intégrées au téléphone : instantanées et gratuites. Réglez la voix de chaque personnage ci-dessous.")}</p>
-    <div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.map(x => `<button class="chip ${chColor(s,x.id)}" data-act="charForm" data-v="${id}|${x.id}">${icon("sliders").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${esc(x.name)}</button>`).join("")}</div>
+    <div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.map(x => `<button class="chip ${chColor(s,x.id)}" data-act="charForm" data-v="${id}|${x.id}">${icon("edit").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${esc(x.name)}</button>`).join("")}<button class="chip" style="border:1px dashed var(--line)" data-act="charForm" data-v="${id}|new">${icon("plus").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("Personnage")}</button></div>
+    <div class="read-bar"><span class="tiny muted">${T("Taille du texte")}</span><button class="btn sm ghost" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><b class="tiny num" id="zoomVal">${Math.round(storyZ()*100)} %</b><button class="btn sm ghost" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button><button class="btn sm ${UI.readMode?"kid":"ghost"}" data-act="storyRead">${icon("book")}${UI.readMode?T("Quitter la lecture"):T("Mode lecture")}</button></div>
+    <div class="story-text" id="storyText" style="--sz:${storyZ()}">
     ${s.chapters.map((ch, ci) => `<div class="chapter"><div class="row between"><h3>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h3><div class="row" style="gap:4px;flex-wrap:nowrap">${playing && PL.ch === ci ? `<button class="btn sm kid" data-act="storyPause">${icon("pause")}${T("Pause")}</button><button class="btn sm ghost" data-act="storyStop" data-v="${id}" aria-label="${T("Arrêter")}">${icon("x")}</button>` : s.pos?.ch === ci && s.pos.i > 0 ? `<button class="btn sm kid" data-act="storyPlayFrom" data-v="${id}|${ci}|${s.pos.i}">${icon("play")}${T("Reprendre")}</button><button class="btn sm ghost" data-act="storyPlayFrom" data-v="${id}|${ci}|0" aria-label="${T("Rejouer depuis le début")}">${icon("replay")}</button>` : `<button class="btn sm kid" data-act="storyPlayFrom" data-v="${id}|${ci}|0">${icon("play")}${T("Écouter")}</button>`}</div></div>
       ${ch.img ? `<img class="story-img" data-stimg="${ch.img}" alt="${esc(ch.title)}">` : ""}<div class="row" style="gap:6px"><button class="btn sm ghost" data-act="storyImg" data-v="${id}|${ci}">${icon("camera")}${ch.img?T("Nouvelle image"):T("Illustrer ce chapitre")}</button><button class="btn sm ghost" data-act="storySimplify" data-v="${id}|${ci}">${icon("spark")}${T("Mots plus simples")}</button></div>
       ${ch.segs.map((sg, si) => `<p class="seg-line ${sg.c==="narr"?"narr":""} ${s.pos?.ch===ci && s.pos.i===si && !playing?"mark":""}" id="sg-${ci}-${si}" data-act="storyPlayFrom" data-v="${id}|${ci}|${si}" title="${T("Lire à partir d'ici")}">${sg.c!=="narr"?`<b class="who" style="color:var(--${chColor(s,sg.c)}-ink)">${esc(s.characters.find(x=>x.id===sg.c)?.name||"")}</b> `:""}${esc(sg.t)}</p>`).join("")}</div>`).join("")}
+    </div>
     <div class="card tint"><h3>${T("Chapitre suivant")}</h3><div class="stack" style="gap:10px">${fld("st-dir",T("Où va l'histoire ? (facultatif)"),inp("st-dir","",`placeholder="${T("Ex. : ils trouvent une carte au trésor")}"`))}
       <div class="row" style="flex-wrap:wrap"><button class="btn ghost" data-act="storyNextIdeas" data-v="${id}">${icon("bulb")}${T("Proposer des suites")}</button><button class="btn kid" data-act="storyNext" data-v="${id}">${icon("spark")}${T("Écrire le chapitre {n}",{n:s.chapters.length+1})}</button></div><div id="nextIdeas"></div></div></div>
-    <div class="row"><button class="btn ghost" data-act="storyShare" data-v="${id}">${icon("share")}${T("Partager")}</button>${feat("memories")?`<button class="btn ghost" data-act="storyKeep" data-v="${id}">${icon("star")}${T("Garder dans les souvenirs")}</button>`:""}<button class="btn danger" data-act="storyDel" data-v="${id}">${icon("trash")}</button></div>`, "wide");
-  $$("#layer img[data-stimg]").forEach(async im => { const d = await PhotoDB.get(im.dataset.stimg); if (d) im.src = d; else im.remove(); });
+    <div class="row"><button class="btn ghost" data-act="storyShare" data-v="${id}">${icon("share")}${T("Partager")}</button>${feat("memories")?`<button class="btn ghost" data-act="storyKeep" data-v="${id}">${icon("star")}${T("Garder dans les souvenirs")}</button>`:""}<button class="btn danger" data-act="storyDel" data-v="${id}">${icon("trash")}</button></div>`, UI.readMode ? "wide reading" : "wide");
+  $$("#layer img[data-stimg]").forEach(async im => { im.classList.add("zoomable"); im.dataset.act = "viewImg"; const d = await PhotoDB.get(im.dataset.stimg); if (d) im.src = d; else im.remove(); });
+  const box = $("#storyText"); if (box) pinchText(box, () => storyZ(), z => { S.settings.storyZoom = z; box.style.setProperty("--sz", z); const v = $("#zoomVal"); if (v) v.textContent = Math.round(z*100) + " %"; }, () => save());
+}
+/* taille du texte des histoires (boutons ou pincement à deux doigts) */
+const storyZ = () => clamp(+S.settings.storyZoom || 1, 0.8, 2.4);
+function pinchText(el, get, set, done){
+  let d0 = 0, z0 = 1;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  el.addEventListener("touchstart", e => { if (e.touches.length === 2){ d0 = dist(e.touches); z0 = get(); } }, {passive:true});
+  el.addEventListener("touchmove", e => { if (e.touches.length === 2 && d0){ e.preventDefault(); set(clamp(Math.round(z0 * dist(e.touches) / d0 * 20) / 20, 0.8, 2.4)); } }, {passive:false});
+  el.addEventListener("touchend", e => { if (d0 && e.touches.length < 2){ d0 = 0; done?.(); } });
 }
 /* page « chapitre suivant » : précisions ou surprise */
 function storyNextSheet(id){
@@ -240,19 +292,25 @@ async function storyNextIdeas(id){
     box.innerHTML = (parseJSON(r.text).ideas||[]).map(x => `<button type="button" class="idea" data-act="storyDir" data-v="${esc(x)}"><span class="small">${esc(x)}</span></button>`).join("");
   } catch(e){ box.innerHTML = `<p class="small" style="color:var(--danger)">${esc(e.message)}</p>`; }
 }
+const CH_KINDS = [["enfant","Enfant"],["adulte","Adulte"],["aine","Aîné·e"],["animal","Animal"],["creature","Créature"],["robot","Robot"]];
 function charForm(v){
-  const [sid, cid] = v.split("|"), s = S.stories.find(x => x.id === sid), ch = s?.characters.find(x => x.id === cid); if (!ch) return;
+  const [sid, cid] = v.split("|"), s = S.stories.find(x => x.id === sid); if (!s) return;
+  const isNew = cid === "new", ch = isNew ? {id:"new", name:"", desc:"", kind:"enfant", gender:"fille"} : s.characters.find(x => x.id === cid); if (!ch) return;
+  const lines = isNew ? 0 : sum(s.chapters.map(c => c.segs.filter(sg => sg.c === cid).length));
   const vc = ch.voice || autoVoice(ch.kind, 0, ch.gender); stopPlay();
   TTS.voices().then(list => { const sel = $("#cv-dv"); if (sel) sel.innerHTML = `<option value="">${T("Automatique")}</option>` + list.map(x => `<option value="${esc(x.id)}" ${x.id===vc.dv?"selected":""}>${esc(x.name)} (${esc(x.lang)})</option>`).join(""); });
-  sheet(`<form class="stack" data-form="charSave" data-id="${v}" style="gap:12px">${sheetHead(esc(ch.name))}
-    ${cid==="narr"?"":`${fld("cv-name",T("Nom"),inp("cv-name",ch.name,"required"))}${fld("cv-desc",T("Description"),inp("cv-desc",ch.desc||""))}`}
+  sheet(`<form class="stack" data-form="charSave" data-id="${v}" style="gap:12px">${sheetHead(isNew ? T("Nouveau personnage") : esc(ch.name))}
+    ${cid==="narr"?"":`${fld("cv-name",T("Nom"),inp("cv-name",ch.name,"required"))}${fld("cv-desc",T("Description (caractère, apparence)"),inp("cv-desc",ch.desc||""))}
+    <div class="fgrid">${fld("cv-kind",T("Type"),`<select class="inp" id="cv-kind">${CH_KINDS.map(([k,l]) => `<option value="${k}" ${ch.kind===k?"selected":""}>${T(l)}</option>`).join("")}</select>`)}${fld("cv-gender",T("Voix de"),`<select class="inp" id="cv-gender">${[["fille",T("Fille / femme")],["garcon",T("Garçon / homme")],["neutre",T("Neutre")]].map(([k,l]) => `<option value="${k}" ${ch.gender===k?"selected":""}>${l}</option>`).join("")}</select>`)}</div>
+    ${isNew ? `<p class="tiny muted">${T("Il apparaîtra dans le prochain chapitre écrit par l'IA.")}</p>` : `<label class="switch"><input type="checkbox" id="cv-rename" checked><span class="tg"></span><span class="grow">${T("Si je change le nom, le remplacer aussi dans le texte")}</span></label>`}`}
     <label class="switch"><input type="checkbox" id="cv-fav" ${ch.fav?"checked":""}><span class="tg"></span><span class="grow">${T("Personnage favori")}</span></label>
     <h3>${T("Voix de l'appareil")}</h3>${fld("cv-dv",T("Voix"),`<select class="inp" id="cv-dv"><option value="">${T("Chargement…")}</option></select>`)}
     <div class="fgrid">${fld("cv-pitch",T("Hauteur"),`<input type="range" id="cv-pitch" min="0.5" max="2" step="0.05" value="${vc.pitch??1}">`)}${fld("cv-rate",T("Vitesse"),`<input type="range" id="cv-rate" min="0.6" max="1.4" step="0.05" value="${vc.rate??1}">`)}</div>
     <h3>${T("Voix Gemini")}</h3>${fld("cv-gv",T("Voix"),`<select class="inp" id="cv-gv">${GEMINI_VOICES.map(([n,d]) => `<option value="${n}" ${n===vc.gv?"selected":""}>${n} · ${T(d)}</option>`).join("")}</select>`)}
     ${fld("cv-style",T("Façon de parler (Gemini, facultatif)"),inp("cv-style",vc.style||"",`placeholder="${T("Ex. : voix douce et enjouée, un peu essoufflée")}"`))}
     <div class="row"><button type="button" class="btn ghost" data-act="charTest" data-v="device">${icon("play")}${T("Tester (appareil)")}</button><button type="button" class="btn ghost" data-act="charTest" data-v="gemini">${icon("play")}${T("Tester (Gemini)")}</button></div>
-    <button class="btn kid" type="submit">${T("Enregistrer")}</button></form>`);
+    <div class="row"><button class="btn kid grow" type="submit">${isNew ? T("Ajouter") : T("Enregistrer")}</button>${!isNew && cid !== "narr" ? `<button type="button" class="btn danger" data-act="charDel" data-v="${v}" aria-label="${T("Retirer le personnage")}">${icon("trash")}</button>` : ""}</div>
+    ${!isNew && cid !== "narr" ? `<p class="tiny muted">${lines ? T("Retirer ce personnage : ses {n} réplique(s) seront lues par le narrateur, et il ne reviendra plus dans les prochains chapitres.",{n:lines}) : T("Retirer ce personnage : il ne reviendra plus dans les prochains chapitres.")}</p>` : ""}</form>`);
 }
 const readVoice = () => ({dv:val("cv-dv"), pitch:+$("#cv-pitch").value, rate:+$("#cv-rate").value, gv:val("cv-gv"), style:val("cv-style")});
 
@@ -372,7 +430,20 @@ function recipesPane(){
 }
 
 Object.assign(ACT, {
-  createKind: v => { UI.createKind = v; UI.aiTab = "create"; closeSheet(); if (UI.view !== "assistant") go("assistant"); else render(); },
+  createKind: v => { if (CREATE_TAB[v]){ UI.aiTab = CREATE_TAB[v]; } else { UI.createKind = v; UI.aiTab = "create"; } closeSheet(); if (UI.view !== "assistant") go("assistant"); else render(); },
+  menuOpen: v => menuOpen(v),
+  menuShare: v => { const m = S.menus.find(x => x.id === v); Native.share({title:m.title, text:menuText(m)}); },
+  menuDel: v => askConfirm(T("Supprimer ce menu ?"), T("Supprimer"), () => { S.menus = S.menus.filter(x => x.id !== v); save(); render(); }),
+  menuLike: v => { const [id, di, xi] = v.split("|"), m = S.menus.find(x => x.id === id), x = m?.days[+di]?.meals[+xi]; if (!x) return;
+    if (x.liked){ const r = (S.recipes||[]).find(y => y.id === x.liked); if (r?.fromMenu && !r.edited) S.recipes = S.recipes.filter(y => y.id !== r.id); x.liked = null; save(); toast(T("Retiré des favoris")); return menuOpen(id); }
+    const rec = {id:uid(), title:x.name, labels:[x.label], servings:4, minutes:30, ingredients:[], steps:[], kidTips:x.note||"", fromMenu:true, fav:true, at:Date.now(), kid:m.kid};
+    S.recipes = [rec, ...(S.recipes||[])]; x.liked = rec.id; save(); toast(T("♥ Gardé dans les recettes favorites")); menuOpen(id);
+    if (aiKey()) aiJob("recipe", T("Recette : {w}",{w:x.name.slice(0, 40)}), async () => {
+      const c = kidById(m.kid) || aiKidNow();
+      const r = await gemini({tier:"fast", json:RECIPE_SCHEMA, temperature:0.5, contents:[{role:"user", parts:[{text:`Écris la recette complète de « ${x.name} » (${x.label}) pour une famille avec ${kidLine(c)}, 4 portions, adaptée à l'âge (textures sûres, peu de sel). Allergies : ${c?.allergies||"aucune connue"}. ${NUT_HELP} nut = pour une portion d'enfant. En ${LANG==="en"?"anglais":"français"}.`}]}]});
+      const full = parseJSON(r.text), R = (S.recipes||[]).find(y => y.id === rec.id); if (R) Object.assign(R, {...full, id:R.id, title:R.title, labels:[...new Set([x.label, ...(full.labels||[])])], fromMenu:true, fav:true}); save();
+      return {open:() => recipeSheet(R || rec)};
+    }, {quiet:true}); },
   storyIdeas: () => storyIdeas(), storyPick: v => storyPick(v),
   storyWrite: () => { const plan = val("st-plan"); UI.storyOpts = UI.storyOpts || storyOpts(); storyGen(null, plan); },
   storyOpen: v => storyOpen(v), stMode: v => { UI.stMode = v; render(); }, stFav: () => { UI.stFav = !UI.stFav; render(); },
@@ -403,10 +474,14 @@ Object.assign(ACT, {
   storyKeep: v => { const s = S.stories.find(x => x.id === v); S.memories.push({id:uid(), kind:"story", date:iso(today()), title:s.title, text:s.chapters.map(ch => `## ${ch.title}\n${ch.segs.map(sg => sg.t).join("\n")}`).join("\n\n"), kidIds:s.kid?[s.kid]:[]}); save(); driveQ("mem", S.memories.at(-1).id); toast(T("Souvenir enregistré")); },
   storyDel: v => { if (!confirmDel()) return; stopPlay(); (S.stories.find(x => x.id === v)?.chapters||[]).forEach(ch => ch.img && PhotoDB.del(ch.img).catch(() => {})); driveQDel(S.stories.find(x => x.id === v)?.driveIds); S.stories = S.stories.filter(x => x.id !== v); closeSheet(); commit(); },
   charForm: v => charForm(v),
+  charDel: v => { const [sid, cid] = v.split("|"), s = S.stories.find(x => x.id === sid), ch = s?.characters.find(x => x.id === cid); if (!ch) return;
+    askConfirm(T("Retirer {n} de l'histoire ?",{n:ch.name}), T("Retirer"), () => { s.chapters.forEach(c => c.segs.forEach(sg => { if (sg.c === cid) sg.c = "narr"; })); s.characters = s.characters.filter(x => x.id !== cid); s.removed = [...(s.removed||[]), ch.name]; save(); driveQ("story", sid); toast(T("Personnage retiré")); storyOpen(sid); }); },
+  storyZoom: v => { const z = v === "+" ? storyZ() + 0.1 : v === "-" ? storyZ() - 0.1 : 1; S.settings.storyZoom = Math.round(clamp(z, 0.8, 2.4) * 100) / 100; save(); const b = $("#storyText"); if (b) b.style.setProperty("--sz", storyZ()); const zv = $("#zoomVal"); if (zv) zv.textContent = Math.round(storyZ()*100) + " %"; },
+  storyRead: () => { UI.readMode = !UI.readMode; storyOpenKeepScroll(UI.storyId); },
   charTest: async v => { const vc = readVoice(), txt = LANG === "en" ? "Hello! Here is my voice for the story." : "Bonjour ! Voici ma voix pour l'histoire."; stopPlay();
     try { if (v === "gemini"){ toast(T("Génération de la voix…")); const url = await TTS.gemini(txt, vc); const a = new Audio(url); PL.audio = a; a.play(); } else await TTS.speakDevice(txt, vc); } catch(e){ toast(e.message); } },
   rcLabel: v => { UI.rcLabel = v; render(); }, recipeOpen: v => recipeSheet(S.recipes.find(x => x.id === v)),
-  recipeSave: () => { const r = UI.recipeView; r.labels = checked("rc-lab"); S.recipes = S.recipes || []; const i = S.recipes.findIndex(x => x.id === r.id); if (i >= 0) S.recipes[i] = {...S.recipes[i], ...r}; else S.recipes.unshift({...r, fav:true}); save(); toast(T("Recette gardée en favori")); recipeSheet(r); },
+  recipeSave: () => { const r = UI.recipeView; r.labels = checked("rc-lab"); r.edited = true; S.recipes = S.recipes || []; const i = S.recipes.findIndex(x => x.id === r.id); if (i >= 0) S.recipes[i] = {...S.recipes[i], ...r}; else S.recipes.unshift({...r, fav:true}); save(); toast(T("Recette gardée en favori")); recipeSheet(r); },
   recipeDel: v => { S.recipes = S.recipes.filter(x => x.id !== v); closeSheet(); commit(T("Supprimé")); },
   recipeShare: () => { const r = UI.recipeView; Native.share({title:r.title, text:recipeText(r)}); },
   recipeLog: () => { const r = UI.recipeView, c = child(); closeSheet(); mealForm({items:[{name:r.title, group:"autres", qty:T("1 portion"), nut:r.nut||null}], comment:"", ai:true}); },
@@ -417,6 +492,7 @@ Object.assign(FORMS, {
     const k = UI.createKind || "story", c = aiKidNow();
     if (k === "story"){ UI.storyOpts = storyOpts(); return storyGen(null, ""); }
     if (k === "recipe"){ const w = val("rc-want"); if (!w) return toast(T("Indiquez une envie ou des ingrédients")); return recipeJob(w, radio("rc-label"), +val("rc-time"), +val("rc-serv")); }
+    if (k === "plan") return menuJob(c);
     const fav = (c?.foodFav||[]).map(f => f.name).join(", "), age = c && !isPrenatal(c) ? ageLabel(ageMonths(c)) : "";
     const P = {
       plan:[T("Menu de la semaine"), "menu", `Propose un menu de 7 jours (déjeuner, dîner, souper, 1 ou 2 collations) pour une famille avec ${kidLine(c)}. Guide alimentaire canadien, textures sûres pour l'âge, portions de l'enfant indiquées. Aliments aimés : ${fav||"inconnus"}. Allergies : ${c?.allergies||"aucune connue"}. Contraintes : ${val("pl-a")||"aucune"}. Présente les repas dans un tableau Markdown (Jour | Déjeuner | Dîner | Souper | Collation), puis la liste d'épicerie groupée par rayon.`, false],
@@ -427,8 +503,15 @@ Object.assign(FORMS, {
     if (k === "ideas" && val("id-city")){ S.settings.city = val("id-city"); save(); }
     aiJob(P[1], P[0], async () => { const r = await gemini({system:AI_SYSTEM() + "\n" + kidContext(c), search:P[3], contents:[{role:"user", parts:[{text:P[2]}]}]}); const e = aiHist(P[1], P[0], r.text, {sources:r.sources, kid:c?.id||null}); return {histId:e.id}; }, {kid:c?.id});
   },
-  charSave: f => { const [sid, cid] = f.dataset.id.split("|"), s = S.stories.find(x => x.id === sid), ch = s.characters.find(x => x.id === cid);
-    if (cid !== "narr"){ ch.name = val("cv-name") || ch.name; ch.desc = val("cv-desc"); } ch.fav = $("#cv-fav").checked; ch.voice = {...readVoice(), custom:true}; save(); toast(T("Voix enregistrée")); storyOpen(sid); },
+  charSave: f => { const [sid, cid] = f.dataset.id.split("|"), s = S.stories.find(x => x.id === sid);
+    if (cid === "new"){ const name = val("cv-name").trim(); if (!name) return toast(T("Nom requis")); const g = val("cv-gender") || "neutre", k = val("cv-kind") || "enfant";
+      s.characters.push({id:uid(), name, desc:val("cv-desc"), kind:k, gender:g, fav:$("#cv-fav").checked, voice:{...autoVoice(k, s.characters.length, g), g:g === "fille" ? "f" : "m"}}); save(); toast(T("Personnage ajouté")); return storyOpen(sid); }
+    const ch = s.characters.find(x => x.id === cid);
+    if (cid !== "narr"){ const old = ch.name, nn = val("cv-name").trim() || ch.name;
+      if (nn !== old && $("#cv-rename")?.checked){ const re = new RegExp(`(?<![\\p{L}\\p{N}])${old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "gu"); s.chapters.forEach(c => { c.segs.forEach(sg => sg.t = sg.t.replace(re, nn)); c.title = c.title.replace(re, nn); c.summary = (c.summary||"").replace(re, nn); }); s.title = s.title.replace(re, nn); }
+      ch.name = nn; ch.desc = val("cv-desc"); const ng = val("cv-gender"), nk = val("cv-kind"), moved = (ng && ng !== ch.gender) || (nk && nk !== ch.kind); if (ng) ch.gender = ng; if (nk) ch.kind = nk;
+      if (moved){ ch.fav = $("#cv-fav").checked; ch.voice = autoVoice(ch.kind, s.characters.indexOf(ch), ch.gender); save(); driveQ("story", sid); toast(T("Personnage enregistré · voix adaptée")); return storyOpen(sid); } }
+    ch.fav = $("#cv-fav").checked; ch.voice = {...readVoice(), custom:true}; save(); driveQ("story", sid); toast(T("Personnage enregistré")); storyOpen(sid); },
 });
 Object.assign(CHANGE, { rcQ: t => { UI.rcQ = t.value; render(); } });
 Object.assign(FORMS, { storyNextGo: f => storyNextRun(f.dataset.id, false) });

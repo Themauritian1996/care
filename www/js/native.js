@@ -127,7 +127,7 @@ const Native = (() => {
     const app = P("App");
     const ln = P("LocalNotifications");
     if (ln){ try { ln.addListener("localNotificationActionPerformed", a => setTimeout(() => openFromNotif(a.notification?.extra), 300)); } catch(e){} }
-    if (app) app.addListener("backButton", () => { if (document.querySelector("#layer .scrim")) { closeSheet(); } else if (UI.view !== "home") { if (typeof stopPlay === "function") stopPlay(); go("home"); } else app.exitApp(); });
+    if (app) app.addListener("backButton", () => { if (document.querySelector("#viewer")) { closeViewer(); } else if (document.querySelector("#layer .scrim")) { closeSheet(); } else if (UI.view !== "home") { if (typeof stopPlay === "function") stopPlay(); go("home"); } else app.exitApp(); });
     const sb = P("StatusBar");
     if (sb){ try { sb.setOverlaysWebView({overlay:false}); } catch(e){} }
   }

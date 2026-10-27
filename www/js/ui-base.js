@@ -39,6 +39,39 @@ const radio = n => (document.querySelector(`input[name="${n}"]:checked`)||{}).va
 const checked = n => [...document.querySelectorAll(`input[name="${n}"]:checked`)].map(i => i.value);
 const tsOf = id => { const v = val(id); return v ? new Date(v).getTime() : Date.now(); };
 const numOf = id => Number(val(id).replace(",", ".")) || 0;
+/* ---------- photo en plein écran : pincer pour zoomer, glisser pour se déplacer, toucher deux fois ---------- */
+function closeViewer(){ $("#viewer")?.remove(); document.removeEventListener("keydown", viewerKey); }
+const viewerKey = e => { if (e.key === "Escape") closeViewer(); };
+function openViewer(src){
+  if (!src || src.length < 30) return; closeViewer();
+  const el = document.createElement("div"); el.id = "viewer"; el.className = "viewer"; el.setAttribute("role", "dialog");
+  el.innerHTML = `<img src="${src}" alt="" draggable="false"><button class="viewer-x" aria-label="${T("Fermer")}">${icon("x")}</button><span class="viewer-hint">${T("Pincez pour zoomer · touchez deux fois")}</span>`;
+  document.body.appendChild(el); document.addEventListener("keydown", viewerKey);
+  const img = el.querySelector("img"), pts = new Map(); let s = 1, x = 0, y = 0, st = null, lastTap = 0, moved = false;
+  const apply = () => { img.style.transform = `translate(${x}px,${y}px) scale(${s})`; };
+  const snap = () => { const p = [...pts.values()]; return {s, x, y, p:p.map(q => ({...q})), d:p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0, c:p.length > 1 ? {x:(p[0].x + p[1].x)/2, y:(p[0].y + p[1].y)/2} : p[0]}; };
+  const bound = () => { const r = img.getBoundingClientRect(), mx = Math.max(0, (r.width - innerWidth) / 2 + 40), my = Math.max(0, (r.height - innerHeight) / 2 + 40); x = clamp(x, -mx, mx); y = clamp(y, -my, my); };
+  el.querySelector(".viewer-x").onclick = e => { e.stopPropagation(); closeViewer(); };
+  el.addEventListener("pointerdown", e => { if (e.target.closest(".viewer-x")) return; try { el.setPointerCapture(e.pointerId); } catch(_){} pts.set(e.pointerId, {x:e.clientX, y:e.clientY}); st = snap(); moved = false; });
+  el.addEventListener("pointermove", e => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, {x:e.clientX, y:e.clientY}); const p = [...pts.values()];
+    if (p.length >= 2 && st?.d){ const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), c = {x:(p[0].x + p[1].x)/2, y:(p[0].y + p[1].y)/2}; s = clamp(st.s * d / st.d, 1, 6); x = st.x + (c.x - st.c.x); y = st.y + (c.y - st.c.y); moved = true; apply(); }
+    else if (p.length === 1 && st){ const dx = p[0].x - st.p[0].x, dy = p[0].y - st.p[0].y; if (Math.abs(dx) + Math.abs(dy) > 6) moved = true; if (s > 1){ x = st.x + dx; y = st.y + dy; bound(); apply(); } else if (dy > 0){ img.style.transform = `translateY(${dy}px)`; el.style.background = `rgba(0,0,0,${Math.max(.3, 1 - dy/400)})`; } } });
+  const up = e => { if (!pts.has(e.pointerId)) return; const one = pts.size === 1, p0 = st?.p?.[0]; pts.delete(e.pointerId);
+    if (one && s <= 1 && p0 && e.clientY - p0.y > 120){ closeViewer(); return; }
+    if (one && !moved){ const now = Date.now(); if (now - lastTap < 320){ if (s > 1){ s = 1; x = y = 0; } else { s = 2.5; const r = el.getBoundingClientRect(); x = (r.width/2 - e.clientX) * 1.5; y = (r.height/2 - e.clientY) * 1.5; bound(); } apply(); lastTap = 0; } else lastTap = now; }
+    if (s <= 1.02){ s = 1; x = y = 0; el.style.background = ""; apply(); } st = pts.size ? snap() : null; };
+  el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+  el.addEventListener("wheel", e => { e.preventDefault(); s = clamp(s * (e.deltaY < 0 ? 1.15 : 0.87), 1, 6); if (s === 1){ x = y = 0; } apply(); }, {passive:false});
+}
+const lookPick = (k, label, opts, def) => `<div class="field"><label>${label}</label><div class="pick">${opts.map(([v, l]) => `<button data-act="lookSet" data-v="${k}:${v}" aria-pressed="${((S.settings.look||{})[k]||def)===v}">${l}</button>`).join("")}</div></div>`;
+Object.assign(ACT, {
+  lookSet: v => { const [k, x] = v.split(":"); S.settings.look = {...(S.settings.look||{}), [k]:x}; commit(); },
+  lookReset: () => { S.settings.look = {}; commit(T("Style par défaut")); },
+});
+Object.assign(CHANGE, {
+  lookAccent: t => { S.settings.look = {...(S.settings.look||{}), accent:t.value || null}; commit(); },
+  quoteOn: t => { S.settings.quoteOff = !t.checked; commit(); },
+});
 /* confirmation maison (les confirm() natifs sont parfois bloqués dans les applis installées) */
 let CF = null;
 function askConfirm(msg, okLabel, fn, danger = true){ CF = fn; sheet(`${sheetHead(T("Confirmer"))}<p>${esc(msg)}</p><div class="row"><button class="btn ${danger?"danger":"kid"} grow" data-act="cfOk">${esc(okLabel)}</button><button class="btn ghost" data-act="closeSheet">${T("Annuler")}</button></div>`); }
@@ -83,6 +116,9 @@ function applyLook(){
   const st = c ? lookOf(c).id : "fam";
   if (r.dataset.stage !== st){ r.dataset.stage = st; $("#deco").innerHTML = decoSVG(st); }
   if (S.settings.theme) r.dataset.theme = S.settings.theme; else delete r.dataset.theme;
+  const L = S.settings.look || {}; r.dataset.card = L.card || "doux"; r.dataset.tabs = L.tabs || "pilule"; r.dataset.radius = L.radius || "rond";
+  if (L.accent){ r.style.setProperty("--acc", `var(--${L.accent})`); r.style.setProperty("--acc-bg", `var(--${L.accent}-bg)`); r.style.setProperty("--acc-ink", `var(--${L.accent}-ink)`); }
+  else ["--acc","--acc-bg","--acc-ink"].forEach(k => r.style.removeProperty(k));
   const bg = BGS.find(b => b.id === S.settings.bg) || (S.settings.bg?.startsWith?.("#") ? {light:S.settings.bg, dark:S.settings.bg} : BGS[0]);
   r.style.setProperty("--appbg", isDark() ? bg.dark : bg.light);
   document.title = appName();
@@ -139,12 +175,36 @@ function afterRender(){ AFTER.splice(0).forEach(f => { try { f(); } catch(e){ co
 /* rafraîchit seulement si l'utilisateur n'est pas en train d'écrire */
 function softRender(){ if ($("#layer .scrim") || document.activeElement?.matches?.("input,textarea")) { renderPending = true; return; } render(); }
 
+/* ======== PENSÉE DU JOUR (Gemini, sinon une pensée de la liste) ======== */
+const QUOTE_THEMES = ["la patience","le jeu","l'émerveillement","la gratitude","les liens entre frères et sœurs","grandir à son rythme","l'écoute","le rire en famille","les petits moments","la confiance","l'erreur qui fait apprendre","la tendresse","l'autonomie","prendre soin de soi comme parent","la curiosité","les routines rassurantes","la fierté","le courage","la nature","les traditions familiales"];
+const QUOTES = ["Les journées sont longues, mais les années sont courtes : savourez les petits riens.","Un enfant n'a pas besoin d'un parent parfait, mais d'un parent présent.","Chaque « encore ! » est une invitation à rester un peu plus longtemps dans le moment.","Grandir n'est pas une course : chaque enfant a son propre chemin.","Le plus beau cadeau, c'est souvent du temps sans écran, ensemble.","Les erreurs d'aujourd'hui sont les leçons de demain, pour eux comme pour nous.","Un câlin répare plus de choses qu'on ne le croit.","Écouter vraiment, c'est dire à un enfant : tu comptes.","Les rires de la cuisine valent tous les repas parfaits.","La patience d'aujourd'hui devient la confiance de demain.","Les petits pas d'un enfant tracent de grands chemins.","Une famille, c'est un endroit où l'on peut être soi, même les jours difficiles.","Prendre soin de soi, c'est aussi prendre soin de sa tribu.","La curiosité d'un enfant est une porte ouverte : entrez-y avec lui."];
+function quoteCard(){
+  if (S.settings.quoteOff) return "";
+  const td = iso(today()), q = S.quote?.date === td ? S.quote : null;
+  if (!q && aiReady() && aiKey() && !UI.quoteBusy) setTimeout(makeQuote, 800);
+  const dayN = Math.floor(today() / DAY), text = q?.text || T(QUOTES[dayN % QUOTES.length]);
+  return `<div class="quote-card"><span class="q-mark">“</span><p>${esc(text)}</p><div class="row between" style="gap:6px"><span class="tiny muted">${q?.theme ? T("Pensée du jour · {t}",{t:esc(q.theme)}) : T("Pensée du jour")}</span>${aiReady() && aiKey() ? `<button class="icon-btn flat" data-act="quoteNew" aria-label="${T("Une autre pensée")}" title="${T("Une autre pensée")}">${icon("auto")}</button>` : ""}</div></div>`;
+}
+async function makeQuote(force){
+  if (UI.quoteBusy || (!force && S.quote?.date === iso(today()))) return; UI.quoteBusy = true;
+  try {
+    const kids = S.children.filter(c => !isPrenatal(c)).map(c => c.adult ? "adulte" : ageLabel(ageMonths(c))), pre = S.children.some(isPrenatal);
+    const theme = QUOTE_THEMES[(Math.floor(today() / DAY) + (force ? Math.floor(Math.random()*7)+1 : 0)) % QUOTE_THEMES.length];
+    const r = await gemini({tier:"fast", temperature:0.9, contents:[{role:"user", parts:[{text:`Écris une seule pensée positive et chaleureuse, originale (pas une citation existante, n'attribue rien à personne), de 12 à 28 mots, en ${LANG==="en"?"anglais":"français"}, sur le thème « ${theme} », pour une famille avec ${kids.length ? `des enfants de ${kids.join(", ")}` : "de jeunes enfants"}${pre ? " et un bébé à naître" : ""}. Adapte-la à ces âges. Pas de guillemets, pas d'émoji, pas d'auteur. Réponds seulement par la phrase.`}]}]});
+    const text = String(r.text||"").trim().replace(/^["«“\s]+|["»”\s]+$/g, "").split("\n")[0];
+    if (text.length > 10){ S.quote = {date:iso(today()), text, theme}; save(); if (UI.view === "home") softRender(); }
+  } catch(e){ console.warn("quote", e); }
+  UI.quoteBusy = false;
+}
+Object.assign(ACT, { quoteNew: () => { toast(T("Nouvelle pensée…")); makeQuote(true); } });
+
 /* ======== ACCUEIL FAMILIAL ======== */
 function homeView(){
   const h0 = new Date().getHours(), hello = h0 < 12 ? T("Bonjour") : h0 < 18 ? T("Bon après-midi") : T("Bonsoir");
   const m = me();
   let h = `<section class="hero" style="background:var(--surface)"><div>${S.family.photo || S.family.emoji ? familyPic(72) : logo(64)}</div><div class="stack" style="gap:4px;min-width:0"><span class="eyebrow">${fmtD(today(),{weekday:"long",day:"numeric",month:"long"})}</span><h1>${hello}${m?.name && m.name !== T("Moi") ? ", "+esc(m.name) : ""}</h1>
     <div class="row">${S.family.members.slice(0,8).map(x => `<span title="${esc(x.name)}">${avatarOf(x, 32)}</span>`).join("")}${isKidUser()?"":`<button class="btn sm ghost" data-act="go" data-v="plus">${icon("people")}${T("Ma famille")}</button>`}</div></div></section>`;
+  h += quoteCard();
   const pj = (() => { try { return localStorage.getItem("tribe.join"); } catch(e){ return null; } })();
   if (pj && Cloud.configured !== false) h += `<div class="banner info">${icon("key")}<div class="grow small"><b>${T("Invitation reçue")}</b> · ${T("code {c}",{c:esc(pj)})}<br>${Cloud.user ? T("Touchez « Rejoindre » pour entrer dans la famille avec ce compte.") : T("Connectez-vous ou créez votre compte, puis touchez « Rejoindre ».")}</div><div class="stack" style="gap:4px">${Cloud.user ? `<button class="btn sm kid" data-act="joinPending">${T("Rejoindre")}</button>` : `<button class="btn sm kid" data-act="showLogin">${T("Se connecter")}</button>`}<button class="btn sm line" data-act="joinDismiss">${T("Ignorer")}</button></div></div>`;
   if (!S.children.length && !isKidUser() && !pj) h += `<div class="card"><div class="empty">${logo(72)}<h2>${T("Bienvenue dans {app}",{app:esc(appName())})}</h2><p>${T("L'app tout-en-un de la famille : suivi des enfants de la grossesse à 18 ans, agenda partagé, défis, souvenirs.")}</p><div class="row"><button class="btn kid" data-act="kidForm">${T("Ajouter un enfant")}</button><button class="btn ghost" data-act="kidForm" data-v="__pre">${T("Bébé à naître")}</button></div></div></div>`;
@@ -236,6 +296,13 @@ function plusView(){
       <div class="field"><label>${T("Nom de l'app")}</label><div class="pick">${["Tribe","Tribu"].map(k=>`<button data-act="setAppName" data-v="${k}" aria-pressed="${appName()===k}">${k}</button>`).join("")}</div></div>
       <div class="field"><label>${T("Thème")}</label><div class="pick">${[["auto",T("Automatique")],["light",T("Clair")],["dark",T("Sombre")]].map(([k,l])=>`<button data-act="setTheme" data-v="${k}" aria-pressed="${(S.settings.theme||"auto")===k}">${l}</button>`).join("")}</div></div>
       <div class="field"><label>${T("Couleur de fond")}</label><div class="swatches">${BGS.map(b=>`<label title="${T(b.l)}"><input type="radio" name="bg" value="${b.id}" ${S.settings.bg===b.id?"checked":""} data-change="setBg"><span style="background:${isDark()?b.dark:b.light};border:1px solid var(--line)"></span></label>`).join("")}<label title="${T("Personnalisée")}"><input type="color" value="${S.settings.bg?.startsWith?.("#")?S.settings.bg:"#F6F4FB"}" data-change="setBgCustom" style="width:38px;height:38px;border:0;border-radius:50%;padding:0;background:none;cursor:pointer;position:static;opacity:1;pointer-events:auto"></label></div></div></div>
+    <div class="card c6"><div class="card-h"><h2>${T("Style")}</h2>${icon("sliders")}</div><p class="small muted">${T("S'applique en mode clair comme en mode sombre : les couleurs s'adaptent toutes seules.")}</p>
+      ${lookPick("card", T("Encadrés"), [["doux",T("Doux (ombre)")],["contour",T("Contour")],["plat",T("Plat")],["teinte",T("Teinté")],["verre",T("Verre")],["pastel",T("Arc-en-ciel")]], "doux")}
+      ${lookPick("tabs", T("Onglets"), [["pilule",T("Pilule")],["plein",T("Plein")],["souligne",T("Souligné")]], "pilule")}
+      <div class="field"><label>${T("Couleur des onglets et encadrés")}</label><div class="swatches">${[["", T("Automatique (couleur du membre)")], ...["lilac","peach","mint","sky","rose","teal","coral","butter"].map(k => [k, k])].map(([k, l]) => `<label title="${esc(l)}"><input type="radio" name="acc" value="${k}" ${(S.settings.look?.accent||"")===k?"checked":""} data-change="lookAccent"><span style="background:${k ? `var(--${k})` : "conic-gradient(var(--peach),var(--mint),var(--sky),var(--lilac),var(--peach))"};border:1px solid var(--line)"></span></label>`).join("")}</div></div>
+      ${lookPick("radius", T("Coins"), [["rond",T("Arrondis")],["moyen",T("Moyens")],["droit",T("Droits")]], "rond")}
+      <label class="switch"><input type="checkbox" data-change="quoteOn" ${S.settings.quoteOff?"":"checked"}><span class="tg"></span><span class="grow">${T("Pensée du jour à l'accueil")}</span></label>
+      <div class="pick"><button data-act="lookReset">${T("Style par défaut")}</button></div></div>
     <div class="card c6"><div class="card-h"><h2>${T("Fonctions")}</h2></div><p class="small muted">${T("Affichez seulement ce qui vous est utile.")}</p>
       <div>${FEATURES.map(f => `<label class="switch"><input type="checkbox" data-change="feature" data-k="${f.k}" ${feat(f.k)?"checked":""}><span class="tg"></span><span class="grow"><b>${T(f.l)}</b><span class="tiny muted" style="display:block">${T(f.d)}</span></span></label>`).join("")}</div></div>
     <div class="card c6"><div class="card-h"><h2>${T("Contrôle parental")}</h2>${icon("lock")}</div>

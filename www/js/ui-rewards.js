@@ -27,7 +27,8 @@ const teamTotal = r => sum(S.redemptions.filter(x => rKind(x) === "team" && x.re
 function pointsLog(mid){
   const L = [];
   S.completions.filter(x => (!mid || x.memberId === mid) && x.status !== "refuse").forEach(x => { const t = S.tasks.find(y => y.id === x.taskId);
-    L.push({date:x.date, at:x.at||0, who:x.memberId, pts:x.points, kind:"gain", pending:x.status === "pending", title:x.bonus ? T("Bonus : {b}",{b:T(BADGES.find(b => b.k === x.bonus)?.t || "")}) : t?.title || T("Défi"), team:!!x.team, ic:x.bonus ? "gift" : t?.icon||"star"}); });
+    if (x.goal){ L.push({date:x.date, at:x.at||0, who:x.memberId, pts:0, amt:+x.amt||0, unit:t?.unit||"", kind:"goal", title:T("Objectif : {t}",{t:t?.title || "?"}), ic:t?.icon||"target"}); return; }
+    L.push({date:x.date, at:x.at||0, who:x.memberId, pts:x.points, kind:"gain", bonus:!!x.bonus, goalDone:!!x.goalDone, pending:x.status === "pending", title:x.bonus ? T("Bonus : {b}",{b:T(BADGES.find(b => b.k === x.bonus)?.t || "")}) : x.goalDone ? T("Objectif atteint : {t}",{t:t?.title || "?"}) : t?.title || T("Défi"), team:!!x.team, ic:x.bonus ? "gift" : x.goalDone ? "trophy" : t?.icon||"star"}); });
   S.redemptions.filter(x => x.status !== "refuse").forEach(x => { const r = S.rewards.find(y => y.id === x.rewardId), k = rKind(x);
     if (k === "gift"){ if (!mid || x.memberId === mid) L.push({date:x.date, at:x.at||0, who:x.memberId, pts:-x.cost, kind:"gift-out", title:T("Don à {n}",{n:member(x.toId)?.name||"?"}), ic:"heart"});
       if (!mid || x.toId === mid) L.push({date:x.date, at:x.at||0, who:x.toId, pts:x.cost, kind:"gift-in", title:T("Cadeau de {n}",{n:member(x.memberId)?.name||"?"}), ic:"heart"}); return; }
@@ -62,7 +63,7 @@ function streakRuns(days){ const runs = []; let cur = null, prev = null; days.fo
 function awardBonuses(){
   if (isKidUser() || S.settings.bonusOff) return 0; let n = 0; const has = id => S.completions.some(x => x.id === id), td = iso(today());
   const give = (mid, k, key) => { const pts = bonusOf(k), id = `bn_${mid}_${k}_${key}`; if (pts <= 0 || has(id)) return; S.completions.push({id, taskId:null, memberId:mid, points:pts, status:"ok", date:td, at:Date.now(), bonus:k}); n++; };
-  players().forEach(m => { const ok = S.completions.filter(x => x.memberId === m.id && x.status === "ok" && !x.bonus), days = [...new Set(ok.map(x => x.date))].sort();
+  players().forEach(m => { const ok = S.completions.filter(x => x.memberId === m.id && x.status === "ok" && !x.bonus && !x.goal), days = [...new Set(ok.map(x => x.date))].sort();
     streakRuns(days).forEach(r => [["s3",3],["s7",7],["s14",14],["s30",30]].forEach(([k, len]) => { if (r.len >= len) give(m.id, k, r.start); }));
     [["first",1],["c10",10],["c50",50],["c100",100]].forEach(([k, c]) => { if (ok.length >= c) give(m.id, k, "1"); });
     const wk = {}; ok.forEach(x => { const d = parseD(x.date), k = iso(addDays(d, -((d.getDay()+6)%7))); wk[k] = (wk[k]||0) + (x.points||0); }); Object.entries(wk).forEach(([k, v]) => { if (v >= 100) give(m.id, "week", k); });
@@ -70,7 +71,7 @@ function awardBonuses(){
   return n;
 }
 function badgesOf(mid){
-  const ok = S.completions.filter(x => x.memberId === mid && x.status === "ok" && !x.bonus), days = [...new Set(ok.map(x => x.date))].sort();
+  const ok = S.completions.filter(x => x.memberId === mid && x.status === "ok" && !x.bonus && !x.goal), days = [...new Set(ok.map(x => x.date))].sort();
   let best = 0, run = 0, prev = null; days.forEach(d => { run = prev && (parseD(d) - parseD(prev)) / DAY < 1.5 ? run + 1 : 1; best = Math.max(best, run); prev = d; });
   const wk = {}; ok.forEach(x => { const d = parseD(x.date), k = iso(addDays(d, -((d.getDay()+6)%7))); wk[k] = (wk[k]||0) + (x.points||0); });
   const lvl = levelOf(pointsOf(mid).earned).lvl, n = ok.length;
@@ -88,7 +89,7 @@ function levelsLegend(people){
 function defisView(){
   const parent = !isKidUser(), viewer = actor();
   if (parent){ const nb = awardBonuses(); if (nb){ save(); setTimeout(() => { toast(T("Bonus de badge ajouté ({n})",{n:nb})); confetti?.(); }, 300); } }
-  const tabs = [["jour",T("Aujourd'hui")],["recomp",T("Récompenses")],["equipe",T("Équipe")],["histo",T("Historique")]];
+  const tabs = [["jour",T("Aujourd'hui")],["profil",T("Profil")],["recomp",T("Récompenses")],["equipe",T("Équipe")],["histo",T("Historique")]];
   if (!tabs.some(t => t[0] === UI.defTab)) UI.defTab = "jour";
   let h = "";
   // mode enfant sur un appareil partagé : « c'est qui ? »
@@ -97,13 +98,64 @@ function defisView(){
   const people = parent ? players() : [viewer];
   h += `<div class="grid">${(people.length ? people : [viewer]).map(p => { const P = pointsOf(p.id), L = levelOf(P.earned);
     const LT = LEVEL_TITLES[Math.min(L.lvl, LEVEL_TITLES.length) - 1], B = badgesOf(p.id).filter(b => b.got);
-    return `<button class="card c4" data-act="histOf" data-v="${p.id}" style="border:0;text-align:left;cursor:pointer;color:inherit;background:linear-gradient(160deg,var(--${p.color||"peach"}-bg),var(--surface))"><div class="row">${avatarOf(p,44)}<div class="grow" style="min-width:0"><b>${esc(p.name)}</b><div class="tiny muted">${LT.e} ${T("Niveau {n}",{n:L.lvl})} · ${T(LT.t)}</div><div class="tiny muted">${T("{n} pts cette semaine",{n:P.week})}</div></div><div style="text-align:right"><div class="points" style="color:var(--${p.color||"peach"}-ink)">${ptsIc()} ${P.balance}</div><span class="tiny muted">${T("à dépenser")}</span></div></div><div class="levelbar"><i style="width:${clamp((P.earned-L.from)/(L.to-L.from)*100,2,100).toFixed(0)}%"></i></div><span class="tiny muted">${L.lvl >= LEVELS.length ? T("Niveau maximal atteint !") : T("{n} points avant le niveau suivant",{n:Math.max(0,Math.round(L.to-P.earned))})} · ${T("Voir l'historique")}</span>${B.length ? `<div class="badges-row">${B.map(b => `<span title="${esc(T(b.t))}">${b.e}</span>`).join("")}</div>` : ""}</button>`; }).join("")}</div>
+    return `<button class="card c4" data-act="profOf" data-v="${p.id}" style="border:0;text-align:left;cursor:pointer;color:inherit;background:linear-gradient(160deg,var(--${p.color||"peach"}-bg),var(--surface))"><div class="row">${avatarOf(p,44)}<div class="grow" style="min-width:0"><b>${esc(p.name)}</b><div class="tiny muted">${LT.e} ${T("Niveau {n}",{n:L.lvl})} · ${T(LT.t)}</div><div class="tiny muted">${T("{n} pts cette semaine",{n:P.week})}</div></div><div style="text-align:right"><div class="points" style="color:var(--${p.color||"peach"}-ink)">${ptsIc()} ${P.balance}</div><span class="tiny muted">${T("à dépenser")}</span></div></div><div class="levelbar"><i style="width:${clamp((P.earned-L.from)/(L.to-L.from)*100,2,100).toFixed(0)}%"></i></div><span class="tiny muted">${L.lvl >= LEVELS.length ? T("Niveau maximal atteint !") : T("{n} points avant le niveau suivant",{n:Math.max(0,Math.round(L.to-P.earned))})} · ${T("Voir le profil")}</span>${B.length ? `<div class="badges-row">${B.map(b => `<span title="${esc(T(b.t))}">${b.e}</span>`).join("")}</div>` : ""}</button>`; }).join("")}</div>
   <details class="card lexcard"><summary><b>${icon("star")} ${T("Légende : niveaux et badges")}</b></summary>${levelsLegend(people.length ? people : [viewer])}</details>
   ${parent ? `<button class="btn sm ghost" data-act="ptsForm" style="align-self:flex-start">${icon("sliders")}${T("Points : nom, icône et bonus")}</button>` : ""}`;
   h += `<div class="seg">${tabs.map(([id,l]) => `<button data-act="defTab" data-v="${id}" aria-pressed="${UI.defTab===id}">${l}</button>`).join("")}</div>`;
   if (parent && people.length > 1 && UI.defTab !== "equipe") h += `<div class="pick chips-scroll" style="flex-wrap:nowrap;overflow-x:auto"><button data-act="defWho" data-v="" aria-pressed="${!UI.defWho}">${T("Tout le monde")}</button>${people.map(p => `<button data-act="defWho" data-v="${p.id}" aria-pressed="${UI.defWho===p.id}">${avatarOf(p,20)} ${esc(p.name)}</button>`).join("")}</div>`;
-  if (UI.defTab === "histo" && UI.defWho) UI.histWho = UI.defWho;
-  return h + ({jour:defisJour, recomp:defisRecomp, equipe:defisEquipe, histo:defisHisto}[UI.defTab])(parent, viewer);
+  if (["histo","profil"].includes(UI.defTab)) UI.histWho = parent ? (UI.defWho || "all") : viewer.id;
+  return h + ({jour:defisJour, profil:defisProfil, recomp:defisRecomp, equipe:defisEquipe, histo:defisHisto}[UI.defTab])(parent, viewer);
+}
+
+/* profil : niveau, expérience, badges, puis historique et calendrier filtrables */
+function defisProfil(parent, viewer){
+  const mid = parent ? UI.defWho : viewer.id, p = member(mid);
+  if (!p) return `<div class="card"><h2>${T("Choisissez une personne")}</h2><div class="list">${players().map(q => `<button class="li" data-act="profOf" data-v="${q.id}">${avatarOf(q,36)}<div class="grow"><div class="li-title">${esc(q.name)}</div><div class="small muted">${T("Niveau {n}",{n:levelOf(pointsOf(q.id).earned).lvl})}</div></div>${icon("right")}</button>`).join("")}</div></div>`;
+  const P = pointsOf(mid), L = levelOf(P.earned), LT = LEVEL_TITLES[Math.min(L.lvl, LEVEL_TITLES.length) - 1], NX = LEVEL_TITLES[Math.min(L.lvl, LEVEL_TITLES.length - 1)], B = badgesOf(mid);
+  const ok = S.completions.filter(x => x.memberId === mid && x.status === "ok" && !x.bonus && !x.goal), goals = S.tasks.filter(t => t.kind === "goal" && (t.assignees||[]).includes(mid) && goalActive(t));
+  let h = `<div class="card" style="background:linear-gradient(160deg,var(--${p.color||"peach"}-bg),var(--surface))"><div class="row">${avatarOf(p,64)}<div class="grow" style="min-width:0"><h2>${esc(p.name)}</h2><div class="small">${LT.e} ${T("Niveau {n}",{n:L.lvl})} · <b>${T(LT.t)}</b></div></div><div style="text-align:right"><div class="points" style="color:var(--${p.color||"peach"}-ink)">${ptsIc()} ${P.balance}</div><span class="tiny muted">${T("à dépenser")}</span></div></div>
+    <div class="levelbar"><i style="width:${clamp((P.earned-L.from)/(L.to-L.from)*100,2,100).toFixed(0)}%"></i></div><span class="tiny muted">${L.lvl >= LEVELS.length ? T("Niveau maximal atteint !") : T("{n} points d'expérience avant « {t} »",{n:Math.max(0,Math.round(L.to-P.earned)), t:T(NX.t)})}</span>
+    <div class="plate-stats">${[[T("Expérience totale"), P.earned], [T("Cette semaine"), P.week], [T("Défis réussis"), ok.length], [T("Meilleure série"), T("{n} j",{n:B[0]?.streak||0})], [T("Dépensés"), P.spent], [T("Reçus en cadeau"), P.received]].map(([l, v]) => `<div class="pstat"><b class="num">${v}</b><span class="tiny">${l}</span></div>`).join("")}</div></div>
+    <div class="card"><div class="card-h"><h2>${T("Badges")}</h2><span class="chip butter">${B.filter(b => b.got).length} / ${B.length}</span></div><div class="badge-grid">${B.map(b => `<div class="bdg ${b.got?"on":""}"><span class="be">${b.got ? b.e : "🔒"}</span><b>${T(b.t)}</b><small>${T(b.d)}</small>${b.bonus?`<span class="chip ${b.got?"butter":""}">+${b.bonus} ${T("pts")}</span>`:""}</div>`).join("")}</div></div>`;
+  if (goals.length) h += `<div class="card"><div class="card-h"><h2>${T("Objectifs en cours")}</h2></div>${goals.map(g => goalRow(g, parent, viewer, mid)).join("")}</div>`;
+  return h + defisHisto(parent, viewer);
+}
+
+/* ---------- objectifs de la semaine, du mois, de l'année : progression par clics ---------- */
+const fmtQ = x => fmtNum(x, Number(x) % 1 ? 1 : 0);
+const GOAL_PER = () => ({week:T("Cette semaine"), month:T("Ce mois-ci"), year:T("Cette année"), once:T("Dates précises")});
+function goalWindow(g, d = today()){
+  if (g.period === "week"){ const s0 = addDays(d, -((d.getDay()+6)%7)); return [s0, addDays(s0, 6)]; }
+  if (g.period === "month") return [new Date(d.getFullYear(), d.getMonth(), 1), new Date(d.getFullYear(), d.getMonth()+1, 0)];
+  if (g.period === "year") return [new Date(d.getFullYear(), 0, 1), new Date(d.getFullYear(), 11, 31)];
+  return [parseD(g.start || iso(d)), parseD(g.end || g.start || iso(d))];
+}
+const goalActive = (g, d = today()) => !(g.start && iso(d) < g.start) && !(g.period === "once" && g.end && iso(d) > g.end);
+function goalProgress(g, mid, d = today()){ const [a, b] = goalWindow(g, d), A = iso(a), B = iso(b); return sum(S.completions.filter(x => x.taskId === g.id && x.goal && (g.team || x.memberId === mid) && x.date >= A && x.date <= B).map(x => +x.amt || 0)); }
+const goalDoneId = (g, mid, d = today()) => `gd_${g.id}_${mid}_${iso(goalWindow(g, d)[0])}`;
+function goalRow(g, parent, viewer, only){
+  const who = g.team ? [null] : (g.assignees||[]).filter(a => (!only || a === only) && (parent || a === viewer.id || a === only)); if (!who.length) return "";
+  const [a, b] = goalWindow(g), left = Math.max(0, Math.round((b - today()) / DAY)), canTap = parent || (g.assignees||[]).includes(viewer.id);
+  return `<div class="goal"><div class="row between" style="gap:8px"><div class="row" style="gap:10px;min-width:0"><div class="ic" style="background:var(--teal-bg);color:var(--teal-ink)">${icon(g.icon||"target")}</div><div style="min-width:0"><b>${esc(g.title)}</b><div class="tiny muted">${GOAL_PER()[g.period] || ""}${g.period==="once" ? ` · ${fmtD(a,{day:"numeric",month:"short"})} → ${fmtD(b,{day:"numeric",month:"short"})}` : ""} · ${T("encore {n} j",{n:left})} · +${g.points} ${T("pts")}${g.team ? " · " + T("équipe") : ""}</div></div></div>${parent?`<button class="icon-btn flat" data-act="goalForm" data-v="${g.id}" aria-label="${T("Modifier")}">${icon("edit")}</button>`:""}</div>
+    ${who.map(mid => { const pr = goalProgress(g, mid), pc = clamp(pr / g.target * 100, 0, 100), done = pr >= g.target, m = mid ? member(mid) : null, tag = mid || "team";
+      return `<div class="goal-line"><div class="row between small"><span class="row" style="gap:6px;flex-wrap:nowrap">${m ? `${avatarOf(m, 20)} ${esc(m.name)}` : esc((g.assignees||[]).map(x => member(x)?.name).filter(Boolean).join(" + "))}</span><b class="num">${fmtQ(pr)} / ${fmtQ(g.target)} ${esc(g.unit||"")}</b></div>
+        <div class="levelbar"><i style="width:${Math.max(2, pc).toFixed(0)}%;background:linear-gradient(90deg,var(--teal),var(--mint))"></i></div>
+        <div class="row" style="gap:6px">${done ? `<span class="chip mint">${icon("trophy")} ${T("Objectif atteint !")}</span>` : ""}${canTap ? `<button class="btn sm ghost" data-act="goalStep" data-v="${g.id}|${tag}|-1" aria-label="${T("Retirer {s}",{s:g.step})}" ${pr<=0?"disabled":""}>−</button><button class="btn sm kid" data-act="goalStep" data-v="${g.id}|${tag}|1">${icon("plus")}${fmtQ(g.step)} ${esc(g.unit||"")}</button>` : ""}</div></div>`; }).join("")}</div>`;
+}
+const GOAL_TPL = [["Courir 10 km",10,"km",1,"week",30,"run"],["Lire 5 livres",5,"livres",1,"month",40,"book"],["150 min d'activité",150,"min",15,"week",25,"run"],["Ranger sa chambre 5 fois",5,"fois",1,"week",20,"broom"],["30 sorties à vélo",30,"sorties",1,"year",100,"target"],["Boire de l'eau 7 jours",7,"jours",1,"week",15,"drop"]];
+function goalForm(id){
+  const g = S.tasks.find(x => x.id === id) || {title:"", target:10, unit:"km", step:1, period:"week", points:30, assignees:[], team:false, icon:"target", start:iso(today())};
+  sheet(`<form class="stack" data-form="goal" data-id="${id||""}" style="gap:14px">${sheetHead(id ? T("Modifier l'objectif") : T("Nouvel objectif"))}
+    <p class="small muted">${T("Un défi qui dure (semaine, mois, année) : chaque clic fait avancer la barre (ex. 1 km par clic). Les points sont donnés quand l'objectif est atteint.")}</p>
+    ${id ? "" : `<div class="pick">${GOAL_TPL.map((x, i) => `<button type="button" data-act="goalTpl" data-v="${i}">${T(x[0])}</button>`).join("")}</div>`}
+    ${fld("gl-title",T("Objectif"),inp("gl-title",g.title,`required placeholder="${T("Courir 10 km")}"`))}
+    <div class="fgrid">${fld("gl-target",T("À atteindre"),`<input class="inp" id="gl-target" type="number" min="0.1" step="any" value="${g.target}" required>`)}${fld("gl-unit",T("Unité"),inp("gl-unit",g.unit||"",`placeholder="${T("km, livres, fois…")}"`))}${fld("gl-step",T("Par clic"),`<input class="inp" id="gl-step" type="number" min="0.1" step="any" value="${g.step}">`)}${fld("gl-pts",T("Points à la fin"),`<input class="inp" id="gl-pts" type="number" min="1" step="1" value="${g.points}">`)}</div>
+    <div class="field"><label>${T("Période")}</label>${radios("glper",[["week",T("Chaque semaine")],["month",T("Chaque mois")],["year",T("Chaque année")],["once",T("Une seule fois (dates)")]],g.period)}</div>
+    <div class="fgrid">${fld("gl-start",T("Commence le"),`<input class="inp" id="gl-start" type="date" value="${g.start||iso(today())}">`)}${fld("gl-end",T("Se termine le (si une seule fois)"),`<input class="inp" id="gl-end" type="date" value="${g.end||iso(addDays(today(), 30))}">`)}</div>
+    <div class="field"><label>${T("Pour qui ?")}</label>${checks("glwho",S.family.members.map(m=>[m.id,m.name]),g.assignees)}</div>
+    <label class="switch"><input type="checkbox" id="gl-team" ${g.team?"checked":""}><span class="tg"></span><span class="grow"><b>${T("Objectif d'équipe")}</b><br><span class="small muted">${T("La progression de tous compte ensemble ; chacun reçoit les points à la fin.")}</span></span></label>
+    <div class="field"><label>${T("Icône")}</label><div class="radio-row">${["target","run","book","broom","drop","star","heart","ball","spoon","bed"].map(i=>`<label><input type="radio" name="glicon" value="${i}" ${g.icon===i?"checked":""}><span style="display:grid;place-items:center;width:42px;height:38px;padding:0">${icon(i).replace("<svg",'<svg style="width:20px;height:20px"')}</span></label>`).join("")}</div></div>
+    <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${id?`<button type="button" class="btn danger" data-act="delTask" data-v="${id}">${T("Supprimer")}</button>`:""}</div></form>`);
 }
 
 function defisJour(parent, viewer){
@@ -114,7 +166,12 @@ function defisJour(parent, viewer){
   const fw = parent ? UI.defWho : null, list = S.tasks.filter(t => taskDueOn(t, d) && (!fw || (t.assignees||[]).includes(fw)));
   h += `<div class="card"><div class="card-h"><h2>${T("Défis d'aujourd'hui")}</h2>${parent?`<button class="btn sm kid" data-act="taskForm">${icon("plus")}${T("Défi")}</button>`:""}</div>
     ${list.length ? list.map(t => taskBlock(t, d, parent, viewer, fw)).join("") : empty("star", parent ? T("Créez des défis : lit fait, lecture, devoirs, ménage… Les parents peuvent aussi s'en donner !") : T("Aucun défi aujourd'hui."))}</div>`;
-  if (parent && S.tasks.length) h += `<div class="card"><div class="card-h"><h2>${T("Tous les défis")}</h2></div><div class="list">${S.tasks.filter(t => !fw || (t.assignees||[]).includes(fw)).map(t => `<button class="li" data-act="taskForm" data-v="${t.id}"><div class="ic" style="background:var(--surface2)">${icon(t.icon||"star")}</div><div class="grow"><div class="li-title">${esc(t.title)}${t.team?` · ${T("équipe")}`:""}</div><div class="small muted">+${t.points} · ${t.recur==="daily"?T("chaque jour"):t.recur==="weekly"?(t.days||[]).map(d=>WD()[d]).join(", "):fmtD(t.date)} · ${esc((t.assignees||[]).map(a=>member(a)?.name).filter(Boolean).join(", "))}</div></div></button>`).join("")}</div></div>`;
+  const goals = S.tasks.filter(t => t.kind === "goal" && goalActive(t) && (!fw || (t.assignees||[]).includes(fw)) && (parent || (t.assignees||[]).includes(viewer.id)));
+  const later = parent ? S.tasks.filter(t => t.kind === "goal" && !goalActive(t) && t.start > iso(today())) : [];
+  h += `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Semaine · mois · année")}</span><h2>${T("Objectifs")}</h2></div>${parent?`<button class="btn sm kid" data-act="goalForm">${icon("plus")}${T("Objectif")}</button>`:""}</div>
+    ${goals.length ? goals.map(g => goalRow(g, parent, viewer, fw)).join("") : `<p class="small muted">${parent ? T("Ex. : courir 10 km cette semaine (1 km par clic), lire 5 livres ce mois-ci, 30 sorties à vélo cette année.") : T("Aucun objectif en cours.")}</p>`}
+    ${later.length ? `<p class="tiny muted">${T("À venir")} : ${later.map(g => `${esc(g.title)} (${fmtD(g.start,{day:"numeric",month:"short"})})`).join(", ")}</p>` : ""}</div>`;
+  if (parent && S.tasks.length) h += `<div class="card"><div class="card-h"><h2>${T("Tous les défis")}</h2></div><div class="list">${S.tasks.filter(t => !fw || (t.assignees||[]).includes(fw)).map(t => t.kind === "goal" ? `<button class="li" data-act="goalForm" data-v="${t.id}"><div class="ic" style="background:var(--teal-bg);color:var(--teal-ink)">${icon(t.icon||"target")}</div><div class="grow"><div class="li-title">${esc(t.title)}</div><div class="small muted">${T("Objectif")} · ${GOAL_PER()[t.period]||""} · ${fmtQ(t.target)} ${esc(t.unit||"")} · +${t.points} · ${esc((t.assignees||[]).map(a=>member(a)?.name).filter(Boolean).join(", "))}</div></div></button>` : `<button class="li" data-act="taskForm" data-v="${t.id}"><div class="ic" style="background:var(--surface2)">${icon(t.icon||"star")}</div><div class="grow"><div class="li-title">${esc(t.title)}${t.team?` · ${T("équipe")}`:""}</div><div class="small muted">+${t.points} · ${t.recur==="daily"?T("chaque jour"):t.recur==="weekly"?(t.days||[]).map(d=>WD()[d]).join(", "):fmtD(t.date)} · ${esc((t.assignees||[]).map(a=>member(a)?.name).filter(Boolean).join(", "))}</div></div></button>`).join("")}</div></div>`;
   return h;
 }
 
@@ -172,8 +229,10 @@ function defisEquipe(parent, viewer){
 }
 
 function defisHisto(parent, viewer){
-  const who = parent ? (UI.histWho || "all") : viewer.id;
-  const log = pointsLog(who === "all" ? null : who);
+  const who = parent ? (UI.histWho || "all") : viewer.id, ty = UI.histType || "all";
+  const TYPES = [["all",T("Tout")],["defi",T("Défis")],["goal",T("Objectifs")],["bonus",T("Bonus")],["spend",T("Récompenses")],["gift",T("Dons")]];
+  const keep = e => ty === "all" || (ty === "defi" && e.kind === "gain" && !e.bonus && !e.goalDone) || (ty === "goal" && (e.kind === "goal" || e.goalDone)) || (ty === "bonus" && e.bonus) || (ty === "spend" && (e.kind === "spend" || e.kind === "team")) || (ty === "gift" && e.kind.startsWith("gift"));
+  const log = pointsLog(who === "all" ? null : who).filter(keep);
   const base = UI.histMonth ? parseD(UI.histMonth) : new Date(today().getFullYear(), today().getMonth(), 1);
   const first = new Date(base.getFullYear(), base.getMonth(), 1), start = addDays(first, -((first.getDay()+6)%7));
   const mo = iso(first).slice(0,7), inMonth = log.filter(e => e.date.startsWith(mo) && !e.pending);
@@ -181,6 +240,7 @@ function defisHisto(parent, viewer){
   const gained = sum(real.filter(e => e.pts > 0).map(e => e.pts)), spent = -sum(real.filter(e => e.pts < 0).map(e => e.pts)), nTasks = inMonth.filter(e => e.kind === "gain").length;
   const sel = UI.histSel;
   let cells = "";
+  // (les objectifs ne comptent pas comme défis réussis dans le calendrier)
   for (let i = 0; i < 42; i++){
     const d = addDays(start, i), ds = iso(d), out = d.getMonth() !== base.getMonth(); if (i >= 35 && out && d.getDay() === 1) break;
     const de = log.filter(e => e.date === ds && !e.pending), g = de.filter(e => e.kind === "gain").length, sp = de.some(e => e.pts < 0 && e.kind !== "gift-out");
@@ -188,13 +248,13 @@ function defisHisto(parent, viewer){
   }
   const dow = LANG === "en" ? ["M","T","W","T","F","S","S"] : ["L","M","M","J","V","S","D"];
   const shown = sel ? log.filter(e => e.date === sel) : log.filter(e => e.date.startsWith(mo));
-  let h = parent ? `<div class="pick"><button data-act="histWho" data-v="all" aria-pressed="${who==="all"}">${T("Tout le monde")}</button>${players().map(p => `<button data-act="histWho" data-v="${p.id}" aria-pressed="${who===p.id}">${avatarOf(p,20)} ${esc(p.name)}</button>`).join("")}</div>` : "";
+  let h = `<div class="pick chips-scroll" style="flex-wrap:nowrap;overflow-x:auto"><span class="small muted" style="align-self:center">${T("Filtrer")}</span>${TYPES.map(([k, l]) => `<button data-act="histType" data-v="${k}" aria-pressed="${ty===k}">${l}</button>`).join("")}</div>`;
   h += `<div class="card"><div class="row between"><h2>${fmtD(first,{month:"long",year:"numeric"})}</h2><div class="row"><button class="icon-btn" data-act="histNav" data-v="-1" aria-label="${T("Mois précédent")}">${icon("left")}</button><button class="icon-btn" data-act="histNav" data-v="1" aria-label="${T("Mois suivant")}">${icon("right")}</button></div></div>
     <div class="stats"><div class="stat"><span class="muted tiny">${T("Défis réussis")}</span><div class="v" style="color:var(--mint-ink)">${nTasks}</div></div><div class="stat"><span class="muted tiny">${T("Points gagnés")}</span><div class="v">+${gained}</div></div><div class="stat"><span class="muted tiny">${T("Points dépensés")}</span><div class="v" style="color:var(--coral-ink)">−${spent}</div></div></div>
     <div class="cal">${dow.map(x => `<span class="dow">${x}</span>`).join("")}${cells}</div>
     <div class="row tiny muted" style="gap:12px;flex-wrap:wrap"><span><i class="lgd" style="background:var(--mint)"></i> ${T("défis réussis")}</span><span><i class="lgd" style="background:var(--coral)"></i> ${T("points dépensés")}</span><span><i class="lgd" style="background:var(--rose)"></i> ${T("dons")}</span></div></div>`;
   h += `<div class="card"><div class="card-h"><h2>${sel ? fmtD(sel,{weekday:"long",day:"numeric",month:"long"}) : T("Ce mois-ci")}</h2>${sel?`<button class="btn sm ghost" data-act="histDay" data-v="">${T("Tout le mois")}</button>`:""}</div>
-    ${shown.length ? `<div class="list">${shown.map(e => { const m = member(e.who); return `<div class="li"><div class="ic" style="background:var(--${e.pts>0?"mint":"coral"}-bg);color:var(--${e.pts>0?"mint":"coral"}-ink)">${icon(e.ic)}</div><div class="grow"><div class="li-title">${esc(e.title)}${e.team?` · ${T("en équipe")}`:""}</div><div class="small muted">${who==="all"&&m?esc(m.name)+" · ":""}${fmtD(e.date,{day:"numeric",month:"short"})}${e.pending?" · "+T("en attente"):""}</div></div><b class="num" style="color:var(--${e.pts>0?"mint":"coral"}-ink)">${e.pts>0?"+":"−"}${Math.abs(e.pts)}</b></div>`; }).join("")}</div>` : empty("cal", T("Rien ce mois-ci."))}</div>`;
+    ${shown.length ? `<div class="list">${shown.map(e => { const m = member(e.who); return `<div class="li"><div class="ic" style="background:var(--${e.pts>0?"mint":"coral"}-bg);color:var(--${e.pts>0?"mint":"coral"}-ink)">${icon(e.ic)}</div><div class="grow"><div class="li-title">${esc(e.title)}${e.team?` · ${T("en équipe")}`:""}</div><div class="small muted">${who==="all"&&m?esc(m.name)+" · ":""}${fmtD(e.date,{day:"numeric",month:"short"})}${e.pending?" · "+T("en attente"):""}</div></div>${e.kind === "goal" ? `<span class="chip teal num">${e.amt > 0 ? "+" : ""}${fmtQ(e.amt)} ${esc(e.unit)}</span>` : `<b class="num" style="color:var(--${e.pts>0?"mint":"coral"}-ink)">${e.pts>0?"+":"−"}${Math.abs(e.pts)}</b>`}</div>`; }).join("")}</div>` : empty("cal", T("Rien ce mois-ci."))}</div>`;
   return h;
 }
 
@@ -243,6 +303,18 @@ Object.assign(ACT, {
   ptsReset: () => { S.settings.pts = {emoji:S.settings.pts?.emoji}; save(); closeSheet(); render(); },
   histOf: v => { UI.defTab = "histo"; UI.histWho = v; UI.histSel = null; render(); },
   histWho: v => { UI.histWho = v; render(); }, histDay: v => { UI.histSel = v || null; render(); },
+  histType: v => { UI.histType = v; UI.histSel = null; render(); },
+  profOf: v => { UI.defTab = "profil"; UI.defWho = v; UI.histWho = v; UI.histSel = null; render(); window.scrollTo({top:0}); },
+  goalForm: v => { if (!isKidUser()) goalForm(v); },
+  goalTpl: v => { const x = GOAL_TPL[+v]; $("#gl-title").value = T(x[0]); $("#gl-target").value = x[1]; $("#gl-unit").value = T(x[2]); $("#gl-step").value = x[3]; $("#gl-pts").value = x[5]; const r = $(`input[name=glper][value=${x[4]}]`); if (r) r.checked = true; const ic = $(`input[name=glicon][value=${x[6]}]`); if (ic) ic.checked = true; },
+  goalStep: v => { const [gid, tag, sg] = v.split("|"), g = S.tasks.find(x => x.id === gid); if (!g) return; const mid = tag === "team" ? actor().id : tag;
+    const before = goalProgress(g, tag === "team" ? null : mid), amt = (+g.step || 1) * (+sg); if (before + amt < 0) return;
+    S.completions.push({id:uid(), taskId:g.id, memberId:mid, date:iso(today()), at:Date.now(), amt, points:0, status:"ok", goal:true});
+    const after = before + amt, winners = tag === "team" ? (g.assignees||[]) : [mid], auto = !isKidUser() || S.settings.parental.allow.selfApprove;
+    if (after >= g.target && before < g.target){ winners.forEach(w => { const id = goalDoneId(g, w); if (!S.completions.some(x => x.id === id)) S.completions.push({id, taskId:g.id, memberId:w, date:iso(today()), at:Date.now(), points:g.points, status:auto ? "ok" : "pending", goalDone:true, team:tag === "team"}); });
+      commit(auto ? T("Objectif atteint ! +{n} points",{n:g.points}) : T("Objectif atteint ! Envoyé au parent pour validation")); confetti(); return; }
+    if (after < g.target && before >= g.target){ const ids = winners.map(w => goalDoneId(g, w)); S.completions = S.completions.filter(x => !ids.includes(x.id)); }
+    commit(sg > 0 ? T("+{a} {u} · {p} / {t}",{a:fmtQ(amt), u:g.unit||"", p:fmtQ(after), t:fmtQ(g.target)}) : T("Corrigé")); },
   histNav: v => { const b = UI.histMonth ? parseD(UI.histMonth) : new Date(today().getFullYear(), today().getMonth(), 1); UI.histMonth = iso(addMonths(b, +v)); UI.histSel = null; render(); },
   taskUndo: v => { const [tid, ids, ds, sl = ""] = v.split("|"); const mids = ids.split(","); S.completions = S.completions.filter(x => !(x.taskId === tid && mids.includes(x.memberId) && x.date === ds && (x.slot||"") === sl)); commit(T("Décoché")); },
   kidAs: v => { S.settings.parental.kidAs = v; commit(); },
@@ -268,4 +340,7 @@ Object.assign(FORMS, {
     addRedemption({kind:"gift", memberId:from, toId:to, cost:n, note:val("g-why")}); closeSheet(); commit(T("{a} a donné {n} points à {b}",{a:member(from)?.name||"", n, b:member(to)?.name||""})); confetti(); },
   teamGoal: () => { S.rewards.push({id:uid(), title:val("tg-title"), cost:numOf("tg-cost")||300, team:true}); closeSheet(); commit(T("Objectif d'équipe créé")); },
 });
+Object.assign(FORMS, { goal: f => { const id = f.dataset.id, d = {kind:"goal", title:val("gl-title"), target:Math.max(0.1, +val("gl-target") || 1), unit:val("gl-unit"), step:Math.max(0.1, +val("gl-step") || 1), points:Math.max(1, Math.round(+val("gl-pts") || 1)), period:radio("glper") || "week", start:val("gl-start") || iso(today()), end:val("gl-end") || null, assignees:checked("glwho"), team:!!$("#gl-team")?.checked, icon:radio("glicon") || "target", recur:"none"};
+  if (!d.title) return toast(T("Nom requis")); if (!d.assignees.length) return toast(T("Choisissez au moins une personne")); if (d.period === "once" && d.end && d.end < d.start) return toast(T("La fin doit suivre le début"));
+  if (id) Object.assign(S.tasks.find(t => t.id === id), d); else S.tasks.push({id:uid(), ...d}); closeSheet(); commit(T("Objectif enregistré")); } });
 Object.assign(FORMS, { ptsForm: () => { S.settings.bonus = Object.fromEntries($$("input[name=bonus]").map(i => [i.dataset.k, Math.max(0, Math.round(+i.value || 0))])); S.settings.bonusOff = !!$("#bonus-off")?.checked; const name = val("pt-name").trim(); S.settings.pts = {name, short:val("pt-short").trim() || "", emoji:radio("ptemo") || "⭐"}; if (!name) delete S.settings.pts.name; save(); closeSheet(); render(); toast(T("Enregistré")); } });

@@ -431,3 +431,32 @@ const INTERVIEW_Q = [
   "Qu'est-ce qui te fait rire ?","Qu'est-ce qui te fait peur ?","Ta chanson ou ton film préféré ?","Ce que tu veux faire quand tu seras grand·e ?",
   "Ton moment préféré de l'année ?","Qu'est-ce que tu aimes chez maman / papa ?","Si tu avais un super-pouvoir ?","Ton endroit préféré ?",
 ];
+
+/* conseils nutrition supplémentaires (Guide alimentaire canadien, Société canadienne de pédiatrie, Santé Canada) */
+const NUT_TIPS = [
+  ["alim",6,24,"Du fer deux fois par jour","Viande, poisson, œufs, tofu, légumineuses ou céréales enrichies : au moins 2 fois par jour entre 6 et 24 mois, car les réserves de fer du bébé s'épuisent vers 6 mois."],
+  ["alim",9,36,"Lait de vache : pas trop","Le lait de vache entier (3,25 %) peut commencer entre 9 et 12 mois. Ensuite, environ 500 ml (2 tasses) par jour suffisent : davantage coupe l'appétit et peut causer un manque de fer."],
+  ["alim",6,999,"L'eau, la boisson de choix","Offrez de l'eau pour la soif. Le jus n'est pas nécessaire ; s'il y en a, 125 ml (½ tasse) par jour au plus. Évitez les boissons sucrées et énergisantes."],
+  ["alim",12,999,"L'assiette du Guide alimentaire","La moitié de l'assiette en légumes et fruits, un quart en aliments protéinés (dont des protéines végétales), un quart en grains entiers."],
+  ["alim",12,96,"Un nouvel aliment : 10 à 15 essais","Il faut souvent goûter un aliment 10 à 15 fois avant de l'aimer. Présentez-le en petite quantité, à côté d'un aliment connu, sans pression."],
+  ["alim",18,84,"Difficile à table ? C'est fréquent","Entre 2 et 6 ans, se méfier des aliments nouveaux est normal. Gardez des repas réguliers, laissez l'enfant se servir et cuisiner avec vous."],
+  ["alim",12,999,"Des collations planifiées","2 ou 3 collations par jour, environ 2 h avant les repas, avec au moins 2 groupes d'aliments (fruit et yogourt, par exemple). Évitez le grignotage continu."],
+  ["alim",6,48,"Aliments à risque d'étouffement","Avant 4 ans : raisins et tomates cerises coupés en quatre, saucisses en long ; pas de noix entières, maïs soufflé ni bonbons durs. Enfant assis et surveillé."],
+  ["alim",12,999,"Manger ensemble, sans écran","Les repas en famille, sans télé ni téléphone, aident l'enfant à écouter sa faim, à goûter plus d'aliments et à parler de sa journée."],
+  ["alim",24,999,"Du poisson deux fois par semaine","Saumon, truite, sardines, hareng : riches en oméga-3 et faibles en mercure. Limitez thon blanc, espadon et requin chez les jeunes enfants."],
+  ["alim",12,999,"Moins de sucre, sans interdits","Limitez sucres ajoutés et aliments ultratransformés sans en faire des récompenses ni des interdits : offerts à l'occasion, ils perdent de leur attrait."],
+  ["alim",108,999,"Calcium à la préadolescence","De 9 à 18 ans, les besoins en calcium sont les plus élevés : lait, yogourt, fromage, boisson de soya enrichie, tofu au calcium, chaque jour."],
+  ["alim",60,999,"Une boîte à lunch équilibrée","Un légume ou fruit, un aliment protéiné, un grain entier et de l'eau. Laisser l'enfant choisir entre deux options l'aide à tout manger."],
+  ["alim",0,12,"Le lait reste la base","Jusqu'à 12 mois, le lait maternel ou la préparation pour nourrissons reste la principale source d'énergie ; les aliments s'ajoutent sans le remplacer."],
+];
+const ALL_TIPS = TIPS.concat(NUT_TIPS);
+
+/* liste plus complète pour le menu déroulant des aliments */
+const FOOD_MORE = {
+  legfruits:["Carottes","Pomme","Poire","Orange","Fraises","Bleuets","Raisins coupés en 4","Mangue","Avocat","Petits pois","Haricots verts","Maïs","Épinards","Poivron","Chou-fleur","Compote de pommes","Salade","Melon"],
+  proteines:["Bœuf haché","Porc","Dinde","Thon","Crevettes","Haricots noirs","Hoummos","Edamames","Œuf cuit dur","Jambon","Fromage cottage","Noix moulues"],
+  grains:["Céréales enrichies en fer","Bagel","Pain pita","Tortilla","Couscous","Craquelins de blé entier","Muffin maison","Crêpes","Riz blanc","Pâtes","Pain blanc"],
+  laitiers:["Lait 2 %","Fromage cheddar","Fromage en ficelle","Kéfir","Boisson d'avoine enrichie","Lait maternel","Préparation pour nourrissons"],
+  autres:["Biscuits","Gâteau","Crème glacée","Croustilles","Jus","Bonbons","Chocolat","Pizza","Frites","Céréales sucrées","Boisson gazeuse"],
+};
+const foodOptions = g => [...new Set([...(FOOD_SUGG[g]||[]), ...(FOOD_MORE[g]||[])])];

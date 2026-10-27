@@ -66,7 +66,7 @@ function nutritionCard(c){
       : `<p class="small muted">${T("Notez des repas : les nutriments sont estimés automatiquement avec Gemini (photo, étiquette ou saisie).")}</p>`}
     <p class="tiny muted">${T("Cibles quotidiennes : {b}. Apports nutritionnels de référence (Santé Canada) ; ce sont des moyennes sur plusieurs jours, pas des objectifs à atteindre chaque jour.",{b:t.basis})}</p>
     ${aiReady() && !isKidUser() ? `<div class="sep"></div><span class="eyebrow">${icon("spark").replace("<svg",'<svg style="width:12px;height:12px;vertical-align:-1px"')} ${T("Avis nutrition de Gemini")}</span>
-      <div class="row" style="flex-wrap:wrap;gap:6px"><span class="small muted">${T("Période")}</span>${[7,14,30].map(d => `<button class="chip ${(UI.nutDays||7)===d?"lilac":""}" data-act="nutPeriod" data-v="${d}">${T("{n} j",{n:d})}</button>`).join("")}</div>
+      <div class="row" style="flex-wrap:wrap;gap:6px"><span class="small muted">${T("Période")}</span>${[1,7,14,30].map(d => `<button class="chip ${(UI.nutDays||7)===d?"lilac":""}" data-act="nutPeriod" data-v="${d}">${d === 1 ? T("1 jour") : T("{n} j",{n:d})}</button>`).join("")}<span class="small muted">${(UI.nutDays||7) === 1 ? T("le") : T("jusqu'au")}</span><input class="inp" type="date" style="width:auto;padding:6px 10px" value="${UI.nutEnd || iso(today())}" max="${iso(today())}" data-change="nutEnd" aria-label="${T("Date")}"></div>
       <div class="row" style="flex-wrap:wrap">${miss ? `<button class="btn sm ghost" data-act="nutEstimateAll">${icon("spark")}${T("Estimer {n} repas sans nutriments",{n:miss})}</button>` : ""}<button class="btn sm kid" data-act="nutAdvice">${icon("spark")}${T("Avoir un avis maintenant")}</button></div>
       <div class="row" style="flex-wrap:wrap;gap:6px"><span class="small muted">${T("Avis automatique pour {n}",{n:esc(c.nick||c.name)})}</span>${[["jamais",T("Jamais")],["semaine",T("Chaque semaine")],["mois",T("Chaque mois")]].map(([k,l]) => `<button class="chip ${(c.nutAuto||"jamais")===k?"lilac":""}" data-act="nutAutoSet" data-v="${k}">${l}</button>`).join("")}</div>
       ${(S.aiHist||[]).filter(e => e.cat === "nutrition" && e.kid === c.id && e.text).slice(0,1).map(e => `<button class="li" data-act="aiHistOpen" data-v="${e.id}" style="width:100%;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;color:inherit;font:inherit;cursor:pointer"><div class="ic" style="background:var(--lilac-bg);color:var(--lilac-ink)">${icon("spark")}</div><div class="grow"><div class="li-title">${T("Dernier avis")}</div><div class="small muted">${fmtD(new Date(e.at),{day:"numeric",month:"long"})}</div></div>${icon("right")}</button>`).join("")}` : ""}</div>`;
@@ -82,12 +82,17 @@ async function nutEstimate(c, log){
 function nutEstimateJob(c, logs){
   return aiJob("nutrition", T("Nutriments de {n} repas",{n:logs.length}), async () => { for (const l of logs) await nutEstimate(c, l); save(); if (UI.view === "kid") softRender(); return {open:() => { go("kid"); UI.kidTab = "repas"; render(); }}; }, {kid:c.id});
 }
-async function nutAdvice(c, days = UI.nutDays || 7, quiet){
-  return aiJob("nutrition", T("Conseils nutrition · {n}",{n:c.nick||c.name}), async () => {
-    const L = c.logs.filter(l => l.type === "solid" && Date.now() - l.t < days*DAY);
+/* moyenne par jour sur une période choisie (jours avec repas seulement) */
+function rangeNut(c, end, days){ const ds = Array.from({length:days}, (_,i) => dayNut(c, addDays(end, -i))).filter(d => d.n > 0); const a = {days:ds.length}; NUTS.forEach(x => a[x.k] = ds.length ? sum(ds.map(d => d[x.k])) / ds.length : 0); return a; }
+function rangeSummary(c, end, days){ const w = rangeNut(c, end, days), t = nutTargets(c); if (!w.days) return "aucun repas avec nutriments"; return NUTS.map(x => `${x.k} ${Math.round(w[x.k])}${x.u} (cible ${Array.isArray(t[x.k]) ? t[x.k].join("-") : t[x.k]}${x.max?" max":""})`).join(", ") + ` sur ${w.days} jour(s)`; }
+async function nutAdvice(c, days = UI.nutDays || 7, quiet, endIso = UI.nutEnd){
+  const end = endIso ? parseD(endIso) : today(), endT = addDays(end, 1).getTime(), startT = addDays(end, 1 - days).getTime();
+  const label = days === 1 ? fmtD(end,{day:"numeric",month:"long"}) : T("{n} j jusqu'au {d}",{n:days, d:fmtD(end,{day:"numeric",month:"short"})});
+  return aiJob("nutrition", T("Conseils nutrition · {n}",{n:c.nick||c.name}) + " · " + label, async () => {
+    const L = c.logs.filter(l => l.type === "solid" && l.t >= startT && l.t < endT);
     const foods = L.map(l => `${iso(new Date(l.t))} ${mealKindOf(l)} : ${(l.data.items||[]).map(i => `${i.name}${i.qty?` (${i.qty})`:""}`).join(", ")}`).slice(-80).join("\n");
-    const r = await gemini({system:AI_SYSTEM(), contents:[{role:"user", parts:[{text:`${kidContext(c)}\nPériode : ${days} jours. Apports moyens sur 7 jours vs cibles : ${nutSummary(c)}.\nRepas notés (date, moment, aliments) :\n${foods||"peu"}\nDonne : 1) ce qui va bien, 2) les écarts importants (seulement s'ils sont nets, en tenant compte que l'estimation est approximative et que des repas peuvent manquer), 3) 4 idées concrètes de repas ou collations adaptées à l'âge et au Guide alimentaire canadien pour combler les écarts, 4) portions indicatives pour l'âge. Rassurant, sans culpabiliser, pas de régime restrictif. 200 à 300 mots.`}]}]});
-    const e = aiHist("nutrition", T("Conseils nutrition · {n}",{n:c.nick||c.name}), r.text, {kid:c.id}); return {histId:e.id};
+    const r = await gemini({system:AI_SYSTEM(), contents:[{role:"user", parts:[{text:`${kidContext(c)}\nPériode : ${days === 1 ? `la journée du ${iso(end)}` : `${days} jours, du ${iso(addDays(end, 1 - days))} au ${iso(end)}`}. Apports moyens par jour vs cibles : ${rangeSummary(c, end, days)}.\nRepas notés (date, moment, aliments) :\n${foods||"peu"}\nDonne : 1) ce qui va bien, 2) les écarts importants (seulement s'ils sont nets, en tenant compte que l'estimation est approximative et que des repas peuvent manquer), 3) 4 idées concrètes de repas ou collations adaptées à l'âge et au Guide alimentaire canadien pour combler les écarts, 4) portions indicatives pour l'âge. Rassurant, sans culpabiliser, pas de régime restrictif. 200 à 300 mots.`}]}]});
+    const e = aiHist("nutrition", T("Conseils nutrition · {n}",{n:c.nick||c.name}) + " · " + label, r.text, {kid:c.id}); return {histId:e.id};
   }, {kid:c.id, quiet});
 }
 Object.assign(ACT, {
@@ -136,5 +141,13 @@ Object.assign(ACT, {
   mealSpan: v => { UI.mealSpan = +v; render(); },
   mealAddDay: v => { const d = parseD(v); d.setHours(12, 0, 0, 0); mealForm({items:[{name:"", group:"legfruits", qty:""}], t:Math.min(Date.now(), d.getTime())}); },
   nutPeriod: v => { UI.nutDays = +v; render(); },
+  plateWeek: v => { UI.plateWeek = Math.max(0, (UI.plateWeek||0) + (+v)); render(); },
   nutAutoSet: v => { const c = child(); c.nutAuto = v; commit(v === "jamais" ? T("Avis automatique désactivé") : T("Avis nutrition automatique activé")); },
+});
+
+Object.assign(CHANGE, {
+  nutEnd: t => { UI.nutEnd = t.value || null; },
+  mealPick: t => { const [g, name] = t.value.split("|"), i = +t.dataset.i; if (!name || !UI.meal) return; const c = child(), fav = (c.foodFav||[]).find(f => f.name === name);
+    const it = UI.meal.items[i]; it.name = name; it.group = g === "fav" ? (fav?.group || it.group) : g; if (fav?.qty && !it.qty) it.qty = fav.qty; if (fav?.nut) it.nut = fav.nut; else delete it.nut; mealForm(UI.meal); },
+  mealPickAdd: t => { const [, name] = t.value.split("|"); if (!name) return; const inp = $("#ma-add"); if (inp){ inp.value = name; ACT.mealItemAdd(); } },
 });

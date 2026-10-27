@@ -82,7 +82,7 @@ if (cfg && cfg.apiKey){
   }
   const rolesObj = () => Object.fromEntries(S.family.members.filter(m => m.uid).map(m => [m.uid, m.role === "enfant" ? "enfant" : "parent"]));
   const membersObj = () => Object.fromEntries(S.family.members.map(m => [m.id, m]));
-  const sharedSettings = () => ({features:S.settings.features, parental:{allow:S.settings.parental.allow, pin:S.settings.parental.pin}, appName:S.settings.appName, driveKeeper:S.settings.driveKeeper||null});
+  const sharedSettings = () => ({features:S.settings.features, parental:{allow:S.settings.parental.allow, pin:S.settings.parental.pin}, appName:S.settings.appName, driveKeeper:S.settings.driveKeeper||null, threads:S.settings.threads||[]});
 
   /* ---------- envoi des changements (diff par document) ---------- */
   const J = o => JSON.stringify(o);
@@ -158,7 +158,7 @@ if (cfg && cfg.apiKey){
       S.family.name = d.name || ""; S.family.photo = d.photo || null; const mems = Object.values(d.members || {});
       if (mems.length) S.family.members = mems;
       const mine = S.family.members.find(m => m.uid === C.user.uid); if (mine) S.me = mine.id;
-      if (d.shared){ S.settings.features = {...S.settings.features, ...d.shared.features}; if (d.shared.parental){ S.settings.parental.allow = {...S.settings.parental.allow, ...d.shared.parental.allow}; if (d.shared.parental.pin) S.settings.parental.pin = d.shared.parental.pin; } if (d.shared.appName && !S.settings.appNameLocal) S.settings.appName = d.shared.appName; if ("driveKeeper" in d.shared) S.settings.driveKeeper = d.shared.driveKeeper; }
+      if (d.shared){ S.settings.features = {...S.settings.features, ...d.shared.features}; if (d.shared.parental){ S.settings.parental.allow = {...S.settings.parental.allow, ...d.shared.parental.allow}; if (d.shared.parental.pin) S.settings.parental.pin = d.shared.parental.pin; } if (d.shared.appName && !S.settings.appNameLocal) S.settings.appName = d.shared.appName; if ("driveKeeper" in d.shared) S.settings.driveKeeper = d.shared.driveKeeper; if (Array.isArray(d.shared.threads)) S.settings.threads = d.shared.threads; }
       if (role === "enfant" && mine) mine.role = "enfant";
       last[`families/${fid}`] = J({name:S.family.name||"", members:membersObj(), shared:sharedSettings(), roles:rolesObj(), photo:S.family.photo||null});
       applyRemote();
@@ -198,7 +198,7 @@ if (cfg && cfg.apiKey){
     let first = true;
     unsubs.push(onSnapshot(query(collection(fam, "messages"), orderBy("at"), limitToLast(300)), qs => {
       const before = S.messages.length; S.messages = qs.docs.map(d => d.data());
-      if (!first && S.messages.length > before){ const m = S.messages[S.messages.length-1]; if (m.uid !== C.user.uid) chatNotify(m, T("Famille")); }
+      if (!first && S.messages.length > before){ const m = S.messages[S.messages.length-1]; if (m.uid !== C.user.uid && threadVisible("family", m.th)) chatNotify(m, T("Famille")); }
       first = false; applyRemote();
     }));
   }
@@ -207,10 +207,10 @@ if (cfg && cfg.apiKey){
     if (mentioned){ Native.notifyNow(T("{n} vous a mentionné · {w}",{n:m.name||"", w:where}), m.text, {go:"tribu"}, true); if (!document.hidden) toast(T("{n} vous a mentionné",{n:m.name||""})); }
     else if (S.settings.notif.chat !== false) Native.notifyNow(`${where} · ${m.name||""}`, m.text, {go:"tribu"});
   };
-  C.send = async (channel, text) => {
+  C.send = async (channel, text, th) => {
     const people = mentionables(channel), low = text.toLowerCase();
     const mentions = /@(tous|all|everyone)\b/i.test(text) ? ["all"] : people.filter(p => p.uid && low.includes("@" + p.name.toLowerCase().split(" ")[0])).map(p => p.uid);
-    const m = {text, uid:C.user.uid, name:me()?.name || C.user.displayName || "", at:Date.now(), mentions};
+    const m = {text, uid:C.user.uid, name:me()?.name || C.user.displayName || "", at:Date.now(), mentions}; if (th && th !== "main") m.th = th;
     if (channel === "family") await addDoc(collection(db, "families", fid, "messages"), m);
     else await addDoc(collection(db, "groups", channel, "messages"), m);
   };
@@ -255,7 +255,7 @@ if (cfg && cfg.apiKey){
       S.groups = qs.docs.map(d => ({...(S.groups||[]).find(g => g.id === d.id), ...d.data(), id:d.id}));
       ids.forEach(id => { if (groupUnsubs[id]) return; groupUnsubs[id] = [
         onSnapshot(collection(db, "groups", id, "events"), q2 => { const g = S.groups.find(x => x.id === id); if (g){ g.events = q2.docs.map(d => ({...d.data(), id:d.id})); softRender(); } }),
-        onSnapshot(query(collection(db, "groups", id, "messages"), orderBy("at"), limitToLast(200)), q2 => { const g = S.groups.find(x => x.id === id); if (g){ const before = (g.messages||[]).length; g.messages = q2.docs.map(d => d.data()); if (before && g.messages.length > before){ const m = g.messages[g.messages.length-1]; if (m.uid !== C.user.uid) chatNotify(m, g.name); } softRender(); } }),
+        onSnapshot(query(collection(db, "groups", id, "messages"), orderBy("at"), limitToLast(200)), q2 => { const g = S.groups.find(x => x.id === id); if (g){ const before = (g.messages||[]).length; g.messages = q2.docs.map(d => d.data()); if (before && g.messages.length > before){ const m = g.messages[g.messages.length-1]; if (m.uid !== C.user.uid && threadVisible(id, m.th)) chatNotify(m, g.name); } softRender(); } }),
       ]; });
       Object.keys(groupUnsubs).filter(id => !ids.includes(id)).forEach(id => { groupUnsubs[id].forEach(u => u()); delete groupUnsubs[id]; });
       softRender();

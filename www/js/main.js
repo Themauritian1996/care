@@ -98,6 +98,7 @@ Object.assign(ACT, {
   activityForm: v => activityForm(v), delActivity: v => { const c = child(); c.activities = c.activities.filter(x => x.id !== v); closeSheet(); commit(); },
   allergen: v => { const c = child(); (c.allergensLog[v] = c.allergensLog[v] || []).push(iso(today())); commit(T("{a} : exposition notée",{a:T(v)})); },
   quickFood: v => { const c = child(), f = c.foodFav.find(x => x.name === v); c.logs.push({id:uid(), type:"solid", t:Date.now(), data:{items:[{name:f.name, group:f.group, qty:f.qty||"", nut:f.nut||null}], meal:f.snack ? "Collation" : mealKindAt(Date.now())}}); commit(T("{a} noté",{a:v})); },
+  mealFormPhoto: async () => { const d = await Native.takePhoto({source:"prompt"}); if (!d) return; UI.meal.photo = await shrinkImage(d, 1280, 0.82); mealForm(UI.meal); },
   addMealItem: () => { UI.meal.items.push({name:"", group:"legfruits", qty:""}); mealForm(UI.meal); },
   rmMealItem: v => { UI.meal.items.splice(+v, 1); mealForm(UI.meal); },
   mealGroup: v => { const [i, g] = v.split(":"); UI.meal.items[+i].group = g; mealForm(UI.meal); },
@@ -238,6 +239,7 @@ Object.assign(ACT, {
     try { await Cloud.groupDelete(v); UI.groupOpen = null; render(); toast(T("Groupe supprimé")); }
     catch(e){ console.error(e); try { await Cloud.groupLeave(v); UI.groupOpen = null; render(); toast(T("Suppression refusée : vous avez quitté le groupe à la place")); } catch(e2){ toast(T("Impossible de supprimer : {e}",{e:e.code||e.message})); } } }),
   resync: async () => { toast(T("Synchronisation…")); try { const n = await Cloud.resync(); render(); toast(n ? T("{n} image(s) récupérée(s)",{n}) : T("Tout est à jour")); } catch(e){ toast(e.message); } },
+  viewImg: (v, b) => openViewer(v || b?.src),
   cfOk: () => { const f = CF; CF = null; closeSheet(); if (f) f(); }, retryView: () => render(),
   groupPhotoDel: async v => { const g = S.groups.find(x => x.id === v); g.photo = null; await Cloud.groupPhoto(v, null); closeSheet(); render(); },
   groupRsvp: async v => { const [g, e] = v.split("|"), ev = S.groups.find(x => x.id === g)?.events?.find(x => x.id === e); await Cloud.groupRsvp(g, e, !ev?.rsvp?.[Cloud.user.uid]?.ok); },
@@ -314,6 +316,7 @@ Object.assign(FORMS, {
     const ex = UI.meal.editId ? c.logs.find(x => x.id === UI.meal.editId) : null;
     const log = ex || {id:uid(), type:"solid"}; Object.assign(log, {t, data:{...(ex?.data||{}), items, allergen:al, reaction:val("f-re"), ai:!!UI.meal.ai, meal:pickVal("mealk")||mealKindAt(t)}}); if (!ex) c.logs.push(log);
     if (aiReady() && aiKey() && ageMonths(c) >= 12 && items.some(i => !i.nut)) nutEstimateJob(c, [log]);
+    if (UI.meal.photo && $("#f-keep")?.checked && !log.data.photoId && feat("memories")){ const m = await mealToMemory(UI.meal.photo, items, [c.id], t, log.data.meal); log.data.photoId = m.photoId; }
     UI.meal = null; closeSheet(); commit(T("Repas noté"));
   },
   goals: () => { const c = child(), g = guide(ageMonths(c)); c.goals = {}; const set = (k, v, def) => { if (v && v !== def) c.goals[k] = v; };
@@ -353,7 +356,7 @@ Object.assign(FORMS, {
   task: f => { const id = f.dataset.id; const d = {title:val("tk-title"), points:Math.max(1, Math.round(numOf("tk-pts")||1)), assignees:checked("tkwho"), team:!!$("#tk-team")?.checked, times:[0,1,2,3].map(i => val("tk-h"+i)).filter(Boolean), perDay:Math.max(1, Math.min(8, +val("tk-per")||1)), recur:radio("tkrec")||"daily", days:checked("tkdays").map(Number), date:val("tk-date"), icon:radio("tkicon")||"star"};
     if (!d.assignees.length) return toast(T("Choisissez au moins une personne")); if (id) Object.assign(S.tasks.find(t => t.id === id), d); else S.tasks.push({id:uid(), ...d}); closeSheet(); commit(T("Défi enregistré")); },
   reward: f => { const d = {title:val("rw-title"), cost:Math.max(1, Math.round(numOf("rw-cost")||1))}; if ($("input[name=rwfor]")) d.for = checked("rwfor"); if (f.dataset.id) Object.assign(S.rewards.find(r => r.id === f.dataset.id), d); else S.rewards.push({id:uid(), ...d}); closeSheet(); commit(f.dataset.id ? T("Modifié") : T("Récompense ajoutée")); },
-  chat: async f => { const t = $("#chat-in").value.trim(); if (!t) return; $("#chat-in").value = ""; await Cloud.send(f.dataset.ch, t); },
+  chat: async f => { const t = $("#chat-in").value.trim(); if (!t) return; $("#chat-in").value = ""; await Cloud.send(f.dataset.ch, t, f.dataset.th); },
   groupNew: async () => { const id = await Cloud.groupCreate(val("gn")); closeSheet(); UI.groupOpen = id; toast(T("Groupe créé")); },
   joinGroup: async () => { await Cloud.groupJoin(val("jg-code")); toast(T("Vous avez rejoint le groupe")); },
   groupEvent: async f => { const gid = f.dataset.g, eid = f.dataset.id, g = S.groups.find(x => x.id === gid), ex = eid ? g?.events?.find(x => x.id === eid) : null;

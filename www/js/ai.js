@@ -142,7 +142,7 @@ const jobsList = () => AIJ.length ? `<div class="list">${AIJ.map(j => `<div clas
 function aiOpenJob(id){ const j = AIJ.find(x => x.id === id); if (!j || j.st !== "ok") return; if (j.res?.histId) return aiHistOpen(j.res.histId); if (j.res?.open) return j.res.open(); }
 
 /* ---------- page Assistant ---------- */
-const AI_TABS = () => [["ask",T("Demander"),"chat"],["scan",T("Lire"),"camera"],["create",T("Créer"),"spark"],["stories",T("Histoires"),"moon"],["recipes",T("Recettes"),"dish"],["review",T("Revues"),"chart"],["hist",T("Historique"),"clock"],["jobs",T("En cours"),"play"],["set",T("Réglages"),"sliders"]];
+const AI_TABS = () => [["ask",T("Demander"),"chat"],["scan",T("Lire"),"camera"],["create",T("Créer"),"spark"],["stories",T("Histoires"),"moon"],["recipes",T("Recettes"),"dish"],["menus",T("Menus"),"spoon"],["ideas",T("Activités"),"run"],["talk",T("Aborder un sujet"),"heart"],["review",T("Revues"),"chart"],["hist",T("Historique"),"clock"],["jobs",T("En cours"),"play"],["set",T("Réglages"),"sliders"]];
 function aiSheet(tab){ if (tab) UI.aiTab = tab; go("assistant"); }
 function assistantView(){
   if (!UI.aiTab) UI.aiTab = "ask";
@@ -152,8 +152,8 @@ function assistantView(){
     <button class="icon-btn" data-act="search" aria-label="${T("Rechercher")}">${icon("search")}</button><button class="icon-btn" data-act="go" data-v="home" aria-label="${T("Fermer")}">${icon("x")}</button></div>`;
   if (!aiKey()) return h + `<div class="card"><div class="banner info">${icon("key")}<div class="small">${T("L'assistant utilise Gemini avec votre propre clé (gratuite pour un usage personnel). Créez-la sur aistudio.google.com/apikey puis collez-la ci-dessous. Elle reste sur cet appareil.")}</div></div>${aiKeyForm()}</div>`;
   h += `<div class="ai-tabs" role="tablist">${AI_TABS().map(([k,l,ic]) => `<button role="tab" data-act="aiTab" data-v="${k}" aria-pressed="${UI.aiTab===k}">${icon(ic)}<span>${l}</span>${k==="jobs"?`<b class="badge" id="aiTabJobs">${run||""}</b>`:""}</button>`).join("")}</div>`;
-  if (kids.length > 1 && !["hist","jobs","set","recipes"].includes(UI.aiTab)) h += `<div class="pick">${kids.map(k => `<button data-act="aiKid" data-v="${k.id}" aria-pressed="${k.id===UI.aiKid}">${avatarOf(k,20)} ${esc(k.nick||k.name)}</button>`).join("")}</div>`;
-  return h + ({ask:askPane, scan:scanPane, create:createPane, stories:storiesPane, recipes:recipesPane, review:reviewPane, hist:histPane, jobs:() => `<div class="card"><div class="card-h"><h2>${T("En cours et terminés")}</h2></div><div id="aiJobs">${jobsList()}</div></div>`, set:setPane}[UI.aiTab] || askPane)();
+  if (kids.length > 1 && !["hist","jobs","set","recipes","stories"].includes(UI.aiTab)) h += `<div class="pick">${kids.map(k => `<button data-act="aiKid" data-v="${k.id}" aria-pressed="${k.id===UI.aiKid}">${avatarOf(k,20)} ${esc(k.nick||k.name)}</button>`).join("")}</div>`;
+  return h + ({ask:askPane, scan:scanPane, create:createPane, stories:storiesPane, recipes:recipesPane, menus:menusPane, ideas:ideasPane, talk:talkPane, review:reviewPane, hist:histPane, jobs:() => `<div class="card"><div class="card-h"><h2>${T("En cours et terminés")}</h2></div><div id="aiJobs">${jobsList()}</div></div>`, set:setPane}[UI.aiTab] || askPane)();
 }
 const chatItems = c => { (S.aiChat||[]).forEach(x => { if (!x.id) x.id = uid(); }); return (S.aiChat||[]).filter(x => x.kid === (c?.id||null) && !x.arch); };
 /* l'entrée d'historique qui correspond à un échange (créée au besoin pour les anciens échanges) */
@@ -280,16 +280,24 @@ function mealDone(){
   const M = UI.mealLog; if (!M) return closeSheet();
   const live = M.items.filter(i => !i.off), tot = k => Math.round(sum(live.map(i => Number(scaleNut(i.b, i.f)?.[k])||0)));
   const profiles = S.children.filter(k => !isPrenatal(k) && ageMonths(k) >= 6);
-  sheet(`${sheetHead(T("Repas noté"))}${UI.mealImg?`<img src="${UI.mealImg}" alt="" style="border-radius:16px;max-height:160px;object-fit:cover">`:""}
+  sheet(`${sheetHead(T("Repas noté"))}${UI.mealImg?`<img src="${UI.mealImg}" alt="" data-act="viewImg" style="border-radius:16px;max-height:160px;object-fit:cover">`:""}
     <div class="field"><label>${T("Pour qui ? (enfants et parents)")}</label><div class="pick">${profiles.map(k => `<button data-act="mealWho" data-v="${k.id}" aria-pressed="${!!M.ids[k.id]}">${avatarOf(k,20)} ${esc(k.nick||k.name)}</button>`).join("")}</div></div>
     <div class="field"><label>${T("Moment")}</label><div class="pick">${["Déjeuner","Dîner","Souper","Collation"].map(x => `<button data-act="mealKindSet" data-v="${x}" aria-pressed="${M.meal===x}">${T(x)}</button>`).join("")}</div></div>
     <div class="stack" style="gap:8px">${M.items.map((i, n) => `<div class="mitem ${i.off?"off":""}"><div class="row between"><div class="grow"><b>${esc(i.name)}</b><div class="small muted">${esc(i.qty||"")}${i.b?.kcal?` · ${Math.round(i.b.kcal*i.f)} kcal`:""}</div></div><button class="icon-btn flat" data-act="mealItemOff" data-v="${n}" aria-label="${i.off?T("Remettre"):T("Retirer")}">${icon(i.off?"plus":"x")}</button></div>
       ${i.off ? "" : `<div class="row" style="gap:6px"><span class="tiny muted">${T("Portion")}</span>${PORTIONS.map(([f, l]) => `<button class="chip ${i.f===f?"lilac":""}" data-act="mealPortion" data-v="${n}:${f}">${l}</button>`).join("")}</div>`}</div>`).join("")}</div>
+    ${foodSelect(child(), 'data-change="mealPickAdd"')}
     <div class="row"><div class="grow">${acInput("ma-add", "", {list:[...(child()?.foodFav||[]).map(f => f.name), ...Object.values(FOOD_SUGG).flat().map(T)], placeholder:T("Ajouter un aliment oublié")})}</div><button class="btn ghost" data-act="mealItemAdd">${icon("plus")}</button></div>
     <div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip peach">${tot("kcal")} kcal</span><span class="chip coral">${tot("prot")} g ${T("prot.")}</span><span class="chip butter">${tot("carb")} g ${T("glucides")}</span><span class="chip lilac">${tot("fat")} g ${T("lipides")}</span><span class="chip mint">${tot("fiber")} g ${T("fibres")}</span></div>
     ${M.comment?`<div class="banner soft">${icon("spark")}<div class="small">${esc(M.comment)}</div></div>`:""}
     <p class="tiny muted">${T("Déjà ajouté au calendrier des repas de chaque personne choisie. Les portions sont par personne. Valeurs estimées.")}</p>
+    ${UI.mealImg && feat("memories") ? (M.memId ? `<div class="banner ok">${icon("star")}<div class="small">${T("Gardé dans les souvenirs")}</div></div>` : `<button class="btn ghost" data-act="mealKeep">${icon("star")}${T("Garder ce repas en souvenir")}</button>`) : ""}
     <div class="row"><button class="btn kid grow" data-act="closeSheet">${icon("check")}${T("Parfait")}</button><button class="btn danger" data-act="mealUndo">${icon("trash")}</button></div>`);
+}
+/* un repas en photo devient un souvenir (photo synchronisée avec la famille) */
+async function mealToMemory(img, items, kidIds, t, meal){
+  const pid = "meal-" + uid(); await PhotoDB.put(pid, img);
+  const m = {id:uid(), date:iso(new Date(t||Date.now())), title:T("{m} : {i}",{m:T(meal||"Repas"), i:items.map(i => i.name).slice(0, 4).join(", ")}), text:"", kidIds, photoId:pid, by:S.me, meal:true};
+  S.memories.push(m); save(); driveQ("mem", m.id); return m;
 }
 /* ---------- revues ---------- */
 async function aiReview(kidId, silent){
@@ -314,7 +322,7 @@ function maybeAutoReview(){
   if (aiKey() && feat("ai")) S.children.filter(c => c.nutAuto && c.nutAuto !== "jamais" && !isPrenatal(c) && ageMonths(c) >= 12).forEach((c, i) => {
     const per = c.nutAuto === "mois" ? 30 : 7, last = (S.aiHist||[]).find(e => e.cat === "nutrition" && e.kid === c.id && e.text);
     if (!c.nutAutoAt){ c.nutAutoAt = Date.now(); save(); return; }
-    if (Date.now() - Math.max(c.nutAutoAt, last?.at || 0) >= per*DAY){ c.nutAutoAt = Date.now(); save(); setTimeout(() => nutAdvice(c, per, true).then?.(() => {}), 5000 + i*2000); }
+    if (Date.now() - Math.max(c.nutAutoAt, last?.at || 0) >= per*DAY){ c.nutAutoAt = Date.now(); save(); setTimeout(() => nutAdvice(c, per, true, iso(today())).then?.(() => {}), 5000 + i*2000); }
   });
   const A = S.settings.ai; if (!aiKey() || A.freq === "jamais" || !feat("ai")) return;
   if (!A.lastReview){ A.lastReview = iso(today()); save(); return; } // première fois : on attend le prochain rendez-vous prévu
@@ -337,7 +345,9 @@ Object.assign(ACT, {
   mealItemAdd: async () => { const name = val("ma-add"); if (!name) return; const M = UI.mealLog, fav = (child()?.foodFav||[]).find(f => f.name === name);
     const it = {name, group:fav?.group||"autres", qty:fav?.qty||"", b:fav?.nut||null, f:1}; M.items.push(it); mealSync(); mealDone();
     if (!it.b && aiKey()){ try { const fake = {data:{items:[{name, qty:it.qty}]}}; await nutEstimate(kidById(Object.keys(M.ids)[0]), fake); it.b = fake.data.items[0].nut; if (it.b?.kcal) it.group = it.group; mealSync(); if ($("#layer .sheet")) mealDone(); } catch(e){} } },
-  aiAskQuick: v => aiAsk(v), aiMealPhoto: () => aiMealPhoto(),
+  aiAskQuick: v => { if (UI.view !== "assistant"){ UI.aiTab = "ask"; closeSheet(); go("assistant"); } aiAsk(v); }, aiMealPhoto: () => aiMealPhoto(),
+  mealKeep: async () => { const M = UI.mealLog; if (!M || !UI.mealImg) return; const m = await mealToMemory(UI.mealImg, M.items.filter(i => !i.off), Object.keys(M.ids), M.t, M.meal); M.memId = m.id;
+    Object.entries(M.ids).forEach(([kid, id]) => { const L = kidById(kid)?.logs.find(x => x.id === id); if (L) L.data.photoId = m.photoId; }); save(); mealDone(); toast(T("Souvenir enregistré")); },
   mealUndo: () => { const M = UI.mealLog; Object.entries(M.ids).forEach(([kid, id]) => { const c = kidById(kid); if (c) c.logs = c.logs.filter(x => x.id !== id); }); closeSheet(); commit(T("Repas retiré")); },
   aiReview: () => { S.settings.ai.topics = checked("aitopics"); S.settings.ai.freq = radio("aifreq") || S.settings.ai.freq; save(); return aiReview(UI.aiKid); },
   aiReviewSave: () => { const A = S.settings.ai; A.topics = checked("aitopics"); A.freq = radio("aifreq") || A.freq; A.reviewDay = +val("ai-rday"); A.reviewTime = val("ai-rtime") || "19:00";

@@ -25,8 +25,46 @@ function kidView(){
     ${isKidUser()?"":`<div class="hero-actions"><button class="btn sm ghost" data-act="kidForm" data-v="${c.id}">${icon("edit")}${T("Profil")}</button><button class="btn sm ghost" data-act="modules">${icon("sliders")}${T("Personnaliser")}</button>${isPrenatal(c)?"":`<button class="btn sm ghost" data-act="report">${icon("doc")}${T("Rapport")}</button>`}</div>`}</section>`;
   h += timerBar(c) + feverAlert(c) + goalBandNotice(c);
   if (tabs.length > 1) h += `<div class="seg" role="tablist">${tabs.map(([id,l]) => `<button data-act="kidTab" data-v="${id}" aria-pressed="${UI.kidTab===id}">${l}</button>`).join("")}</div>`;
-  return h + ({quotidien, repas, croissance, sante, dev, conseils, grossesse}[UI.kidTab])(c);
+  return h + ({quotidien, repas, croissance, sante, dev, conseils, grossesse}[UI.kidTab])(c) + tabTips(c, UI.kidTab);
 }
+/* conseils de la section en cours, cliquables pour plus de détails */
+const TAB_TIPS = {quotidien:["sommeil","ecrans","sport","emotions"], repas:["alim"], croissance:["alim","sport","sante"], sante:["sante","secu"], dev:["dev","social","emotions","ecole","parler","puberte"]};
+const tipsForAge = (c, cats) => { const m = isPrenatal(c) ? -1 : ageMonths(c); return ALL_TIPS.map((t, i) => ({t, i})).filter(({t}) => cats.includes(t[0]) && m >= t[1] && m < t[2]); };
+const tipRow = ({t, i}) => `<button class="tip-row" data-act="tipOpen" data-v="${i}"><span class="tip-dot" style="background:var(--${TIPCAT[t[0]][1]})"></span><span class="grow"><b>${T(t[3])}</b><span class="small muted clamp2">${T(t[4])}</span></span>${icon("right")}</button>`;
+function tabTips(c, tab){
+  if (!feat("tips") || !TAB_TIPS[tab] || isPrenatal(c) || c.adult) return "";
+  const list = tipsForAge(c, TAB_TIPS[tab]).filter(x => !(c.hideTips||[]).includes(x.t[0])); if (!list.length) return "";
+  const seed = Math.floor(today() / DAY), n = tab === "repas" ? 5 : 3, pick = list.length <= n ? list : Array.from({length:n}, (_, k) => list[(seed + k * 7) % list.length]).filter((x, k, a) => a.indexOf(x) === k);
+  return `<div class="card"><div class="card-h"><div><span class="eyebrow">${T("Pour les parents")}</span><h2>${T("Conseils")}</h2></div><button class="btn sm ghost" data-act="kidTab" data-v="conseils">${T("Tous ({n})",{n:tipsForAge(c, Object.keys(TIPCAT)).length})}</button></div><div class="stack" style="gap:6px">${pick.map(tipRow).join("")}</div><p class="tiny muted">${T("Touchez un conseil pour plus de détails.")}</p></div>`;
+}
+function tipOpen(i){
+  const t = ALL_TIPS[+i]; if (!t) return; const c = child(), key = "tip|" + t[3], more = (S.tipMore||{})[key];
+  sheet(`${sheetHead(esc(T(t[3])))}<div class="row" style="gap:6px;flex-wrap:wrap"><span class="chip ${TIPCAT[t[0]][1]}">${T(TIPCAT[t[0]][0])}</span><span class="chip">${t[1] < 0 ? T("Grossesse") : t[2] >= 999 ? T("dès {a}",{a:mLabel(Math.max(0,t[1]))}) : T("{a} à {b}",{a:mLabel(Math.max(0,t[1])), b:mLabel(t[2])})}</span></div>
+    <p>${T(t[4])}</p>${moreBlock(key, more)}
+    <div class="row" style="flex-wrap:wrap">${feat("ai") && allow("ai") ? `<button class="btn ghost" data-act="aiAskQuick" data-v="${esc(T(t[3]) + " : " + T("explique-moi davantage pour mon enfant"))}">${icon("chat")}${T("Poser une question")}</button>` : ""}<a class="btn ghost" href="https://www.google.com/search?q=${encodeURIComponent(T(t[3]) + " site:naitreetgrandir.com OR site:soinsdenosenfants.cps.ca")}" target="_blank" rel="noopener">${icon("search")}${T("Sources fiables")}</a></div>`, "wide");
+}
+/* explication détaillée par l'IA, gardée pour la prochaine fois */
+const moreBlock = (key, more) => more ? `<div class="banner soft" style="display:block"><b>${icon("spark").replace("<svg",'<svg style="width:14px;height:14px;vertical-align:-2px"')} ${T("En détail")}</b><div class="small">${md(more.text)}</div>${typeof srcList === "function" ? srcList(more.sources) : ""}</div>`
+  : aiReady() && aiKey() ? `<button class="btn kid" data-act="tipMore" data-v="${esc(key)}" id="tipMoreBtn">${icon("spark")}${T("Plus de détails pour mon enfant")}</button>` : `<p class="tiny muted">${T("Ajoutez votre clé Gemini dans l'Assistant pour obtenir une explication détaillée et adaptée.")}</p>`;
+async function tipMore(key){
+  const c = child(), btn = $("#tipMoreBtn"); if (btn){ btn.disabled = true; btn.innerHTML = `<span class="spin"></span> ${T("Je prépare une explication…")}`; }
+  const [kind, id] = key.split("|"); let subject = id;
+  if (kind === "ms"){ const it = MS.find(x => x.k === id); subject = `Le jalon « ${it?.t} » (habituellement ${it ? rangeTxt(it) : ""}) n'est pas encore observé`; }
+  try {
+    const r = await gemini({search:true, system:AI_SYSTEM() + "\n" + kidContext(c), contents:[{role:"user", parts:[{text:`${kind === "ms" ? subject + ". Explique au parent, sans l'inquiéter : ce que veut dire ce jalon, pourquoi certains enfants y arrivent plus tard, 4 ou 5 activités concrètes au quotidien pour l'encourager, et quand et à qui en parler (médecin, infirmière du CLSC, programme Agir tôt)." : `Conseil « ${subject} ». Détaille-le pour ce parent : pourquoi c'est recommandé, comment le mettre en pratique concrètement à cet âge (4 ou 5 astuces), les erreurs fréquentes, et quand demander de l'aide.`} Titres courts, listes, 180 à 280 mots, sources reconnues (SCP, INSPQ, Naître et grandir, Santé Canada).`}]}]});
+    S.tipMore = S.tipMore || {}; S.tipMore[key] = {text:r.text, sources:r.sources, at:Date.now()}; save();
+    if (kind === "ms") msOpen(id); else tipOpen(ALL_TIPS.findIndex(t => "tip|" + t[3] === key));
+  } catch(e){ if (btn){ btn.disabled = false; btn.textContent = e.message; } }
+}
+/* jalon « à mentionner » : explications et pistes */
+function msOpen(k){
+  const c = child(), it = MS.find(x => x.k === k); if (!it) return; const em = effAge(c), L = msLevel(c, it, em), key = "ms|" + k;
+  sheet(`${sheetHead(esc(T(it.t)))}<div class="row" style="gap:6px;flex-wrap:wrap"><span class="chip ${L.c}">${L.l}</span><span class="chip" style="color:var(--${DOMAINS[it.d].color}-ink)">${T(DOMAINS[it.d].label)}</span></div>
+    <div class="tbl"><table><tbody><tr><td>${T("La plupart des enfants")}</td><td class="num">${rangeTxt(it)}</td></tr><tr><td>${T("Médiane")}</td><td class="num">${mLabel(it.m50)}</td></tr>${it.al?`<tr><td>${T("À mentionner si pas acquis vers")}</td><td class="num">${mLabel(it.al)}</td></tr>`:""}<tr><td>${T("Âge de l'enfant")}</td><td class="num">${ageLabel(em)}</td></tr></tbody></table></div>
+    ${L.tip ? `<p class="small">${L.tip}</p>` : ""}${moreBlock(key, (S.tipMore||{})[key])}
+    <div class="row" style="flex-wrap:wrap"><button class="btn ghost" data-act="ms" data-v="${esc(k)}">${icon("check")}${c.milestones[k] ? T("Décocher") : T("Je l'ai observé")}</button><a class="btn ghost" href="${AGIR_TOT}" target="_blank" rel="noopener">${T("Programme Agir tôt")}</a></div>`, "wide");
+}
+Object.assign(ACT, { tipOpen: v => tipOpen(v), tipMore: v => tipMore(v), msOpen: v => msOpen(v) });
 
 /* ---------- minuteries (avec pause) ---------- */
 const timerOf = c => (S.timers||{})[c.id];
@@ -296,10 +334,12 @@ function repas(c){
     ${aiReady() && !isKidUser() ? `<span class="eyebrow">${icon("spark").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("Avec Gemini")}</span><div class="row" style="flex-wrap:wrap;gap:6px">${aiBtn("aiMealPhoto",null,T("Photo du repas"),"camera")}${aiBtn("aiScan","label",T("Lire une étiquette"),"tag")}${m < 144 ? aiBtn("aiScan","menu",m < 60 ? T("Menu de la garderie") : T("Menu de l'école"),"dish") : ""}</div>` : ""}
     ${fav.length ? `<span class="eyebrow">${T("Favoris : touchez pour noter")}</span><div class="pick">${fav.map(f => `<button data-act="quickFood" data-v="${esc(f.name)}" style="border-color:var(--${FOOD_GROUPS[f.group]?.color||"line"})">${esc(f.name)}</button>`).join("")}</div>` : `<p class="small muted">${T("Les aliments marqués d'une étoile apparaîtront ici pour les noter en un geste.")}</p>`}
     <div class="banner soft">${icon("spoon")}<div class="small"><b>${T("Portions pour cet âge :")}</b> ${T(portionHint(m))}</div></div></div>`;
-  // répartition par groupe sur 7 jours
-  const G = {}; for (let i=0;i<7;i++){ const t = dayTotals(c, addDays(today(), -i)); for (const k in t.groups) G[k] = (G[k]||0) + t.groups[k]; }
+  // répartition par groupe sur 7 jours (semaine choisie)
+  const wOff = UI.plateWeek || 0, wEnd = addDays(today(), -7 * wOff);
+  const G = {}; for (let i=0;i<7;i++){ const t = dayTotals(c, addDays(wEnd, -i)); for (const k in t.groups) G[k] = (G[k]||0) + t.groups[k]; }
   const tot = sum(Object.values(G));
-  h += `<div class="card"><div class="card-h"><h2>${T("L'assiette de la semaine")}</h2><span class="tiny muted">${T("Guide alimentaire canadien")}</span></div>
+  h += `<div class="card"><div class="card-h"><div><span class="eyebrow">${wOff ? T("Du {a} au {b}",{a:fmtD(addDays(wEnd,-6),{day:"numeric",month:"short"}), b:fmtD(wEnd,{day:"numeric",month:"short"})}) : T("7 derniers jours · Guide alimentaire canadien")}</span><h2>${T("L'assiette de la semaine")}</h2></div><div class="row"><button class="icon-btn" data-act="plateWeek" data-v="1" aria-label="${T("Semaine précédente")}">${icon("left")}</button><button class="icon-btn" data-act="plateWeek" data-v="-1" aria-label="${T("Semaine suivante")}" ${wOff?"":"disabled"}>${icon("right")}</button></div></div>
+    ${plateStats(c, wEnd)}
     ${tot ? `<div class="stack" style="gap:8px">${Object.entries(FOOD_GROUPS).map(([k,g]) => { const p = (G[k]||0)/tot; return `<div><div class="row between small"><b style="color:var(--${g.color}-ink)">${T(g.label)}</b><span class="muted num">${Math.round(p*100)} %${g.target?` · ${T("cible")} ${Math.round(g.target*100)} %`:""}</span></div><div class="dombar" style="position:relative"><i style="width:${(p*100).toFixed(0)}%;background:var(--${g.color})"></i>${g.target?`<span style="position:absolute;top:-2px;bottom:-2px;left:${g.target*100}%;width:2px;background:var(--ink)"></span>`:""}</div></div>`; }).join("")}</div>` : `<p class="small muted">${T("Notez quelques repas pour voir l'équilibre de la semaine.")}</p>`}
     ${tot ? (() => { const low = Object.entries(FOOD_GROUPS).filter(([k,g]) => g.target && (G[k]||0)/tot < g.target*0.7).map(([k]) => k); return low.length ? `<div class="banner ok">${icon("bulb")}<div class="small"><b>${T("Idées pour équilibrer :")}</b> ${low.map(k => `${T(FOOD_GROUPS[k].label)} : ${FOOD_SUGG[k].slice(0,4).map(T).join(", ")}`).join(" · ")}</div></div>` : `<div class="banner ok">${icon("check")}<div class="small">${T("Belle variété cette semaine.")}</div></div>`; })() : ""}</div>`;
   h += nutritionCard(c);
@@ -308,13 +348,19 @@ function repas(c){
   h += mealJournalCard(c) + mealTrendsCard(c);
   return h;
 }
+/* menu déroulant : favoris, collations gardées, puis chaque groupe alimentaire (on peut aussi écrire) */
+function foodSelect(c, attrs){
+  const fav = (c?.foodFav||[]).map(f => f.name);
+  return `<select class="inp food-select" ${attrs} aria-label="${T("Choisir dans la liste")}"><option value="">${T("Choisir dans la liste…")}</option>${fav.length ? `<optgroup label="${T("Favoris")}">${fav.map(n => `<option value="fav|${esc(n)}">${esc(n)}</option>`).join("")}</optgroup>` : ""}${Object.entries(FOOD_GROUPS).map(([g, G]) => `<optgroup label="${T(G.label)}">${foodOptions(g).map(n => `<option value="${g}|${esc(T(n))}">${T(n)}</option>`).join("")}</optgroup>`).join("")}</select>`;
+}
 function mealForm(prefill){
   const c = child(); UI.meal = prefill || {items:[{name:"", group:"legfruits", qty:""}]};
   const favNames = (c.foodFav||[]).map(f => f.name);
-  const rows = UI.meal.items.map((it,i) => `<div class="stack" style="gap:6px;padding:10px;border-radius:14px;background:var(--surface2)"><div class="row"><div class="grow">${acInput("mi-"+i, it.name, {list:[...favNames, ...Object.values(FOOD_SUGG).flat().map(T)], placeholder:T("Aliment")}, `data-meal="${i}" data-k="name"`)}</div><input class="inp" style="width:110px" data-meal="${i}" data-k="qty" value="${esc(it.qty)}" placeholder="${T("Quantité")}"><button type="button" class="icon-btn flat" data-act="favFood" data-v="${i}" aria-label="${T("Favori")}" style="color:var(--butter-ink)">${icon("star").replace('fill="none"', favNames.includes(it.name)?'fill="currentColor"':'fill="none"')}</button>${UI.meal.items.length>1?`<button type="button" class="icon-btn flat" data-act="rmMealItem" data-v="${i}" aria-label="${T("Retirer")}">${icon("x")}</button>`:""}</div>
+  const rows = UI.meal.items.map((it,i) => `<div class="stack" style="gap:6px;padding:10px;border-radius:14px;background:var(--surface2)">${foodSelect(c, `data-change="mealPick" data-i="${i}"`)}<div class="row"><div class="grow">${acInput("mi-"+i, it.name, {list:[...favNames, ...Object.values(FOOD_SUGG).flat().map(T)], placeholder:T("Aliment")}, `data-meal="${i}" data-k="name"`)}</div><input class="inp" style="width:110px" data-meal="${i}" data-k="qty" value="${esc(it.qty)}" placeholder="${T("Quantité")}"><button type="button" class="icon-btn flat" data-act="favFood" data-v="${i}" aria-label="${T("Favori")}" style="color:var(--butter-ink)">${icon("star").replace('fill="none"', favNames.includes(it.name)?'fill="currentColor"':'fill="none"')}</button>${UI.meal.items.length>1?`<button type="button" class="icon-btn flat" data-act="rmMealItem" data-v="${i}" aria-label="${T("Retirer")}">${icon("x")}</button>`:""}</div>
     <div class="pick">${Object.entries(FOOD_GROUPS).map(([k,g]) => `<button type="button" data-act="mealGroup" data-v="${i}:${k}" aria-pressed="${it.group===k}" style="font-size:.78rem;padding:5px 9px">${T(g.label)}</button>`).join("")}</div></div>`).join("");
   const M0 = UI.meal; sheet(`<form class="stack" data-form="meal" style="gap:12px">${sheetHead(M0.editId ? T("Modifier le repas") : T("Repas"))}
-    ${UI.meal.photo?`<img src="${UI.meal.photo}" alt="" style="border-radius:16px;max-height:200px;object-fit:cover">`:""}
+    <div class="row" style="flex-wrap:wrap;gap:6px"><button type="button" class="btn sm ghost" data-act="mealFormPhoto">${icon("camera")}${UI.meal.photo ? T("Changer la photo") : T("Ajouter une photo (facultatif)")}</button>${UI.meal.photo ? `<label class="switch" style="flex:1 1 200px"><input type="checkbox" id="f-keep" ${UI.meal.keep!==false?"checked":""}><span class="tg"></span><span class="grow small">${T("Garder aussi en souvenir")}</span></label>` : ""}</div>
+    ${UI.meal.photo?`<img src="${UI.meal.photo}" alt="" data-act="viewImg" style="border-radius:16px;max-height:200px;object-fit:cover">`:""}
     ${UI.meal.comment?`<div class="banner soft">${icon("spark")}<div class="small">${esc(UI.meal.comment)}</div></div>`:""}
     <div id="mealItems" class="stack" style="gap:8px">${rows}</div>
     <button type="button" class="btn ghost" data-act="addMealItem">${icon("plus")}${T("Ajouter un aliment")}</button>
@@ -324,6 +370,21 @@ function mealForm(prefill){
     ${fld("f-t",T("Heure"),`<input class="inp" id="f-t" type="datetime-local" value="${localInput(M0.t||Date.now())}">`)}
     ${M0.items.some(i => i.nut) ? `<p class="tiny muted">${icon("spark").replace("<svg",'<svg style="width:12px;height:12px"')} ${T("Nutriments estimés : {k} kcal · {p} g protéines",{k:Math.round(sum(M0.items.map(i => Number(i.nut?.kcal)||0))), p:Math.round(sum(M0.items.map(i => Number(i.nut?.prot)||0)))})}</p>` : ""}
     <div class="row"><button class="btn kid grow" type="submit">${T("Enregistrer")}</button>${M0.editId?`<button type="button" class="btn danger" data-act="delLog" data-v="${M0.editId}">${icon("trash")}</button>`:""}</div></form>`);
+}
+/* indicateurs de la semaine : variété, nouveaux aliments, légumes et fruits, collations, sucres, boissons */
+function plateStats(c, end){
+  const from = addDays(end, -6).getTime(), to = addDays(end, 1).getTime(), L = c.logs.filter(l => l.type === "solid" && l.t >= from && l.t < to);
+  if (!L.length) return "";
+  const items = L.flatMap(l => l.data.items||[]), names = new Set(items.map(i => i.name.trim().toLowerCase()));
+  const before = new Set(c.logs.filter(l => l.type === "solid" && l.t < from).flatMap(l => (l.data.items||[]).map(i => i.name.trim().toLowerCase())));
+  const fresh = [...names].filter(n => !before.has(n)), days = new Set(L.map(l => dayKey(l.t))).size;
+  const vegDays = new Set(L.filter(l => (l.data.items||[]).some(i => i.group === "legfruits")).map(l => dayKey(l.t))).size;
+  const snacks = L.filter(l => mealKindOf(l) === "Collation").length, treats = items.filter(i => i.group === "autres").length;
+  const sugar = sum(items.map(i => Number(i.nut?.sugar)||0)) / Math.max(1, days), drinks = items.filter(i => /jus|boisson gazeuse|liqueur|soda|juice/i.test(i.name)).length;
+  const fish = items.filter(i => /saumon|truite|sardine|thon|poisson|hareng|maquereau|crevette|fish|salmon/i.test(i.name)).length, legumes = items.filter(i => /lentille|pois chiche|haricot|tofu|edamame|hoummos|bean|lentil/i.test(i.name)).length;
+  const st = [[T("Aliments différents"), names.size, names.size >= 15 ? "mint" : "butter"], [T("Nouveaux aliments"), fresh.length, fresh.length ? "lilac" : ""], [T("Jours avec légumes ou fruits"), `${vegDays}/${days}`, vegDays >= days ? "mint" : "butter"], [T("Repas notés"), L.length, ""], [T("Collations"), snacks, ""], [T("Gâteries"), treats, treats > 5 ? "rose" : ""], [T("Poisson"), fish, fish >= 2 ? "mint" : ""], [T("Légumineuses ou tofu"), legumes, legumes ? "mint" : ""], [T("Jus ou boissons sucrées"), drinks, drinks > 3 ? "rose" : ""]];
+  if (ageMonths(c) >= 12 && sugar) st.push([T("Sucres par jour"), `${Math.round(sugar)} g`, ""]);
+  return `<div class="plate-stats">${st.map(([l, v, col]) => `<div class="pstat ${col?"c-"+col:""}"><b class="num">${v}</b><span class="tiny">${l}</span></div>`).join("")}</div>${fresh.length ? `<p class="tiny muted">${T("Nouveaux cette semaine")} : ${esc(fresh.slice(0, 8).join(", "))}</p>` : ""}`;
 }
 function allergenCard(c){
   const log = c.allergensLog || {};
@@ -552,7 +613,7 @@ function dev(c){
     <div class="banner ok">${icon("heart")}<div class="small">${T("Chaque enfant a son rythme. Les plages montrent l'âge où la plupart des enfants acquièrent une habileté : un enfant en fin de plage est tout à fait normal.")} ${usesCorrected(c)?`<b>${T("Âge corrigé utilisé : {a}",{a:ageLabel(em)})}</b>`:""}</div></div>
     ${domainSummary(c, em)}</div>`;
   const talk = MS.filter(it => msLevel(c, it, em).id === "parler");
-  if (talk.length) h += `<div class="banner soft">${icon("info")}<div><b>${T("À mentionner calmement à la prochaine visite")}</b> ${T("(rien d'urgent ; souvent l'enfant y arrive peu après) :")}<ul>${talk.map(it=>`<li>${esc(T(it.t))}</li>`).join("")}</ul></div></div>`;
+  if (talk.length) h += `<div class="banner soft">${icon("info")}<div><b>${T("À mentionner calmement à la prochaine visite")}</b> ${T("(rien d'urgent ; souvent l'enfant y arrive peu après) :")}<div class="stack" style="gap:4px;margin-top:6px">${talk.map(it=>`<button class="tip-row" data-act="msOpen" data-v="${esc(it.k)}"><span class="tip-dot" style="background:var(--rose)"></span><span class="grow">${esc(T(it.t))}</span>${icon("right")}</button>`).join("")}</div><p class="tiny muted">${T("Touchez un élément : ce que ça veut dire, comment l'encourager, à qui en parler.")}</p></div></div>`;
   const band = UI.msBand || "auto";
   h += `<div class="card" style="padding:12px 14px"><span class="eyebrow">${T("Filtrer par âge")}</span><div class="pick chips-scroll" style="flex-wrap:nowrap;overflow-x:auto"><button data-act="msBand" data-v="auto" aria-pressed="${band==="auto"}">${T("Autour de maintenant")}</button>${BANDS.map(b => `<button data-act="msBand" data-v="${b}" aria-pressed="${String(band)===String(b)}">${bandLabel(b)}</button>`).join("")}<button data-act="msBand" data-v="all" aria-pressed="${band==="all"}">${T("Tous")}</button></div></div>`;
   h += UI.msMode === "detail" ? msDetail(c, em) : msConcise(c, em);
@@ -610,10 +671,10 @@ function conseils(c){
   const m = isPrenatal(c) ? -1 : ageMonths(c), hidden = c.hideTips || [];
   const inAge = t => m >= t[1] && m < t[2];
   const order = m >= 144 ? ["parler","social","sport","emotions","puberte","sommeil","sante","ecrans","alim","ecole","secu","parents"] : Object.keys(TIPCAT);
-  const cats = order.filter(k => TIPS.some(t => t[0]===k && inAge(t)));
+  const cats = order.filter(k => ALL_TIPS.some(t => t[0]===k && inAge(t)));
   let h = `<div class="card"><div class="card-h"><div><span class="eyebrow">${isPrenatal(c)?T("Grossesse"):T("Pour {a}",{a:ageLabel(m)})}</span><h2>${T("Conseils")}</h2></div></div><p class="small muted">${T("Touchez une catégorie pour la masquer ou l'afficher.")}</p>
     <div class="row">${cats.map(k=>`<button class="chip ${TIPCAT[k][1]}" data-act="tipCat" data-v="${k}" aria-pressed="${!hidden.includes(k)}">${T(TIPCAT[k][0])}</button>`).join("")}</div></div>`;
-  h += cats.filter(k => !hidden.includes(k)).map(k => `<div class="card"><h3 style="color:var(--${TIPCAT[k][1]}-ink)">${T(TIPCAT[k][0])}</h3><div class="stack">${TIPS.filter(t=>t[0]===k && inAge(t)).map(t=>`<div><b>${T(t[3])}</b><p class="small">${T(t[4])}</p></div>`).join('<div class="sep"></div>')}</div></div>`).join("");
+  h += cats.filter(k => !hidden.includes(k)).map(k => `<div class="card"><h3 style="color:var(--${TIPCAT[k][1]}-ink)">${T(TIPCAT[k][0])}</h3><div class="stack" style="gap:6px">${ALL_TIPS.map((t, i) => ({t, i})).filter(({t}) => t[0]===k && inAge(t)).map(tipRow).join("")}</div></div>`).join("");
   const futur = TIPS.filter(t => t[1] > m && t[1] <= m + 12 && !hidden.includes(t[0]));
   if (futur.length) h += `<div class="card tint"><h3>${T("Pour les prochains mois")}</h3><div class="stack">${futur.slice(0,4).map(t=>`<div><span class="dom" style="color:var(--${TIPCAT[t[0]][1]}-ink)">${T(TIPCAT[t[0]][0])} · ${t[1] < 0 ? "" : T("dès {a}",{a:mLabel(t[1])})}</span><div><b>${T(t[3])}</b></div><p class="small">${T(t[4])}</p></div>`).join("")}</div></div>`;
   if (feat("ai") && allow("ai")) h += `<button class="btn ghost" data-act="ai" style="align-self:flex-start">${icon("spark")}${T("Poser une question à l'assistant")}</button>`;
