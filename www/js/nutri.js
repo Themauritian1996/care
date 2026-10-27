@@ -121,6 +121,21 @@ function nutOfFood(name, amt, unit){
   const f = foodInfo(name); if (!f) return null; const g = gramsOf(f, amt, unit || f.unit);
   return Object.fromEntries(NUT_KEYS.map(k => [k, Math.round(f.per100[k] * g / 100 * 10) / 10]));
 }
+/* contrôle de vraisemblance des valeurs nutritives (estimations de l'IA) */
+function cleanNut(n){
+  if (!n) return n; const o = {}; NUT_KEYS.forEach(k => { const v = Number(n[k]); o[k] = isFinite(v) && v > 0 ? v : 0; });
+  if (o.sugar > o.carb && o.carb) o.sugar = o.carb; if (o.fiber > o.carb && o.carb) o.fiber = o.carb;
+  const at = 4 * o.prot + 4 * o.carb + 9 * o.fat;
+  if (at > 0 && o.kcal > 0){ if (at > o.kcal * 1.6){ const f = o.kcal / at; ["prot","carb","fat","fiber","sugar"].forEach(k => o[k] *= f); } else if (at < o.kcal * 0.55) o.kcal = at; }
+  else if (at > 0 && !o.kcal) o.kcal = at;
+  if (o.sugar > 150) o.sugar = Math.min(o.carb || 0, o.sugar / 1000) || 0; if (o.prot > 200) o.prot /= 1000;
+  NUT_KEYS.forEach(k => o[k] = Math.round(o[k] * 10) / 10); return o;
+}
+/* valeurs pour la portion : base de l'app si l'aliment est connu, sinon valeurs pour 100 g données par l'IA */
+function nutFromPer100(name, grams, per100){
+  const g = Number(grams) || 0, f = foodInfo(name), base = f ? f.per100 : per100; if (!base || !g) return null;
+  return cleanNut(Object.fromEntries(NUT_KEYS.map(k => [k, (Number(base[k]) || 0) * g / 100])));
+}
 const qtyTxt = (amt, unit) => amt ? `${fmtNum(+amt, +amt % 1 ? 2 : 0)} ${T(unit||"")}`.trim() : "";
 
 /* ---------- portions du Guide alimentaire (repères par âge, 2 ans et plus) ---------- */

@@ -149,20 +149,22 @@ const dayName = d => { const diff = Math.round((today()-d)/DAY); return diff===0
 /* statistiques hebdomadaires : cette semaine vs la précédente */
 /* points d'une mesure entre deux dates */
 function rangeSeries(c, key, from, to){ const M = metricOf(c, key), out = []; for (let d = parseD(from); d <= parseD(to); d = addDays(d, 1)) out.push({d, v:M.get(dayTotals(c, d))}); return out; }
+/* moyennes sur les jours notés seulement (les jours vides fausseraient les chiffres) */
+const logged = pts => pts.filter(p => p.v > 0), lavg = pts => { const a = logged(pts); return a.length ? sum(a.map(p => p.v)) / a.length : 0; };
 function weeklyStats(c){
   const keys = ["sleep","act"].concat(mod(c,"screen")?["screen"]:[]).concat(mod(c,"reading")?["read"]:[]).concat(mod(c,"feeding")?["feeds"]:[]).concat((c.trackers||[]).map(t=>"trk:"+t.id));
   const per = UI.wsPer || "7", to = per === "custom" && UI.wsTo ? UI.wsTo : iso(today()), from = per === "custom" && UI.wsFrom ? UI.wsFrom : iso(addDays(parseD(to), -(+per || 7) + 1)), n = Math.max(1, Math.round((parseD(to) - parseD(from)) / DAY) + 1);
   const pFrom = iso(addDays(parseD(from), -n)), pTo = iso(addDays(parseD(from), -1));
   const rows = keys.map(k => {
     const M = metricOf(c, k), cur = rangeSeries(c, k, from, to), prev = rangeSeries(c, k, pFrom, pTo);
-    const avg = x => sum(x.map(p=>p.v))/Math.max(1, x.length), A = avg(cur), B = avg(prev), goal = M.goal(c);
-    const hit = goal ? cur.filter(p => M.kind === "max" ? p.v <= goal : p.v >= goal).length : null;
+    const A = lavg(cur), B = lavg(prev), goal = M.goal(c), L = logged(cur);
+    const hit = goal ? L.filter(p => M.kind === "max" ? p.v <= goal : p.v >= goal).length : null;
     const diff = B ? (A-B)/B : null, good = diff == null ? null : (M.kind === "max" ? diff <= 0 : diff >= 0);
     const fmt = v => k === "sleep" ? fmtNum(v,1)+" h" : M.u === "min" ? fmtMin(v) : fmtNum(v, v%1?1:0)+(M.u?" "+M.u:"");
-    return `<tr data-act="trend" data-v="${k}" style="cursor:pointer"><td style="font-weight:600">${T(M.l)}</td><td><b>${fmt(A)}</b></td><td class="small">${diff==null?"—":`<span style="color:var(--${good?"mint":"rose"}-ink)">${diff>=0?"▲":"▼"} ${Math.abs(Math.round(diff*100))} %</span>`}</td><td class="small">${hit==null?"—":`${hit}/${cur.length}`}</td></tr>`;
+    return `<tr data-act="trend" data-v="${k}" style="cursor:pointer"><td style="font-weight:600">${T(M.l)}</td><td><b>${L.length ? fmt(A) : "—"}</b><div class="tiny muted">${T("{n} j notés",{n:L.length})}</div></td><td class="small">${diff==null?"—":`<span style="color:var(--${good?"mint":"rose"}-ink)">${diff>=0?"▲":"▼"} ${Math.abs(Math.round(diff*100))} %</span>`}</td><td class="small">${hit==null?"—":`${hit}/${L.length}`}</td></tr>`;
   }).join("");
   const ins = per === "7" ? insights(c, keys) : "";
-  return `<div class="card"><div class="card-h"><h2>${T("Statistiques")}</h2><span class="tiny muted">${T("moyenne par jour · touchez une ligne")}</span></div>
+  return `<div class="card"><div class="card-h"><h2>${T("Statistiques")}</h2><span class="tiny muted">${T("moyenne des jours notés · touchez une ligne")}</span></div>
     <div class="row" style="gap:6px;flex-wrap:wrap"><div class="seg" style="width:auto">${[["7",T("7 j")],["30",T("30 j")],["90",T("90 j")],["365",T("1 an")],["custom",T("Dates")]].map(([k, l]) => `<button data-act="wsPer" data-v="${k}" aria-pressed="${per===k}">${l}</button>`).join("")}</div>
     ${per === "custom" ? `<input class="inp" type="date" style="width:auto" value="${from}" max="${iso(today())}" data-change="wsFrom" aria-label="${T("Du")}"><span class="small muted">→</span><input class="inp" type="date" style="width:auto" value="${to}" max="${iso(today())}" data-change="wsTo" aria-label="${T("Au")}">` : ""}</div>
     <p class="tiny muted">${T("Du {a} au {b} ({n} jours), comparé aux {n} jours précédents.",{a:fmtD(parseD(from),{day:"numeric",month:"short",year:"numeric"}), b:fmtD(parseD(to),{day:"numeric",month:"short",year:"numeric"}), n})}</p>
@@ -180,17 +182,17 @@ function trendSheet(key){
   const c = child(), M = metricOf(c, key); if (!M) return;
   UI.trendKey = key; const days = UI.trendDays || 7;
   const pts = series(c, key, days), goal = M.goal(c), unitH = key === "sleep";
-  const vals = pts.map(p=>p.v), avg = sum(vals)/days, prev = series(c, key, days*2).slice(0, days), pavg = sum(prev.map(p=>p.v))/days;
-  const hit = goal ? vals.filter(v => M.kind === "max" ? v <= goal : v >= goal).length : null;
+  const L = logged(pts), vals = (L.length ? L : pts).map(p=>p.v), avg = lavg(pts), prev = series(c, key, days*2).slice(0, days), pavg = lavg(prev);
+  const hit = goal ? L.map(p => p.v).filter(v => M.kind === "max" ? v <= goal : v >= goal).length : null;
   const fmt = v => unitH ? fmtNum(v,1)+" h" : M.u === "min" ? fmtMin(v) : fmtNum(v, v%1?1:0)+(M.u?" "+M.u:"");
   let extra = "";
-  if (key === "sleep"){ const naps = sum(pts.map(p => dayTotals(c, p.d).nap))/days; extra = `<div class="stat"><span class="muted tiny">${T("Siestes / jour")}</span><div class="v">${fmtMin(naps)}</div></div>`; }
+  if (key === "sleep"){ const naps = sum(L.map(p => dayTotals(c, p.d).nap))/Math.max(1, L.length); extra = `<div class="stat"><span class="muted tiny">${T("Siestes / jour")}</span><div class="v">${fmtMin(naps)}</div></div>`; }
   sheet(`${sheetHead(T(M.l))}<div class="seg">${[7,30,90].map(n=>`<button data-act="trendDays" data-v="${n}" aria-pressed="${days===n}">${T("{n} jours",{n})}</button>`).join("")}</div>
-    ${days >= 90 ? (() => { const w = []; for (let i = pts.length; i > 0; i -= 7){ const a = pts.slice(Math.max(0, i-7), i); w.unshift({d:a[0].d, v:sum(a.map(p => p.v))/a.length}); } return `<p class="tiny muted">${T("Moyenne par jour, semaine par semaine. Touchez une semaine pour voir ses jours.")}</p>${bars(w, goal, M.col, M.kind, unitH, key)}`; })() : bars(pts, goal, M.col, M.kind, unitH)}
-    <div class="stats"><div class="stat"><span class="muted tiny">${T("Moyenne / jour")}</span><div class="v">${fmt(avg)}</div></div><div class="stat"><span class="muted tiny">${T("Période précédente")}</span><div class="v">${fmt(pavg)}</div></div><div class="stat"><span class="muted tiny">${T("Min · max")}</span><div class="v" style="font-size:1.1rem">${fmt(Math.min(...vals))} · ${fmt(Math.max(...vals))}</div></div>${hit!=null?`<div class="stat"><span class="muted tiny">${T("Jours où l'objectif est atteint")}</span><div class="v">${hit}/${days}</div></div>`:""}${extra}</div>
+    ${days >= 90 ? (() => { const w = []; for (let i = pts.length; i > 0; i -= 7){ const a = pts.slice(Math.max(0, i-7), i); w.unshift({d:a[0].d, v:lavg(a)}); } return `<p class="tiny muted">${T("Moyenne par jour, semaine par semaine. Touchez une semaine pour voir ses jours.")}</p>${bars(w, goal, M.col, M.kind, unitH, key)}`; })() : bars(pts, goal, M.col, M.kind, unitH)}
+    <div class="stats"><div class="stat"><span class="muted tiny">${T("Moyenne / jour noté")} · ${L.length}/${days}</span><div class="v">${fmt(avg)}</div></div><div class="stat"><span class="muted tiny">${T("Période précédente")}</span><div class="v">${fmt(pavg)}</div></div><div class="stat"><span class="muted tiny">${T("Min · max")}</span><div class="v" style="font-size:1.1rem">${fmt(Math.min(...vals))} · ${fmt(Math.max(...vals))}</div></div>${hit!=null?`<div class="stat"><span class="muted tiny">${T("Jours où l'objectif est atteint")}</span><div class="v">${hit}/${L.length}</div></div>`:""}${extra}</div>
     ${goal?`<p class="tiny muted">${T("Ligne pointillée : objectif de {v}. Touchez une barre pour voir la journée.",{v:fmt(goal)})}</p>`:`<p class="tiny muted">${T("Touchez une barre pour voir la journée.")}</p>`}
     ${days <= 7 ? `<div class="list">${[...pts].reverse().map(p => `<button class="li rowbtn" data-act="dayDetail" data-v="${iso(p.d)}"><div class="grow"><div class="li-title cap">${fmtD(p.d,{weekday:"long",day:"numeric",month:"short"})}</div></div><b class="num" style="color:var(--${goal && (M.kind==="max" ? p.v > goal : p.v < goal) ? "rose" : "ink"}-ink, var(--ink))">${fmt(p.v)}</b>${icon("right")}</button>`).join("")}</div>`
-      : `<div class="list">${Array.from({length:Math.ceil(days/7)}, (_,w) => pts.slice(Math.max(0, days-7*(w+1)), days-7*w)).filter(a => a.length).map(a => `<button class="li rowbtn" data-act="weekDetail" data-v="${iso(a[0].d)}|${key}"><div class="grow"><div class="li-title">${T("Semaine du {d}",{d:fmtD(a[0].d,{day:"numeric",month:"short"})})}</div><div class="small muted">${a.length} ${T("jours")}</div></div><b class="num">${fmt(sum(a.map(p=>p.v))/a.length)}</b>${icon("right")}</button>`).join("")}</div>`}`, "wide");
+      : `<div class="list">${Array.from({length:Math.ceil(days/7)}, (_,w) => pts.slice(Math.max(0, days-7*(w+1)), days-7*w)).filter(a => a.length).map(a => `<button class="li rowbtn" data-act="weekDetail" data-v="${iso(a[0].d)}|${key}"><div class="grow"><div class="li-title">${T("Semaine du {d}",{d:fmtD(a[0].d,{day:"numeric",month:"short"})})}</div><div class="small muted">${T("{n} j notés",{n:logged(a).length})} / ${a.length}</div></div><b class="num">${fmt(lavg(a))}</b>${icon("right")}</button>`).join("")}</div>`}`, "wide");
 }
 /* calendrier de l'enfant : un coup d'œil par jour (sommeil, repas, activité, humeur) */
 function kidCalendarCard(c){

@@ -43,11 +43,11 @@ function nutTargets(c){
 }
 function dayNut(c, d){
   const t = {n:0, miss:0}; NUTS.forEach(x => t[x.k] = 0);
-  dayLogs(c, d).filter(l => l.type === "solid").forEach(l => (l.data.items||[]).forEach(it => { if (it.nut){ t.n++; NUTS.forEach(x => t[x.k] += Number(it.nut[x.k])||0); } else t.miss++; }));
+  dayLogs(c, d).filter(l => l.type === "solid").forEach(l => (l.data.items||[]).forEach(it => { if (it.nut){ t.n++; const n = cleanNut(it.nut); NUTS.forEach(x => t[x.k] += Number(n[x.k])||0); } else t.miss++; }));
   return t;
 }
 function weekNut(c){ const days = Array.from({length:7}, (_,i) => dayNut(c, addDays(today(), -i))).filter(d => d.n > 0); const a = {days:days.length}; NUTS.forEach(x => a[x.k] = days.length ? sum(days.map(d => d[x.k])) / days.length : 0); return a; }
-function nutSummary(c){ const w = weekNut(c), t = nutTargets(c); if (!w.days) return "aucun repas avec nutriments"; return NUTS.map(x => `${x.k} ${Math.round(w[x.k])}${x.u} (cible ${Array.isArray(t[x.k]) ? t[x.k].join("-") : t[x.k]}${x.max?" max":""})`).join(", ") + ` sur ${w.days} jour(s)`; }
+function nutSummary(c){ const w = weekNut(c), t = nutTargets(c); if (!w.days) return "aucun repas avec nutriments"; return `moyenne des ${w.days} jour(s) où des repas ont été notés (jours vides exclus) — ` + NUTS.map(x => `${x.k} ${Math.round(w[x.k])}${x.u} (cible ${Array.isArray(t[x.k]) ? t[x.k].join("-") : t[x.k]}${x.max?" max":""})`).join(", ") + ` sur ${w.days} jour(s)`; }
 const tgtVal = (t, k) => Array.isArray(t[k]) ? (t[k][0] + t[k][1]) / 2 : t[k];
 function nutBar(x, v, t){
   const tv = tgtVal(t, x.k), p = tv ? v / tv : 0, over = x.max ? p > 1 : (x.k === "sugar" && tv === 0 ? v > 0 : p > 1.35);
@@ -66,7 +66,8 @@ function nutritionCard(c){
       : `<p class="small muted">${T("Notez des repas : les nutriments sont estimés automatiquement avec Gemini (photo, étiquette ou saisie).")}</p>`}
     <p class="tiny muted">${T("Cibles quotidiennes : {b}. Apports nutritionnels de référence (Santé Canada) ; ce sont des moyennes sur plusieurs jours, pas des objectifs à atteindre chaque jour.",{b:t.basis})}</p>
     ${aiReady() && !isKidUser() ? `<div class="sep"></div><span class="eyebrow">${icon("spark").replace("<svg",'<svg style="width:12px;height:12px;vertical-align:-1px"')} ${T("Avis nutrition de Gemini")}</span>
-      <div class="row" style="flex-wrap:wrap;gap:6px"><span class="small muted">${T("Période")}</span>${[1,7,14,30].map(d => `<button class="chip ${(UI.nutDays||7)===d?"lilac":""}" data-act="nutPeriod" data-v="${d}">${d === 1 ? T("1 jour") : T("{n} j",{n:d})}</button>`).join("")}<span class="small muted">${(UI.nutDays||7) === 1 ? T("le") : T("jusqu'au")}</span><input class="inp" type="date" style="width:auto;padding:6px 10px" value="${UI.nutEnd || iso(today())}" max="${iso(today())}" data-change="nutEnd" aria-label="${T("Date")}"></div>
+      <div class="row" style="flex-wrap:wrap;gap:6px"><span class="small muted">${T("Période")}</span>${[[1,T("1 jour")],["w",T("Semaine")],[7,T("7 j")],[14,T("14 j")],[30,T("30 j")]].map(([d,l]) => `<button class="chip ${(UI.nutDays||7)===d?"lilac":""}" data-act="nutPeriod" data-v="${d}">${l}</button>`).join("")}</div>
+      <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><input class="inp" type="date" style="width:auto;padding:6px 10px" value="${UI.nutEnd || iso(today())}" max="${iso(today())}" data-change="nutEnd" aria-label="${T("Date")}"><span class="small muted" id="nut-per-lbl">${nutPerLabel()}</span></div>
       <div class="row" style="flex-wrap:wrap">${miss ? `<button class="btn sm ghost" data-act="nutEstimateAll">${icon("spark")}${T("Estimer {n} repas sans nutriments",{n:miss})}</button>` : ""}<button class="btn sm kid" data-act="nutAdvice">${icon("spark")}${T("Avoir un avis maintenant")}</button></div>
       <div class="row" style="flex-wrap:wrap;gap:6px"><span class="small muted">${T("Avis automatique pour {n}",{n:esc(c.nick||c.name)})}</span>${[["jamais",T("Jamais")],["semaine",T("Chaque semaine")],["mois",T("Chaque mois")]].map(([k,l]) => `<button class="chip ${(c.nutAuto||"jamais")===k?"lilac":""}" data-act="nutAutoSet" data-v="${k}">${l}</button>`).join("")}</div>
       ${(S.aiHist||[]).filter(e => e.cat === "nutrition" && e.kid === c.id && e.text).slice(0,1).map(e => `<button class="li" data-act="aiHistOpen" data-v="${e.id}" style="width:100%;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;color:inherit;font:inherit;cursor:pointer"><div class="ic" style="background:var(--lilac-bg);color:var(--lilac-ink)">${icon("spark")}</div><div class="grow"><div class="li-title">${T("Dernier avis")}</div><div class="small muted">${fmtD(new Date(e.at),{day:"numeric",month:"long"})}</div></div>${icon("right")}</button>`).join("")}` : ""}</div>`;
@@ -74,10 +75,10 @@ function nutritionCard(c){
 /* estimation des nutriments d'un repas noté à la main */
 async function nutEstimate(c, log){
   const items = (log.data.items||[]).filter(i => !i.nut); if (!items.length) return;
-  const schema = {type:"OBJECT", properties:{items:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, nut:NUT_SCHEMA}, required:["name","nut"]}}}, required:["items"]};
-  const r = await gemini({tier:"fast", json:schema, temperature:0.2, contents:[{role:"user", parts:[{text:`Estime les nutriments de chaque aliment pour la quantité indiquée (portion d'un enfant de ${ageLabel(ageMonths(c))} si la quantité manque), avec le Fichier canadien sur les éléments nutritifs comme référence. ${NUT_HELP}\nAliments : ${items.map(i => `${i.name} — ${i.qty||"portion habituelle"}`).join(" ; ")}`}]}]});
+  const schema = {type:"OBJECT", properties:{items:{type:"ARRAY", items:{type:"OBJECT", properties:{name:{type:"STRING"}, grams:{type:"NUMBER"}, per100:PER100_SCHEMA}, required:["name","grams","per100"]}}}, required:["items"]};
+  const r = await gemini({tier:"fast", json:schema, temperature:0, contents:[{role:"user", parts:[{text:`Estime les valeurs nutritives réelles de chaque aliment pour la quantité indiquée (si la quantité manque : portion habituelle d'un enfant de ${ageLabel(ageMonths(c))}). ${GRAMS_HELP}\nAliments : ${items.map(i => `${i.name} — ${i.qty||"portion habituelle"}`).join(" ; ")}`}]}]});
   const out = parseJSON(r.text).items || [];
-  items.forEach((it, i) => { const o = out.find(x => x.name?.toLowerCase() === it.name.toLowerCase()) || out[i]; if (o?.nut) it.nut = o.nut; });
+  items.forEach((it, i) => { const o = out.find(x => x.name?.toLowerCase() === it.name.toLowerCase()) || out[i]; if (!o) return; const n = nutFromPer100(it.name, o.grams, o.per100); if (n){ it.nut = n; it.grams = Math.round(o.grams); } });
 }
 function nutEstimateJob(c, logs){
   return aiJob("nutrition", T("Nutriments de {n} repas",{n:logs.length}), async () => { for (const l of logs) await nutEstimate(c, l); save(); if (UI.view === "kid") softRender(); return {open:() => { go("kid"); UI.kidTab = "repas"; render(); }}; }, {kid:c.id});
@@ -85,9 +86,18 @@ function nutEstimateJob(c, logs){
 /* moyenne par jour sur une période choisie (jours avec repas seulement) */
 function rangeNut(c, end, days){ const ds = Array.from({length:days}, (_,i) => dayNut(c, addDays(end, -i))).filter(d => d.n > 0); const a = {days:ds.length}; NUTS.forEach(x => a[x.k] = ds.length ? sum(ds.map(d => d[x.k])) / ds.length : 0); return a; }
 function rangeSummary(c, end, days){ const w = rangeNut(c, end, days), t = nutTargets(c); if (!w.days) return "aucun repas avec nutriments"; return NUTS.map(x => `${x.k} ${Math.round(w[x.k])}${x.u} (cible ${Array.isArray(t[x.k]) ? t[x.k].join("-") : t[x.k]}${x.max?" max":""})`).join(", ") + ` sur ${w.days} jour(s)`; }
-async function nutAdvice(c, days = UI.nutDays || 7, quiet, endIso = UI.nutEnd){
-  const end = endIso ? parseD(endIso) : today(), endT = addDays(end, 1).getTime(), startT = addDays(end, 1 - days).getTime();
-  const label = days === 1 ? fmtD(end,{day:"numeric",month:"long"}) : T("{n} j jusqu'au {d}",{n:days, d:fmtD(end,{day:"numeric",month:"short"})});
+/* période des conseils : un jour, la semaine (lun.→dim.) de la date choisie, ou n jours se terminant à la date */
+function nutPeriodOf(days = UI.nutDays || 7, endIso = UI.nutEnd){
+  const pick = endIso ? parseD(endIso) : today();
+  if (days === "w"){ const mon = addDays(pick, -((pick.getDay()+6)%7)), sun = addDays(mon, 6), end = sun > today() ? today() : sun;
+    return {end, days:Math.round((end - mon)/DAY) + 1, label:T("semaine du {a} au {b}",{a:fmtD(mon,{weekday:"short",day:"numeric",month:"short"}), b:fmtD(sun,{weekday:"short",day:"numeric",month:"short"})})}; }
+  days = +days || 7;
+  return {end:pick, days, label: days === 1 ? fmtD(pick,{weekday:"long",day:"numeric",month:"long"}) : T("du {a} au {b}",{a:fmtD(addDays(pick, 1-days),{weekday:"short",day:"numeric",month:"short"}), b:fmtD(pick,{weekday:"short",day:"numeric",month:"short"})})};
+}
+const nutPerLabel = () => { const l = nutPeriodOf().label; return l.charAt(0).toUpperCase() + l.slice(1); };
+async function nutAdvice(c, daysIn = UI.nutDays || 7, quiet, endIso = UI.nutEnd){
+  const P = nutPeriodOf(daysIn, endIso), end = P.end, days = P.days, endT = addDays(end, 1).getTime(), startT = addDays(end, 1 - days).getTime();
+  const label = P.label;
   return aiJob("nutrition", T("Conseils nutrition · {n}",{n:c.nick||c.name}) + " · " + label, async () => {
     const L = c.logs.filter(l => l.type === "solid" && l.t >= startT && l.t < endT);
     const foods = L.map(l => `${iso(new Date(l.t))} ${mealKindOf(l)} : ${(l.data.items||[]).map(i => `${i.name}${i.qty?` (${i.qty})`:""}`).join(", ")}`).slice(-80).join("\n");
@@ -140,13 +150,13 @@ Object.assign(ACT, {
   mealWeek: v => { UI.mealDay = iso(addDays(parseD(UI.mealDay || iso(today())), +v)); render(); },
   mealSpan: v => { UI.mealSpan = +v; render(); },
   mealAddDay: v => { const d = parseD(v); d.setHours(12, 0, 0, 0); mealForm({items:[{name:"", group:"legfruits", qty:""}], t:Math.min(Date.now(), d.getTime())}); },
-  nutPeriod: v => { UI.nutDays = +v; render(); },
+  nutPeriod: v => { UI.nutDays = v === "w" ? "w" : +v; render(); },
   plateWeek: v => { UI.plateWeek = Math.max(0, (UI.plateWeek||0) + (+v)); render(); },
   nutAutoSet: v => { const c = child(); c.nutAuto = v; commit(v === "jamais" ? T("Avis automatique désactivé") : T("Avis nutrition automatique activé")); },
 });
 
 Object.assign(CHANGE, {
-  nutEnd: t => { UI.nutEnd = t.value || null; },
+  nutEnd: t => { UI.nutEnd = t.value || null; const l = $("#nut-per-lbl"); if (l) l.textContent = nutPerLabel(); },
   mealPick: t => { const [g, name] = t.value.split("|"), i = +t.dataset.i; if (!name || !UI.meal) return; const c = child(), fav = (c.foodFav||[]).find(f => f.name === name);
     const it = UI.meal.items[i], f = foodInfo(name); it.name = name; it.group = g === "fav" ? (fav?.group || f?.group || it.group) : g;
     if (f){ it.amt = f.amt; it.unit = f.unit; it.nut = nutOfFood(name, f.amt, f.unit); it.qty = qtyTxt(f.amt, f.unit); }

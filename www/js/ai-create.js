@@ -710,7 +710,7 @@ Object.assign(ACT, {
     if (!aiKey()) return toast(T("Ajoutez d'abord votre clé Gemini dans l'Assistant."));
     aiJob("recipe", T("Recette : {w}",{w:x.name.slice(0, 40)}), async () => { const c = kidById(m.kid) || aiKidNow();
       const r = await gemini({tier:"fast", json:RECIPE_SCHEMA, temperature:0.5, contents:[{role:"user", parts:[{text:`Écris la recette complète de « ${x.name} » (${x.label}${x.note ? ", " + x.note : ""}) pour une famille avec ${kidLine(c)}, 4 portions, adaptée à l'âge (textures sûres, peu de sel). Quantités précises. Allergies : ${c?.allergies||"aucune connue"}. ${NUT_HELP} nut = pour une portion d'enfant. En ${LANG==="en"?"anglais":"français"}.`}]}]});
-      x.recipe = {...parseJSON(r.text), id:uid(), title:x.name, labels:[x.label], at:Date.now(), kid:m.kid}; save(); return {open:() => recipeSheet({...x.recipe, menuRef:v})};
+      x.recipe = {...parseJSON(r.text), id:uid(), title:x.name, labels:[x.label], at:Date.now(), kid:m.kid}; x.recipe.nut = cleanNut(x.recipe.nut); save(); return {open:() => recipeSheet({...x.recipe, menuRef:v})};
     }, {kid:m.kid, open:res => res?.open?.()}); },
   menuShare: v => { const m = S.menus.find(x => x.id === v); Native.share({title:m.title, text:menuText(m)}); },
   menuDel: v => askConfirm(T("Supprimer ce menu ?"), T("Supprimer"), () => { S.menus = S.menus.filter(x => x.id !== v); save(); render(); }),
