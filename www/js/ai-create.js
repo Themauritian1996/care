@@ -174,19 +174,40 @@ function storyOpen(id){
   s.characters.forEach((x, i) => { if (x.id === "narr" || x.voice?.custom || x.voice?.g) return; x.gender = x.gender || guessGender(x.name, x.desc); x.voice = autoVoice(x.kind, i, x.gender); });
   UI.storyId = id;
   const playing = PL.story === id && PL.on;
+  if (UI.readMode) return storyBook(s, id, playing);
   sheet(`${sheetHead(esc(s.title))}<div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ghost" data-act="storyFav" data-v="${id}">${icon("star")}${s.fav?T("Favori ✓"):T("Favori")}</button>
       <div class="seg" style="width:auto"><button data-act="storyEngine" data-v="device" aria-pressed="${s.engine!=="gemini"}">${T("Voix de l'appareil")}</button><button data-act="storyEngine" data-v="gemini" aria-pressed="${s.engine==="gemini"}">${T("Voix Gemini")}</button></div></div>
     <p class="tiny muted">${s.engine==="gemini" ? T("Voix naturelles générées par Gemini (quelques secondes par réplique, utilise votre clé).") : T("Voix intégrées au téléphone : instantanées et gratuites. Réglez la voix de chaque personnage ci-dessous.")}</p>
     <div class="row" style="flex-wrap:wrap;gap:6px">${s.characters.map(x => `<button class="chip ${chColor(s,x.id)}" data-act="charForm" data-v="${id}|${x.id}">${icon("edit").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${esc(x.name)}</button>`).join("")}<button class="chip" style="border:1px dashed var(--line)" data-act="charForm" data-v="${id}|new">${icon("plus").replace("<svg",'<svg style="width:13px;height:13px;vertical-align:-2px"')} ${T("Personnage")}</button></div>
-    <div class="read-bar"><span class="tiny muted">${T("Taille du texte")}</span><button class="btn sm ghost" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><b class="tiny num" id="zoomVal">${Math.round(storyZ()*100)} %</b><button class="btn sm ghost" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button><button class="btn sm ${UI.readMode?"kid":"ghost"}" data-act="storyRead">${icon("book")}${UI.readMode?T("Quitter la lecture"):T("Mode lecture")}</button></div>
+    <div class="read-bar"><span class="tiny muted">${T("Taille du texte")}</span><button class="btn sm ghost" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><b class="tiny num" id="zoomVal">${Math.round(storyZ()*100)} %</b><button class="btn sm ghost" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button><button class="btn sm kid" data-act="storyRead">${icon("book")}${T("Mode lecture")}</button><button class="btn sm ghost" data-act="storyBookShop" data-v="${id}">${icon("image")}${T("Livre illustré")}</button></div>
     <div class="story-text" id="storyText" style="--sz:${storyZ()}">
-    ${s.chapters.map((ch, ci) => `<div class="chapter"><div class="row between"><h3>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h3><div class="row" style="gap:4px;flex-wrap:nowrap">${playing && PL.ch === ci ? `<button class="btn sm kid" data-act="storyPause">${icon("pause")}${T("Pause")}</button><button class="btn sm ghost" data-act="storyStop" data-v="${id}" aria-label="${T("Arrêter")}">${icon("x")}</button>` : s.pos?.ch === ci && s.pos.i > 0 ? `<button class="btn sm kid" data-act="storyPlayFrom" data-v="${id}|${ci}|${s.pos.i}">${icon("play")}${T("Reprendre")}</button><button class="btn sm ghost" data-act="storyPlayFrom" data-v="${id}|${ci}|0" aria-label="${T("Rejouer depuis le début")}">${icon("replay")}</button>` : `<button class="btn sm kid" data-act="storyPlayFrom" data-v="${id}|${ci}|0">${icon("play")}${T("Écouter")}</button>`}</div></div>
+    ${s.chapters.map((ch, ci) => `<div class="chapter"><div class="row between"><h3>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h3><div class="row" style="gap:4px;flex-wrap:nowrap">${chCtl(s, id, ci, playing)}</div></div>
       ${ch.img ? `<img class="story-img" data-stimg="${ch.img}" alt="${esc(ch.title)}">` : ""}<div class="row" style="gap:6px"><button class="btn sm ghost" data-act="storyImg" data-v="${id}|${ci}">${icon("camera")}${ch.img?T("Nouvelle image"):T("Illustrer ce chapitre")}</button><button class="btn sm ghost" data-act="storySimplify" data-v="${id}|${ci}">${icon("spark")}${T("Mots plus simples")}</button></div>
-      ${ch.segs.map((sg, si) => `<p class="seg-line ${sg.c==="narr"?"narr":""} ${s.pos?.ch===ci && s.pos.i===si && !playing?"mark":""}" id="sg-${ci}-${si}" data-act="storyPlayFrom" data-v="${id}|${ci}|${si}" title="${T("Lire à partir d'ici")}">${sg.c!=="narr"?`<b class="who" style="color:var(--${chColor(s,sg.c)}-ink)">${esc(s.characters.find(x=>x.id===sg.c)?.name||"")}</b> `:""}${esc(sg.t)}</p>`).join("")}</div>`).join("")}
+      ${segsHtml(s, id, ci, ch, playing)}</div>`).join("")}
     </div>
     <div class="card tint"><h3>${T("Chapitre suivant")}</h3><div class="stack" style="gap:10px">${fld("st-dir",T("Où va l'histoire ? (facultatif)"),inp("st-dir","",`placeholder="${T("Ex. : ils trouvent une carte au trésor")}"`))}
       <div class="row" style="flex-wrap:wrap"><button class="btn ghost" data-act="storyNextIdeas" data-v="${id}">${icon("bulb")}${T("Proposer des suites")}</button><button class="btn kid" data-act="storyNext" data-v="${id}">${icon("spark")}${T("Écrire le chapitre {n}",{n:s.chapters.length+1})}</button></div><div id="nextIdeas"></div></div></div>
-    <div class="row"><button class="btn ghost" data-act="storyShare" data-v="${id}">${icon("share")}${T("Partager")}</button>${feat("memories")?`<button class="btn ghost" data-act="storyKeep" data-v="${id}">${icon("star")}${T("Garder dans les souvenirs")}</button>`:""}<button class="btn danger" data-act="storyDel" data-v="${id}">${icon("trash")}</button></div>`, UI.readMode ? "wide reading" : "wide");
+    <div class="row"><button class="btn ghost" data-act="storyShare" data-v="${id}">${icon("share")}${T("Partager")}</button>${feat("memories")?`<button class="btn ghost" data-act="storyKeep" data-v="${id}">${icon("star")}${T("Garder dans les souvenirs")}</button>`:""}<button class="btn danger" data-act="storyDel" data-v="${id}">${icon("trash")}</button></div>`, "wide");
+  storyAfterOpen();
+}
+/* morceaux communs : contrôles d'écoute et texte d'un chapitre */
+function chCtl(s, id, ci, playing){ return `${playing && PL.ch === ci ? `<button class="btn sm kid" data-act="storyPause">${icon("pause")}${T("Pause")}</button><button class="btn sm ghost" data-act="storyStop" data-v="${id}" aria-label="${T("Arrêter")}">${icon("x")}</button>` : s.pos?.ch === ci && s.pos.i > 0 ? `<button class="btn sm kid" data-act="storyPlayFrom" data-v="${id}|${ci}|${s.pos.i}">${icon("play")}${T("Reprendre")}</button><button class="btn sm ghost" data-act="storyPlayFrom" data-v="${id}|${ci}|0" aria-label="${T("Rejouer depuis le début")}">${icon("replay")}</button>` : `<button class="btn sm kid" data-act="storyPlayFrom" data-v="${id}|${ci}|0">${icon("play")}${T("Écouter")}</button>`}`; }
+function segsHtml(s, id, ci, ch, playing){ return `${ch.segs.map((sg, si) => `<p class="seg-line ${sg.c==="narr"?"narr":""} ${s.pos?.ch===ci && s.pos.i===si && !playing?"mark":""}" id="sg-${ci}-${si}" data-act="storyPlayFrom" data-v="${id}|${ci}|${si}" title="${T("Lire à partir d'ici")}">${sg.c!=="narr"?`<b class="who" style="color:var(--${chColor(s,sg.c)}-ink)">${esc(s.characters.find(x=>x.id===sg.c)?.name||"")}</b> `:""}${esc(sg.t)}</p>`).join("")}`; }
+function zoomBar(){ return `<span class="tiny muted">${T("Taille du texte")}</span><button class="btn sm ghost" data-act="storyZoom" data-v="-" aria-label="${T("Texte plus petit")}">A−</button><b class="tiny num" id="zoomVal">${Math.round(storyZ()*100)} %</b><button class="btn sm ghost" data-act="storyZoom" data-v="+" aria-label="${T("Texte plus grand")}">A+</button>`; }
+/* mode lecture : un vrai livre (couverture, une image par chapitre, texte en grand) */
+function storyBook(s, id, playing){
+  const kid = kidById(s.kid), done = s.chapters.filter(c => c.img).length;
+  sheet(`<div class="book-top">${sheetHead(esc(s.title))}<div class="read-bar">${zoomBar()}<button class="btn sm ghost" data-act="storyRead">${icon("x")}${T("Quitter la lecture")}</button><button class="btn sm ${s.cover && done === s.chapters.length ? "ghost" : "kid"}" data-act="storyBookShop" data-v="${id}">${icon("image")}${T("Illustrer le livre")}${s.cover || done ? ` · ${(s.cover?1:0) + done}/${s.chapters.length + 1}` : ""}</button><button class="btn sm ghost" data-act="storyPdf" data-v="${id}">${icon("doc")}${T("Livre PDF")}</button></div></div>
+    <div class="book" id="storyText" style="--sz:${storyZ()}">
+      <section class="book-cover">${s.cover ? `<img class="cover-img" data-stimg="${s.cover}" alt="${esc(s.title)}">` : `<button class="cover-ph" data-act="storyBookShop" data-v="${id}">${icon("image")}<span>${T("Ajouter une couverture")}</span></button>`}
+        <h1>${esc(s.title)}</h1>${kid ? `<p>${T("Une histoire pour {n}",{n:esc(kid.nick||kid.name)})}</p>` : ""}<p class="tiny muted">${T("{n} chapitre(s)",{n:s.chapters.length})} · ${esc(s.characters.filter(x => x.id !== "narr").map(x => x.name).join(", "))}</p></section>
+      ${s.chapters.map((ch, ci) => `<section class="book-page">${ch.img ? `<img class="story-img" data-stimg="${ch.img}" alt="${esc(ch.title)}">` : ""}
+        <div class="row between"><h2>${T("Chapitre {n}",{n:ch.n})} · ${esc(ch.title)}</h2><div class="row" style="gap:4px;flex-wrap:nowrap">${chCtl(s, id, ci, playing)}</div></div>
+        ${segsHtml(s, id, ci, ch, playing)}</section>`).join("")}
+      <section class="book-end">${T("Fin")} ✦</section></div>`, "wide reading");
+  storyAfterOpen();
+}
+function storyAfterOpen(){
   $$("#layer img[data-stimg]").forEach(async im => { im.classList.add("zoomable"); im.dataset.act = "viewImg"; const d = await PhotoDB.get(im.dataset.stimg); if (d) im.src = d; else im.remove(); });
   const box = $("#storyText"); if (box) pinchText(box, () => storyZ(), z => { S.settings.storyZoom = z; box.style.setProperty("--sz", z); const v = $("#zoomVal"); if (v) v.textContent = Math.round(z*100) + " %"; }, () => save());
 }
@@ -282,6 +303,67 @@ function storyImgSheet(sid, ci){
       <button class="btn sm ghost" data-act="storyImgGen" data-v="${sid}|${ci}">${icon("spark")}${T("Essayer quand même")}</button></div>`);
   UI.imgPromptTxt = "";
   storyLooks(s).catch(() => {}).finally(() => { UI.imgPromptTxt = storyImgPrompt(s, ch, !!prev); const el = $("#imgPrompt"); if (el) el.textContent = UI.imgPromptTxt; });
+}
+/* ---------- livre illustré : prompts à copier dans l'app Gemini (gratuit), une seule conversation ---------- */
+const STY = s => s.style || "soft watercolor children's picture book illustration, warm gentle light, rounded friendly shapes";
+const castOf = s => s.characters.filter(x => x.id !== "narr").slice(0, 6).map(x => `${x.name}: ${x.look || x.desc || x.name}`).join(" | ");
+function bookPrompts(s){
+  const kid = kidById(s.kid), lang = LANG === "en" ? "English" : "French";
+  const P = [{k:"ref", t:T("1. Les personnages (référence)"), d:T("Une planche avec tous les personnages : Gemini s'en servira pour les dessiner pareils ensuite."), img:s.refImg,
+      p:`${STY(s)}. Character reference sheet for the children's picture book "${s.title}". Draw each main character side by side, full body, front view, on a plain light background, clearly separated, friendly expressions. Characters: ${castOf(s)}. No text, no letters.`},
+    {k:"cover", t:T("2. La couverture"), d:T("Avec le titre écrit en grand, comme un vrai livre."), img:s.cover,
+      p:`Using exactly the same characters and art style as the character sheet above: ${STY(s)}. Front cover of a children's picture book, portrait format (3:4). At the top, write the title "${s.title}" in large, playful, rounded, easy-to-read letters (${lang}, spelled exactly like this). ${kid ? `At the bottom, small text: "${T("Une histoire pour {n}",{n:kid.nick||kid.name})}". ` : ""}Inviting, magical scene that captures the whole story: ${s.chapters.map(c => c.summary).join(" ")} Characters: ${castOf(s)}. No other text.`}];
+  s.chapters.forEach((ch, ci) => P.push({k:"ch" + ci, ci, t:T("{n}. Chapitre {c} · {t}",{n:ci + 3, c:ch.n, t:ch.title}), img:ch.img,
+    p:`Next illustration of the same book, with exactly the same characters and the same art style as the previous images: ${storyImgPrompt(s, ch, false).replace(/^.*?One single illustration/, "One single illustration")} Square format.`}));
+  return P;
+}
+async function storyBookShop(sid){
+  const s = S.stories.find(x => x.id === sid); if (!s) return; UI.storyId = sid;
+  sheet(`${sheetHead(T("Livre illustré"))}<p class="small muted"><span class="spin"></span> ${T("Préparation des prompts…")}</p>`, "wide");
+  try { if (aiKey()) await storyLooks(s); } catch(e){}
+  s.characters.forEach(ch => { if (ch.id !== "narr" && !ch.look) ch.look = ch.desc || ch.name; });
+  const P = bookPrompts(s); UI.bookP = P; const done = P.filter(x => x.img).length;
+  sheet(`${sheetHead(T("Livre illustré"))}
+    <div class="card tint" style="padding:12px 14px"><b>${T("Gratuit, avec l'app Gemini, en 3 gestes par image :")}</b>
+      <ol class="small" style="margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px"><li>${T("« Copier » le prompt, puis « Ouvrir Gemini » et le coller (choisissez « Créer une image » si on vous le propose).")}</li><li>${T("Restez dans la même conversation Gemini du début à la fin : les personnages et le style resteront les mêmes d'une image à l'autre.")}</li><li>${T("Enregistrez l'image (appui long → Télécharger), revenez ici et touchez « Ajouter l'image ».")}</li></ol></div>
+    <div class="row between"><span class="small"><b>${done}</b> / ${P.length} ${T("images")}</span><div class="row" style="gap:6px"><a class="btn sm kid" href="https://gemini.google.com/app" target="_blank" rel="noopener">${icon("spark")}${T("Ouvrir Gemini")}</a><button class="btn sm ghost" data-act="bookCopyAll">${icon("note")}${T("Tout copier")}</button></div></div>
+    <div class="levelbar"><i style="width:${Math.max(2, done / P.length * 100).toFixed(0)}%"></i></div>
+    <div class="stack" style="gap:8px">${P.map((x, i) => `<div class="book-step ${x.img ? "done" : ""}"><div class="row between" style="gap:8px"><div style="min-width:0"><b>${x.img ? "✓ " : ""}${esc(x.t)}</b>${x.d ? `<div class="tiny muted">${esc(x.d)}</div>` : ""}</div>${x.img ? `<img class="bs-thumb" data-stimg="${x.img}" alt="">` : ""}</div>
+      <details><summary class="tiny">${T("Voir le prompt")}</summary><div class="tiny prompt-box">${esc(x.p)}</div></details>
+      <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm ${x.img ? "ghost" : "kid"}" data-act="bookCopy" data-v="${i}">${icon("note")}${T("Copier")}</button><button class="btn sm ghost" data-act="bookImport" data-v="${sid}|${x.k}">${icon("image")}${x.img ? T("Remplacer l'image") : T("Ajouter l'image")}</button></div></div>`).join("")}</div>
+    <p class="tiny muted">${T("Astuce : si un personnage change d'apparence, joignez dans Gemini la planche des personnages ou l'image précédente avec le prompt.")}</p>
+    <div class="row" style="flex-wrap:wrap"><button class="btn kid" data-act="storyReadOpen" data-v="${sid}">${icon("book")}${T("Lire le livre")}</button><button class="btn ghost" data-act="storyPdf" data-v="${sid}">${icon("doc")}${T("Livre PDF")}</button></div>`, "wide");
+  $$("#layer img[data-stimg]").forEach(async im => { im.dataset.act = "viewImg"; const d = await PhotoDB.get(im.dataset.stimg); if (d) im.src = d; });
+}
+async function copyTxt(t, ok){ try { await navigator.clipboard.writeText(t); toast(ok); } catch(e){ Native.share({title:T("Prompt d'image"), text:t}); } }
+/* livre PDF : couverture, puis pour chaque chapitre l'image et le texte en grand */
+async function storyPdf(sid){
+  const s = S.stories.find(x => x.id === sid); if (!s) return;
+  if (!window.jspdf){ toast(T("Chargement du module PDF…")); await new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "js/vendor/jspdf.umd.min.js"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); }).catch(() => {}); }
+  if (!window.jspdf) return toast(T("Impossible de créer le PDF ici"));
+  toast(T("Création du livre…"));
+  const W = 576, H = 648, M = 44, doc = new jspdf.jsPDF({unit:"pt", format:[W, H]}), ink = [42,35,64], soft = [115,107,138], kid = kidById(s.kid);
+  const fmtOf = d => d.startsWith("data:image/png") ? "PNG" : "JPEG";
+  const dims = d => new Promise(res => { const im = new Image(); im.onload = () => res([im.width, im.height]); im.onerror = () => res([1, 1]); im.src = d; });
+  const put = async (id, x, y, w, h) => { const d = id && await PhotoDB.get(id); if (!d) return 0; const [iw, ih] = await dims(d), k = Math.min(w / iw, h / ih), dw = iw * k, dh = ih * k; doc.addImage(d, fmtOf(d), x + (w - dw) / 2, y, dw, dh); return dh; };
+  const N = t => String(t).normalize("NFC").replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}]/gu, "");
+  // couverture
+  doc.setFillColor(255, 245, 230); doc.rect(0, 0, W, H, "F");
+  const ch0 = await put(s.cover, M, M, W - 2*M, H - 2*M - (s.cover ? 0 : 0));
+  if (!ch0 || !s.cover){ doc.setFont("helvetica", "bold"); doc.setFontSize(30); doc.setTextColor(...ink); doc.splitTextToSize(N(s.title), W - 2*M).forEach((l, i) => doc.text(l, W/2, 220 + i*36, {align:"center"}));
+    doc.setFont("helvetica", "normal"); doc.setFontSize(14); doc.setTextColor(...soft); if (kid) doc.text(N(T("Une histoire pour {n}",{n:kid.nick||kid.name})), W/2, 330, {align:"center"}); }
+  for (const [ci, c] of s.chapters.entries()){
+    doc.addPage([W, H]); let y = M;
+    const ih = await put(c.img, M, y, W - 2*M, 300); if (ih) y += ih + 22;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(...ink); doc.splitTextToSize(N(`${T("Chapitre {n}",{n:c.n})} · ${c.title}`), W - 2*M).forEach(l => { doc.text(l, M, y); y += 22; }); y += 6;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(14);
+    for (const sg of c.segs){ const who = sg.c !== "narr" ? (s.characters.find(x => x.id === sg.c)?.name || "") : "", txt = N((who ? who + " : " : "") + sg.t);
+      for (const l of doc.splitTextToSize(txt, W - 2*M)){ if (y > H - M){ doc.addPage([W, H]); y = M + 10; doc.setFont("helvetica", "normal"); doc.setFontSize(14); doc.setTextColor(...ink); } doc.text(l, M, y); y += 20; } y += 6; }
+  }
+  doc.addPage([W, H]); doc.setFont("helvetica", "bold"); doc.setFontSize(28); doc.setTextColor(...ink); doc.text(N(T("Fin")), W/2, H/2, {align:"center"});
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...soft); doc.text(N(T("Créé avec {app} le {d}",{app:appName(), d:fmtD(today(),{day:"numeric",month:"long",year:"numeric"})})), W/2, H/2 + 30, {align:"center"});
+  const total = doc.getNumberOfPages(); for (let i = 2; i < total; i++){ doc.setPage(i); doc.setFontSize(9); doc.setTextColor(...soft); doc.text(String(i - 1), W/2, H - 20, {align:"center"}); }
+  Native.share({title:s.title, text:s.title, dataUrl:doc.output("datauristring"), filename:`${s.title.replace(/[^\p{L}\p{N}]+/gu, "-")}.pdf`, mime:"application/pdf"});
 }
 async function storyNextIdeas(id){
   const s = S.stories.find(x => x.id === id), box = $("#nextIdeas");
@@ -477,7 +559,17 @@ Object.assign(ACT, {
   charDel: v => { const [sid, cid] = v.split("|"), s = S.stories.find(x => x.id === sid), ch = s?.characters.find(x => x.id === cid); if (!ch) return;
     askConfirm(T("Retirer {n} de l'histoire ?",{n:ch.name}), T("Retirer"), () => { s.chapters.forEach(c => c.segs.forEach(sg => { if (sg.c === cid) sg.c = "narr"; })); s.characters = s.characters.filter(x => x.id !== cid); s.removed = [...(s.removed||[]), ch.name]; save(); driveQ("story", sid); toast(T("Personnage retiré")); storyOpen(sid); }); },
   storyZoom: v => { const z = v === "+" ? storyZ() + 0.1 : v === "-" ? storyZ() - 0.1 : 1; S.settings.storyZoom = Math.round(clamp(z, 0.8, 2.4) * 100) / 100; save(); const b = $("#storyText"); if (b) b.style.setProperty("--sz", storyZ()); const zv = $("#zoomVal"); if (zv) zv.textContent = Math.round(storyZ()*100) + " %"; },
-  storyRead: () => { UI.readMode = !UI.readMode; storyOpenKeepScroll(UI.storyId); },
+  storyRead: () => { UI.readMode = !UI.readMode; storyOpen(UI.storyId); const sh = $("#layer .sheet"); if (sh) sh.scrollTop = 0; },
+  storyReadOpen: v => { UI.readMode = true; storyOpen(v); },
+  storyBookShop: v => storyBookShop(v),
+  storyPdf: v => storyPdf(v),
+  bookCopy: v => { const x = UI.bookP?.[+v]; if (x) copyTxt(x.p, T("Prompt copié : collez-le dans Gemini")); },
+  bookCopyAll: () => copyTxt((UI.bookP||[]).map(x => `${x.t}\n${x.p}`).join("\n\n"), T("Tous les prompts sont copiés : collez-les un à la fois dans la même conversation")),
+  bookImport: async v => { const [sid, k] = v.split("|"), s = S.stories.find(x => x.id === sid); if (!s) return;
+    const d = await Native.takePhoto({source:"photos"}); if (!d) return; const small = await shrinkImage(d, k === "cover" ? 1400 : 1024, 0.85), id = "stimg-" + uid(); await PhotoDB.put(id, small);
+    if (k === "cover"){ if (s.cover) PhotoDB.del(s.cover).catch(() => {}); s.cover = id; } else if (k === "ref"){ if (s.refImg) PhotoDB.del(s.refImg).catch(() => {}); s.refImg = id; }
+    else { const ch = s.chapters[+k.slice(2)]; if (!ch) return; if (ch.img) PhotoDB.del(ch.img).catch(() => {}); ch.img = id; ch.imgModel = "gemini-app"; }
+    save(); driveQ("story", sid); toast(T("Image ajoutée")); storyBookShop(sid); },
   charTest: async v => { const vc = readVoice(), txt = LANG === "en" ? "Hello! Here is my voice for the story." : "Bonjour ! Voici ma voix pour l'histoire."; stopPlay();
     try { if (v === "gemini"){ toast(T("Génération de la voix…")); const url = await TTS.gemini(txt, vc); const a = new Audio(url); PL.audio = a; a.play(); } else await TTS.speakDevice(txt, vc); } catch(e){ toast(e.message); } },
   rcLabel: v => { UI.rcLabel = v; render(); }, recipeOpen: v => recipeSheet(S.recipes.find(x => x.id === v)),

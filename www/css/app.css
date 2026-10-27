@@ -620,3 +620,24 @@ img.zoomable,img[data-act=viewImg]{cursor:zoom-in}
 .chatbox .msg .tiny{font-size:.62rem}
 .chat-card{gap:8px}
 .thread-row button{font-size:.82rem;padding:5px 10px}
+
+/* ---- livre illustré ---- */
+.book{font-size:calc(1.08rem * var(--sz,1));display:flex;flex-direction:column;gap:22px;max-width:760px;margin:0 auto;touch-action:pan-y}
+.book-cover{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:18px;border-radius:var(--r-lg);background:linear-gradient(160deg,var(--butter-bg),var(--peach-bg))}
+.book-cover h1{font-family:var(--display);font-size:calc(1.9rem * var(--sz,1));margin:6px 0 0;line-height:1.15}
+.book-cover p{margin:0}
+.cover-img{width:100%;max-width:520px;border-radius:14px;box-shadow:0 10px 30px -12px rgba(0,0,0,.35)}
+.cover-ph{width:100%;max-width:420px;aspect-ratio:3/4;border:2px dashed var(--line);border-radius:14px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font:inherit;cursor:pointer}
+.cover-ph svg{width:36px;height:36px}
+.book-page{display:flex;flex-direction:column;gap:8px;padding-top:6px;border-top:1px dashed var(--line)}
+.book-page h2{font-family:var(--display);font-size:calc(1.15rem * var(--sz,1));margin:0}
+.book-page .seg-line{font-family:Georgia,"Iowan Old Style",serif;line-height:1.7;background:none;padding:4px 2px}
+.book-page .seg-line:not(.narr){background:none}
+.book-page .seg-line.now,.book-page .seg-line.mark{background:var(--butter-bg)}
+.book-page .story-img{max-height:none;aspect-ratio:auto}
+.book-end{text-align:center;font-family:var(--display);font-size:1.4rem;color:var(--muted);padding:20px 0 30px}
+.book-top{position:sticky;top:-20px;z-index:2;background:var(--surface);padding-top:2px}
+.book-step{background:var(--surface2);border-radius:var(--r-md);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.book-step.done{background:var(--mint-bg)}
+.bs-thumb{width:52px;height:52px;object-fit:cover;border-radius:10px;flex:none}
+.prompt-box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:6px;max-height:160px;overflow:auto}
