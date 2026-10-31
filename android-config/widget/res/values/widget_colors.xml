@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="w_ink">#2A2540</color>
+  <color name="w_muted">#6E6886</color>
+  <color name="w_accent">#7A5CD6</color>
+  <color name="w_on_ink">#FFFFFF</color>
+  <string name="w_desc">Notez en un toucher : boire, couche, dodo…</string>
+</resources>

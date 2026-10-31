@@ -313,6 +313,7 @@ function plusView(){
       <div class="row"><button class="btn ghost" data-act="pinForm">${icon("key")}${P.pin?T("Changer le NIP"):T("Choisir un NIP")}</button><button class="btn kid" data-act="enterKidMode" ${P.pin?"":"disabled"}>${icon("lock")}${T("Activer le mode enfant")}</button></div>
       <div>${[["chat",T("Discussions")],["groups",T("Groupes d'amis")],["photos",T("Photos et souvenirs")],["ai",T("Assistant IA")],["health",T("Voir la santé et la croissance")],["selfApprove",T("Valider ses propres défis")],["delete",T("Supprimer des éléments")],["settings",T("Modifier les réglages")]].map(([k,l]) => `<label class="switch"><input type="checkbox" data-change="allow" data-k="${k}" ${P.allow[k]?"checked":""}><span class="tg"></span><span class="grow">${T("Permettre aux enfants")} : <b>${l}</b></span></label>`).join("")}</div></div>
     <div class="card c6"><div class="card-h"><h2>${T("Notifications")}</h2>${icon("bell")}</div>${notifSettings()}</div>
+    ${widgetCard()}
     <div class="card c6"><div class="card-h"><h2>${T("Assistant IA")}</h2>${icon("spark")}</div>${aiSettings()}</div>
     <div class="card c12"><div class="card-h"><h2>${T("Mes données")}</h2>${icon("db")}</div>
       ${Cloud.user && Cloud.syncLine?.() ? `<div class="row" style="flex-wrap:wrap;gap:8px"><span class="small ${Cloud.status?.ok===false?"":"muted"}" style="${Cloud.status?.ok===false?"color:var(--danger)":""}">${esc(Cloud.syncLine())}</span><button class="btn sm ghost" data-act="resync">${icon("auto")}${T("Resynchroniser (photos incluses)")}</button></div>` : ""}

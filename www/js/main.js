@@ -389,7 +389,7 @@ Object.assign(FORMS, {
   try { const j = new URLSearchParams(location.search).get("join"); if (j && /^[A-Z0-9]{6}$/i.test(j)){ localStorage.setItem("tribe.join", j.toUpperCase()); history.replaceState(null, "", location.pathname + location.hash); } } catch(e){}
   try { const h = location.hash.slice(1); if (["home","kid","agenda","tribu","souvenirs","plus","assistant"].includes(h)) UI.view = h; } catch(e){}
   $("#fab").addEventListener("click", () => { if (UI.view === "assistant") go("home"); else aiSheet(); });
-  Native.initKeyboard(); Native.initApp();
+  Native.initKeyboard(); Native.initApp(); try { Widget.init(); } catch(e){}
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => render());
   render(); save();
   setInterval(() => { const el = $("#timerVal"); if (el){ const t = (S.timers||{})[el.dataset.kid]; if (t) el.textContent = fmtDur(timerElapsed(t)); } }, 15000);

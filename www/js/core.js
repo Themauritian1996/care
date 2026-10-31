@@ -207,7 +207,7 @@ function loadLocal(){
 let saveT;
 function save(){
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){ toast(T("Stockage plein : exportez vos données ou retirez des photos")); }
-  clearTimeout(saveT); saveT = setTimeout(() => { try { window.Cloud?.push?.(); } catch(e){} try { scheduleNotifications(); } catch(e){} try { typeof driveWatch === "function" && driveWatch(); } catch(e){} }, 600);
+  clearTimeout(saveT); saveT = setTimeout(() => { try { window.Cloud?.push?.(); } catch(e){} try { typeof Widget !== "undefined" && Widget.push(); } catch(e){} try { scheduleNotifications(); } catch(e){} try { typeof driveWatch === "function" && driveWatch(); } catch(e){} }, 600);
 }
 const child = () => S.children.find(c => c.id === S.active) || S.children[0];
 const kidById = id => S.children.find(c => c.id === id);
