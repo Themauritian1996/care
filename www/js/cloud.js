@@ -18,6 +18,20 @@ if (cfg && cfg.apiKey){
   let fid = null, role = "parent", purging = false, unsubs = [], groupUnsubs = {}, last = {}, pushing = false, pushAgain = false;
   C.configured = true;
 
+  /* Connexion Google directe (Google Identity Services) : évite la page firebaseapp.com,
+     bloquée par le cloisonnement du stockage sur iPhone et dans les navigateurs intégrés. */
+  const GIS_ID = !Native.isApp && cfg.googleClientId;
+  if (GIS_ID){ const s = document.createElement("script"); s.src = "https://accounts.google.com/gsi/client"; s.async = true; document.head.appendChild(s); }
+  function gisToken(prompt, hint){
+    return new Promise((res, rej) => {
+      if (!window.google?.accounts?.oauth2) return rej(new Error(T("Connexion Google en cours de chargement : réessayez dans un instant")));
+      const tc = google.accounts.oauth2.initTokenClient({client_id:GIS_ID, scope:"openid email profile " + DRIVE_SCOPE, prompt, hint,
+        callback: r => r.error ? rej(Object.assign(new Error(r.error_description || r.error), {code:r.error})) : res(r.access_token),
+        error_callback: e => rej(Object.assign(new Error(e?.message || e?.type || "popup"), {code:e?.type === "popup_closed" ? "popup-closed" : e?.type || ""}))});
+      tc.requestAccessToken();
+    });
+  }
+
   const skipKey = "tribe.skipLogin";
   C.mustLogin = () => C.ready && !C.user && !(() => { try { return localStorage.getItem(skipKey); } catch(e){ return null; } })();
   C.skip = () => { try { localStorage.setItem(skipKey, "1"); } catch(e){} render(); };
@@ -33,6 +47,10 @@ if (cfg && cfg.apiKey){
         const cred = A.GoogleAuthProvider.credential(r.credential?.idToken, r.credential?.accessToken);
         C.googleToken = r.credential?.accessToken || null; C.tokenAt = Date.now();
         await A.signInWithCredential(auth, cred);
+      } else if (GIS_ID){
+        const tok = await gisToken("select_account");
+        C.googleToken = tok; C.tokenAt = Date.now();
+        await A.signInWithCredential(auth, A.GoogleAuthProvider.credential(null, tok));
       } else {
         const p = new A.GoogleAuthProvider(); p.addScope(DRIVE_SCOPE); p.setCustomParameters({prompt:"select_account"});
         const r = await A.signInWithPopup(auth, p);
@@ -284,6 +302,7 @@ if (cfg && cfg.apiKey){
     if (NativeAuth){ const r = await NativeAuth.signInWithGoogle({scopes:[DRIVE_SCOPE], useCredentialManager:false}); C.googleToken = r.credential?.accessToken; C.tokenAt = Date.now();
       if (!C.googleToken) throw new Error(T("Google n'a pas donné l'accès à Drive. Réessayez et acceptez l'autorisation « Google Drive »."));
       return C.googleToken; }
+    if (GIS_ID){ C.googleToken = await gisToken("", auth.currentUser?.email || undefined); C.tokenAt = Date.now(); return C.googleToken; }
     const p = new A.GoogleAuthProvider(); p.addScope(DRIVE_SCOPE);
     const r = await A.reauthenticateWithPopup(auth.currentUser, p).catch(() => A.linkWithPopup(auth.currentUser, p));
     C.googleToken = A.GoogleAuthProvider.credentialFromResult(r)?.accessToken; C.tokenAt = Date.now(); return C.googleToken;

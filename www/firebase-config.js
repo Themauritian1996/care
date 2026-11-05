@@ -6,5 +6,7 @@ window.TRIBE_FIREBASE = {
   projectId: "tribe-26d85",
   storageBucket: "tribe-26d85.firebasestorage.app",
   messagingSenderId: "736810177",
-  appId: "1:736810177:web:b483080d030dc25c0db040"
+  appId: "1:736810177:web:b483080d030dc25c0db040",
+  // ID client OAuth « Web » (public) : connexion Google directe, fiable sur iPhone. Vide = méthode Firebase habituelle.
+  googleClientId: ""
 };

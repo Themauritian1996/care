@@ -265,11 +265,17 @@ function homeView(){
 const tipCard = t => `<div class="tipcard" style="background:var(--${TIPCAT[t[0]][1]}-bg)"><span class="dom" style="color:var(--${TIPCAT[t[0]][1]}-ink)">${T(TIPCAT[t[0]][0])}</span><b>${T(t[3])}</b><p class="small">${T(t[4])}</p></div>`;
 
 /* ======== CONNEXION ======== */
+/* iPhone et navigateurs intégrés (Messenger, Instagram…) : la connexion Google peut être bloquée */
+function authTip(){
+  const ua = navigator.userAgent || "", inApp = /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|MicroMessenger|Snapchat|TikTok|GSA\//i.test(ua), ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (Native.isApp || (!inApp && !(ios && !window.TRIBE_FIREBASE?.googleClientId))) return "";
+  return `<div class="banner info small" style="margin-top:8px">${icon("info")}<div>${inApp ? T("Vous êtes dans le navigateur d'une autre app : Google y bloque souvent la connexion. Ouvrez ce lien dans Safari ou Chrome (menu ⋯ > Ouvrir dans le navigateur), ou créez votre compte avec un courriel ci-dessous.") : T("Sur iPhone, si Google affiche « missing initial state », créez plutôt votre compte avec un courriel ci-dessous : tout fonctionne pareil (famille, partage, synchro).")}</div></div>`;
+}
 function authView(){
   return `<div class="auth"><div class="card" style="align-items:stretch">
     <div class="row" style="justify-content:center">${logo(64)}</div>
     <h1 style="text-align:center;font-size:2.4rem">${wordmark()}</h1><p class="muted small" style="text-align:center">${T("L'app tout-en-un de la famille.")}</p>
-    <button class="btn line block" data-act="googleLogin">${icon("google")}${T("Continuer avec Google")}</button>
+    <button class="btn line block" data-act="googleLogin">${icon("google")}${T("Continuer avec Google")}</button>${authTip()}
     <div class="or">${T("ou avec un courriel")}</div>
     <form class="stack" data-form="emailAuth">
       ${fld("a-email",T("Courriel"),`<input class="inp" id="a-email" type="email" autocomplete="email" required>`)}
